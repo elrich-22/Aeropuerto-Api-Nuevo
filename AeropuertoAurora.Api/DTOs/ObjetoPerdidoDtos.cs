@@ -1,0 +1,56 @@
+namespace AeropuertoAurora.Api.DTOs;
+
+public sealed record ObjetoPerdidoDto(
+    int Id,
+    int? VueloId,
+    int AeropuertoId,
+    string Descripcion,
+    DateTime? FechaReporte,
+    string? UbicacionEncontrado,
+    string Estado,
+    string? ReportantePrimerNombre,
+    string? ReportanteSegundoNombre,
+    string? ReportantePrimerApellido,
+    string? ReportanteSegundoApellido,
+    string? ContactoReportante,
+    DateTime? FechaEntrega,
+    string? ReclamantePrimerNombre,
+    string? ReclamanteSegundoNombre,
+    string? ReclamantePrimerApellido,
+    string? ReclamanteSegundoApellido);
+
+public sealed record CrearObjetoPerdidoDto(
+    int? VueloId,
+    int AeropuertoId,
+    string Descripcion,
+    DateTime? FechaReporte,
+    string? UbicacionEncontrado,
+    string Estado,
+    string? ReportantePrimerNombre,
+    string? ReportanteSegundoNombre,
+    string? ReportantePrimerApellido,
+    string? ReportanteSegundoApellido,
+    string? ContactoReportante,
+    DateTime? FechaEntrega,
+    string? ReclamantePrimerNombre,
+    string? ReclamanteSegundoNombre,
+    string? ReclamantePrimerApellido,
+    string? ReclamanteSegundoApellido);
+
+public sealed record ActualizarObjetoPerdidoDto(
+    int? VueloId,
+    int AeropuertoId,
+    string Descripcion,
+    DateTime? FechaReporte,
+    string? UbicacionEncontrado,
+    string Estado,
+    string? ReportantePrimerNombre,
+    string? ReportanteSegundoNombre,
+    string? ReportantePrimerApellido,
+    string? ReportanteSegundoApellido,
+    string? ContactoReportante,
+    DateTime? FechaEntrega,
+    string? ReclamantePrimerNombre,
+    string? ReclamanteSegundoNombre,
+    string? ReclamantePrimerApellido,
+    string? ReclamanteSegundoApellido);
