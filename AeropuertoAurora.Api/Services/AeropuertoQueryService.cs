@@ -55,4 +55,19 @@ public sealed class AeropuertoQueryService(IAeropuertoReadRepository repository)
 
     public Task<IReadOnlyList<IncidenteOperacionDto>> GetIncidentsAsync(int limit, CancellationToken cancellationToken) =>
         repository.GetIncidentsAsync(limit, cancellationToken);
+
+    public Task<IReadOnlyList<ReporteVentasPorFechaDto>> GetSalesReportAsync(DateTime? fechaInicio, DateTime? fechaFin, CancellationToken cancellationToken) =>
+        repository.GetSalesReportAsync(fechaInicio, fechaFin, cancellationToken);
+
+    public Task<IReadOnlyList<ReporteDestinoBuscadoDto>> GetTopDestinationsReportAsync(int limit, CancellationToken cancellationToken) =>
+        repository.GetTopDestinationsReportAsync(limit, cancellationToken);
+
+    public Task<IReadOnlyList<ReporteIncidenteSeveridadDto>> GetIncidentsBySeverityReportAsync(CancellationToken cancellationToken) =>
+        repository.GetIncidentsBySeverityReportAsync(cancellationToken);
+
+    public Task<IReadOnlyList<ReporteOcupacionVueloDto>> GetFlightOccupancyReportAsync(DateTime? fechaInicio, DateTime? fechaFin, int limit, CancellationToken cancellationToken) =>
+        repository.GetFlightOccupancyReportAsync(fechaInicio, fechaFin, limit, cancellationToken);
+
+    public Task<IReadOnlyList<ReporteMetodoPagoDto>> GetPaymentMethodsReportAsync(DateTime? fechaInicio, DateTime? fechaFin, CancellationToken cancellationToken) =>
+        repository.GetPaymentMethodsReportAsync(fechaInicio, fechaFin, cancellationToken);
 }

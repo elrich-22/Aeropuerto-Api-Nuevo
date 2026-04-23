@@ -496,6 +496,138 @@ public sealed class AeropuertoReadRepository(IOracleConnectionFactory connection
             reader.GetStringOrNull("DESCRIPTION")), cancellationToken, Limit(limit));
     }
 
+    public Task<IReadOnlyList<ReporteVentasPorFechaDto>> GetSalesReportAsync(DateTime? fechaInicio, DateTime? fechaFin, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT
+                TRUNC(v.VEN_FECHA_VENTA) AS FECHA,
+                COUNT(*) AS TOTAL_VENTAS,
+                SUM(v.VEN_MONTO_SUBTOTAL) AS SUBTOTAL,
+                SUM(NVL(v.VEN_IMPUESTOS, 0)) AS IMPUESTOS,
+                SUM(NVL(v.VEN_DESCUENTOS, 0)) AS DESCUENTOS,
+                SUM(v.VEN_MONTO_TOTAL) AS MONTO_TOTAL
+            FROM AER_VENTABOLETO v
+            WHERE (:fechaInicio IS NULL OR TRUNC(v.VEN_FECHA_VENTA) >= TRUNC(:fechaInicio))
+              AND (:fechaFin IS NULL OR TRUNC(v.VEN_FECHA_VENTA) <= TRUNC(:fechaFin))
+            GROUP BY TRUNC(v.VEN_FECHA_VENTA)
+            ORDER BY FECHA DESC
+            """;
+
+        return QueryAsync(sql, reader => new ReporteVentasPorFechaDto(
+            reader.GetDateTimeOrNull("FECHA") ?? DateTime.MinValue,
+            reader.GetInt32OrDefault("TOTAL_VENTAS"),
+            reader.GetDecimalOrDefault("SUBTOTAL"),
+            reader.GetDecimalOrDefault("IMPUESTOS"),
+            reader.GetDecimalOrDefault("DESCUENTOS"),
+            reader.GetDecimalOrDefault("MONTO_TOTAL")), cancellationToken, NullableDateParam("fechaInicio", fechaInicio), NullableDateParam("fechaFin", fechaFin));
+    }
+
+    public Task<IReadOnlyList<ReporteDestinoBuscadoDto>> GetTopDestinationsReportAsync(int limit, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT * FROM (
+                SELECT
+                    a.AER_ID AS AEROPUERTO_ID,
+                    a.AER_NOMBRE AS AEROPUERTO,
+                    COUNT(DISTINCT b.BUS_ID_BUSQUEDA) AS TOTAL_BUSQUEDAS,
+                    COUNT(DISTINCT c.CLI_ID_CLICK) AS TOTAL_CLICKS,
+                    SUM(NVL(b.BUS_NUMERO_PASAJEROS, 0)) AS TOTAL_PASAJEROS
+                FROM AER_AEROPUERTO a
+                LEFT JOIN AER_BUSQUEDAVUELO b ON b.BUS_ID_AEROPUERTO_DESTINO = a.AER_ID
+                LEFT JOIN AER_CLICKDESTINO c ON c.CLI_ID_AEROPUERTO_DESTINO = a.AER_ID
+                GROUP BY a.AER_ID, a.AER_NOMBRE
+                ORDER BY TOTAL_BUSQUEDAS DESC, TOTAL_CLICKS DESC, a.AER_NOMBRE
+            ) WHERE ROWNUM <= :limit
+            """;
+
+        return QueryAsync(sql, reader => new ReporteDestinoBuscadoDto(
+            reader.GetInt32OrDefault("AEROPUERTO_ID"),
+            reader.GetStringOrNull("AEROPUERTO") ?? string.Empty,
+            reader.GetInt32OrDefault("TOTAL_BUSQUEDAS"),
+            reader.GetInt32OrDefault("TOTAL_CLICKS"),
+            reader.GetInt32OrDefault("TOTAL_PASAJEROS")), cancellationToken, Limit(limit));
+    }
+
+    public Task<IReadOnlyList<ReporteIncidenteSeveridadDto>> GetIncidentsBySeverityReportAsync(CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT
+                INC_SEVERIDAD AS SEVERIDAD,
+                COUNT(*) AS TOTAL_INCIDENTES,
+                SUM(CASE WHEN INC_ESTADO IN ('ABIERTO', 'EN_PROCESO') THEN 1 ELSE 0 END) AS ABIERTOS,
+                SUM(CASE WHEN INC_ESTADO = 'CERRADO' THEN 1 ELSE 0 END) AS CERRADOS
+            FROM AER_INCIDENTE
+            GROUP BY INC_SEVERIDAD
+            ORDER BY TOTAL_INCIDENTES DESC, INC_SEVERIDAD
+            """;
+
+        return QueryAsync(sql, reader => new ReporteIncidenteSeveridadDto(
+            reader.GetStringOrNull("SEVERIDAD") ?? string.Empty,
+            reader.GetInt32OrDefault("TOTAL_INCIDENTES"),
+            reader.GetInt32OrDefault("ABIERTOS"),
+            reader.GetInt32OrDefault("CERRADOS")), cancellationToken);
+    }
+
+    public Task<IReadOnlyList<ReporteOcupacionVueloDto>> GetFlightOccupancyReportAsync(DateTime? fechaInicio, DateTime? fechaFin, int limit, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT * FROM (
+                SELECT
+                    v.VUE_ID_VUELO AS VUELO_ID,
+                    p.PRV_NUMERO_VUELO AS NUMERO_VUELO,
+                    v.VUE_FECHA_VUELO AS FECHA_VUELO,
+                    NVL(v.VUE_PLAZAS_OCUPADAS, 0) AS PLAZAS_OCUPADAS,
+                    NVL(v.VUE_PLAZAS_VACIAS, 0) AS PLAZAS_DISPONIBLES,
+                    CASE
+                        WHEN NVL(v.VUE_PLAZAS_OCUPADAS, 0) + NVL(v.VUE_PLAZAS_VACIAS, 0) = 0 THEN 0
+                        ELSE ROUND((NVL(v.VUE_PLAZAS_OCUPADAS, 0) / (NVL(v.VUE_PLAZAS_OCUPADAS, 0) + NVL(v.VUE_PLAZAS_VACIAS, 0))) * 100, 2)
+                    END AS PORCENTAJE_OCUPACION,
+                    v.VUE_ESTADO AS ESTADO
+                FROM AER_VUELO v
+                INNER JOIN AER_PROGRAMAVUELO p ON p.PRV_ID = v.VUE_ID_PROGRAMA_VUELO
+                WHERE (:fechaInicio IS NULL OR TRUNC(v.VUE_FECHA_VUELO) >= TRUNC(:fechaInicio))
+                  AND (:fechaFin IS NULL OR TRUNC(v.VUE_FECHA_VUELO) <= TRUNC(:fechaFin))
+                ORDER BY v.VUE_FECHA_VUELO DESC, PORCENTAJE_OCUPACION DESC
+            ) WHERE ROWNUM <= :limit
+            """;
+
+        return QueryAsync(sql, reader => new ReporteOcupacionVueloDto(
+            reader.GetInt32OrDefault("VUELO_ID"),
+            reader.GetStringOrNull("NUMERO_VUELO") ?? string.Empty,
+            reader.GetDateTimeOrNull("FECHA_VUELO") ?? DateTime.MinValue,
+            reader.GetInt32OrDefault("PLAZAS_OCUPADAS"),
+            reader.GetInt32OrDefault("PLAZAS_DISPONIBLES"),
+            reader.GetDecimalOrDefault("PORCENTAJE_OCUPACION"),
+            reader.GetStringOrNull("ESTADO") ?? string.Empty), cancellationToken, NullableDateParam("fechaInicio", fechaInicio), NullableDateParam("fechaFin", fechaFin), Limit(limit));
+    }
+
+    public Task<IReadOnlyList<ReporteMetodoPagoDto>> GetPaymentMethodsReportAsync(DateTime? fechaInicio, DateTime? fechaFin, CancellationToken cancellationToken)
+    {
+        const string sql = """
+            SELECT
+                m.MET_ID_METODO_PAGO AS METODO_PAGO_ID,
+                m.MET_NOMBRE AS METODO_PAGO,
+                COUNT(t.TRA_ID_TRANSACCION) AS TOTAL_TRANSACCIONES,
+                SUM(NVL(t.TRA_MONTO_TOTAL, 0)) AS MONTO_TOTAL,
+                AVG(NVL(t.TRA_MONTO_TOTAL, 0)) AS MONTO_PROMEDIO,
+                MAX(t.TRA_ESTADO) KEEP (DENSE_RANK FIRST ORDER BY COUNT(*) DESC) AS ESTADO_PRINCIPAL
+            FROM AER_METODOPAGO m
+            LEFT JOIN AER_TRANSACCIONPAGO t ON t.TRA_ID_METODO_PAGO = m.MET_ID_METODO_PAGO
+                AND (:fechaInicio IS NULL OR TRUNC(t.TRA_FECHA_TRANSACCION) >= TRUNC(:fechaInicio))
+                AND (:fechaFin IS NULL OR TRUNC(t.TRA_FECHA_TRANSACCION) <= TRUNC(:fechaFin))
+            GROUP BY m.MET_ID_METODO_PAGO, m.MET_NOMBRE
+            ORDER BY MONTO_TOTAL DESC, TOTAL_TRANSACCIONES DESC, m.MET_NOMBRE
+            """;
+
+        return QueryAsync(sql, reader => new ReporteMetodoPagoDto(
+            reader.GetInt32OrDefault("METODO_PAGO_ID"),
+            reader.GetStringOrNull("METODO_PAGO") ?? string.Empty,
+            reader.GetInt32OrDefault("TOTAL_TRANSACCIONES"),
+            reader.GetDecimalOrDefault("MONTO_TOTAL"),
+            reader.GetDecimalOrDefault("MONTO_PROMEDIO"),
+            reader.GetStringOrNull("ESTADO_PRINCIPAL") ?? string.Empty), cancellationToken, NullableDateParam("fechaInicio", fechaInicio), NullableDateParam("fechaFin", fechaFin));
+    }
+
     private async Task<IReadOnlyList<T>> QueryAsync<T>(
         string sql,
         Func<OracleDataReader, T> map,
