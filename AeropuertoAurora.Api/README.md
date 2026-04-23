@@ -18,6 +18,22 @@ Si `ApiSecurity:ApiKey` esta configurada, el frontend debe enviar:
 X-Api-Key: clave-local-segura
 ```
 
+## Base de datos
+
+Los scripts de Oracle quedaron versionados en [Database](./Database):
+
+- `Database/aeropuerto_aurora_v2.sql`: crea la estructura completa de la base de datos.
+- `Database/aeropuerto_aurora_seed.sql`: carga data de prueba con IDs fijos.
+- `Database/reset-identities.sql`: resincroniza las columnas identity despues del seed.
+
+Orden recomendado de ejecucion:
+
+```sql
+@Database/aeropuerto_aurora_v2.sql
+@Database/aeropuerto_aurora_seed.sql
+@Database/reset-identities.sql
+```
+
 ## Despues de ejecutar el seed
 
 El seed inserta IDs fijos. Si luego haces `POST` desde Swagger y Oracle devuelve `ORA-00001` sobre una PK, ejecuta:
