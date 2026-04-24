@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5185';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const API_KEY = import.meta.env.VITE_API_KEY || '';
 
 async function request(path, options = {}) {
@@ -34,7 +34,7 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  baseUrl: API_BASE_URL,
+  baseUrl: API_BASE_URL || 'Proxy local /api',
   health: () => request('/api/health'),
   flights: (limit = 8) => request(`/api/vuelos?limit=${limit}`),
   topDestinations: (limit = 5) => request(`/api/reportes/destinos-mas-buscados?limit=${limit}`),

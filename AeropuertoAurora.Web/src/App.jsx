@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from './services/api';
 
 const services = [
@@ -346,7 +346,7 @@ function App() {
     incidents: []
   });
 
-  const loadDashboard = async () => {
+  const loadDashboard = useCallback(async () => {
     setRefreshing(true);
     setError('');
 
@@ -376,11 +376,21 @@ function App() {
 
     setLoading(false);
     setRefreshing(false);
-  };
+  }, []);
 
   useEffect(() => {
     loadDashboard();
-  }, []);
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    if (!error || dashboard.health) return undefined;
+
+    const retry = window.setTimeout(() => {
+      loadDashboard();
+    }, 3500);
+
+    return () => window.clearTimeout(retry);
+  }, [dashboard.health, error, loadDashboard]);
 
   const openIncidents = useMemo(
     () => dashboard.severities.reduce((sum, severity) => sum + Number(severity.abiertos || 0), 0),

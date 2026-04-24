@@ -44,6 +44,33 @@ $apiProcess = Start-Process `
     -PassThru `
     -WindowStyle Hidden
 
+Write-Host "Esperando a que el backend responda..." -ForegroundColor Cyan
+$healthUrl = "$ApiUrl/api/health"
+$apiReady = $false
+
+for ($attempt = 1; $attempt -le 45; $attempt++) {
+    $apiProcess.Refresh()
+
+    if ($apiProcess.HasExited) {
+        throw "El backend se detuvo antes de responder. Revisa $apiLog y $apiErrorLog"
+    }
+
+    try {
+        $response = Invoke-WebRequest -UseBasicParsing -Uri $healthUrl -TimeoutSec 2
+        if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 300) {
+            $apiReady = $true
+            break
+        }
+    }
+    catch {
+        Start-Sleep -Seconds 1
+    }
+}
+
+if (-not $apiReady) {
+    throw "El backend no respondio en $healthUrl. Revisa $apiLog y $apiErrorLog"
+}
+
 Write-Host "Levantando frontend en http://${WebHost}:$WebPort" -ForegroundColor Cyan
 $webProcess = Start-Process `
     -FilePath "npm.cmd" `
