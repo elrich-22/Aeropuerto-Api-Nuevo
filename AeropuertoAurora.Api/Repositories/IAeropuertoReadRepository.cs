@@ -21,4 +21,9 @@ public interface IAeropuertoReadRepository
     Task<IReadOnlyList<MantenimientoDto>> GetMaintenanceAsync(int limit, CancellationToken cancellationToken);
     Task<IReadOnlyList<ControlSeguridadDto>> GetSecurityControlsAsync(int limit, CancellationToken cancellationToken);
     Task<IReadOnlyList<IncidenteOperacionDto>> GetIncidentsAsync(int limit, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ReporteVentasPorFechaDto>> GetSalesReportAsync(DateTime? fechaInicio, DateTime? fechaFin, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ReporteDestinoBuscadoDto>> GetTopDestinationsReportAsync(int limit, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ReporteIncidenteSeveridadDto>> GetIncidentsBySeverityReportAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<ReporteOcupacionVueloDto>> GetFlightOccupancyReportAsync(DateTime? fechaInicio, DateTime? fechaFin, int limit, CancellationToken cancellationToken);
+    Task<IReadOnlyList<ReporteMetodoPagoDto>> GetPaymentMethodsReportAsync(DateTime? fechaInicio, DateTime? fechaFin, CancellationToken cancellationToken);
 }
