@@ -7,6 +7,7 @@ Este repositorio incluye:
 - `AeropuertoAurora.Api/`: API en ASP.NET Core conectada a Oracle.
 - `AeropuertoAurora.Web/`: frontend en React + Vite para consumir la API.
 - `AeropuertoAurora.Api/Database/`: scripts de estructura, seed y ajuste de identities.
+- `start-dev.ps1`: script para levantar backend y frontend juntos.
 
 ## Estructura
 
@@ -14,6 +15,7 @@ Este repositorio incluye:
 Proyecto2/
 |-- AeropuertoAurora.Api/
 |-- AeropuertoAurora.Web/
+|-- start-dev.ps1
 |-- Proyecto2.sln
 ```
 
@@ -41,14 +43,36 @@ Si despues del seed Oracle devuelve `ORA-00001` en inserts nuevos, vuelve a ejec
 @AeropuertoAurora.Api/Database/reset-identities.sql
 ```
 
-## Backend
+## Ejecutar todo
 
-Para ejecutar la API:
+El flujo recomendado para desarrollo es levantar backend y frontend con un solo comando desde la raiz:
+
+```powershell
+.\start-dev.ps1
+```
+
+El script hace lo siguiente:
+
+- Levanta la API en `http://localhost:5185`.
+- Espera a que `http://localhost:5185/api/health` responda.
+- Levanta el frontend en `http://127.0.0.1:5173`.
+- Instala dependencias del frontend si falta `node_modules`.
+
+URLs principales:
+
+- Frontend: `http://127.0.0.1:5173`
+- Swagger: `http://localhost:5185/swagger`
+
+Para detener ambos procesos, presiona `Ctrl+C` en la terminal donde ejecutaste el script.
+
+## Backend manual
+
+Si necesitas ejecutar solo la API:
 
 ```powershell
 $env:Database__ConnectionString="User Id=AEROPUERTO_AURORA;Password=1234;Data Source=localhost:1521/ORCLPDB"
 $env:ApiSecurity__ApiKey="clave-local-segura"
-dotnet run --project AeropuertoAurora.Api
+dotnet run --project AeropuertoAurora.Api --urls http://localhost:5185
 ```
 
 La API expone Swagger en:
@@ -61,9 +85,9 @@ Si `ApiSecurity:ApiKey` esta configurada, el cliente debe enviar:
 X-Api-Key: clave-local-segura
 ```
 
-## Frontend
+## Frontend manual
 
-Para ejecutar el frontend:
+Normalmente no necesitas estos comandos si usas `.\start-dev.ps1`. Para ejecutar solo el frontend:
 
 ```powershell
 cd AeropuertoAurora.Web
@@ -71,7 +95,7 @@ npm install
 npm run dev
 ```
 
-Por defecto consume `http://localhost:5185`. Si necesitas otra URL o API key, crea un `.env` basado en `AeropuertoAurora.Web/.env.example`.
+En desarrollo, Vite redirige las llamadas `/api` hacia `http://localhost:5185` mediante proxy. Si necesitas otra URL o API key, crea un `.env` basado en `AeropuertoAurora.Web/.env.example`.
 
 Para compilar:
 
