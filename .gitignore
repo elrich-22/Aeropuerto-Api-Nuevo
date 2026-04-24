@@ -9,6 +9,10 @@ obj/
 
 TestResults/
 *.log
+dev-api.log
+dev-api-error.log
+dev-web.log
+dev-web-error.log
 build-verify/
 build-check/
 AeropuertoAurora.Api/build-check/
