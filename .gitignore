@@ -14,5 +14,7 @@ build-check/
 AeropuertoAurora.Api/build-check/
 AeropuertoAurora.Web/node_modules/
 AeropuertoAurora.Web/dist/
+AeropuertoAurora.Web/.vite/
+AeropuertoAurora.Web/.vite-temp/
 
 appsettings.Development.json
