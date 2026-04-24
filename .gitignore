@@ -12,5 +12,7 @@ TestResults/
 build-verify/
 build-check/
 AeropuertoAurora.Api/build-check/
+AeropuertoAurora.Web/node_modules/
+AeropuertoAurora.Web/dist/
 
 appsettings.Development.json
