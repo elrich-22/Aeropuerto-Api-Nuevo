@@ -34,6 +34,27 @@ $apiErrorLog = Join-Path $root "dev-api-error.log"
 $webLog = Join-Path $root "dev-web.log"
 $webErrorLog = Join-Path $root "dev-web-error.log"
 
+function Stop-ProcessOnPort {
+    param([int]$Port)
+
+    $connections = netstat -ano | Select-String ":$Port\s+.*LISTENING"
+    foreach ($connection in $connections) {
+        $parts = ($connection.Line -split "\s+") | Where-Object { $_ }
+        $processId = [int]$parts[-1]
+
+        if ($processId -gt 0) {
+            $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
+            if ($process) {
+                Write-Host "Deteniendo proceso existente en puerto $Port (PID $processId)..." -ForegroundColor Yellow
+                Stop-Process -Id $processId -Force
+            }
+        }
+    }
+}
+
+Stop-ProcessOnPort -Port 5185
+Stop-ProcessOnPort -Port $WebPort
+
 Write-Host "Levantando backend en $ApiUrl" -ForegroundColor Cyan
 $apiProcess = Start-Process `
     -FilePath "dotnet" `
