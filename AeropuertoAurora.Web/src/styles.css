@@ -78,6 +78,10 @@ a {
   color: var(--light);
 }
 
+.nav-links a.active {
+  color: var(--teal);
+}
+
 .nav-user {
   max-width: 240px;
   overflow: hidden;
@@ -354,7 +358,10 @@ a {
 }
 
 .travel-search-section {
-  padding: 5rem 1.5rem 2rem;
+  position: relative;
+  z-index: 3;
+  margin-top: -7rem;
+  padding: 0 1.5rem 4rem;
   background:
     radial-gradient(ellipse 70% 45% at 15% 0%, rgba(30, 184, 200, 0.12), transparent 62%),
     linear-gradient(180deg, #060e1c 0%, #0a1628 100%);
@@ -367,12 +374,28 @@ a {
 
 .travel-search-card {
   position: relative;
-  padding: 1.2rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(30, 184, 200, 0.18);
+  padding: 1.35rem;
+  color: var(--light);
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(30, 184, 200, 0.24);
   border-radius: 8px;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.24);
   backdrop-filter: blur(8px);
+}
+
+.tab-page {
+  min-height: 100vh;
+  padding-top: 5rem;
+  background: var(--deep);
+}
+
+.tab-page .travel-search-section {
+  margin-top: 0;
+  padding-top: 3rem;
+}
+
+.tab-page .location-section {
+  padding-top: 2rem;
 }
 
 .travel-topbar,
@@ -382,13 +405,20 @@ a {
 }
 
 .travel-topbar {
-  grid-template-columns: 1fr 0.7fr 0.9fr;
-  max-width: 440px;
+  grid-template-columns: 1fr 0.78fr;
+  max-width: 520px;
   margin-bottom: 1rem;
 }
 
 .travel-fields {
   grid-template-columns: 1.1fr 1.1fr 0.95fr 0.95fr;
+}
+
+.passenger-age-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(110px, 1fr));
+  gap: 0.8rem;
+  margin: 1rem 0 0.5rem;
 }
 
 .travel-search-card label {
@@ -399,6 +429,24 @@ a {
   font-weight: 800;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.field-title {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.field-icon {
+  display: inline-grid;
+  width: 1.2rem;
+  height: 1.2rem;
+  place-items: center;
+  color: var(--deep);
+  background: var(--teal);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 900;
 }
 
 .travel-search-card input,
@@ -508,14 +556,91 @@ a {
 .fare-picker-body {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 3rem;
-  padding: 2rem 3rem 1.5rem;
+  gap: 2rem;
+  padding: 2rem 2rem 1.5rem;
 }
 
 .fare-month h3 {
   margin: 0 0 1rem;
   text-align: center;
   font-size: 1.45rem;
+}
+
+.passenger-picker {
+  display: grid;
+  gap: 1.4rem;
+  width: min(420px, 100%);
+  padding: 2rem;
+  color: #20242b;
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+}
+
+.passenger-picker h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.passenger-counter-row {
+  display: grid;
+  grid-template-columns: 1fr 38px 44px 38px;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.passenger-counter-row strong,
+.passenger-counter-row small {
+  display: block;
+}
+
+.passenger-counter-row strong {
+  font-size: 1.35rem;
+  font-weight: 500;
+}
+
+.passenger-counter-row small {
+  color: #69707a;
+}
+
+.passenger-counter-row button {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  color: #20242b;
+  background: #fff;
+  border: 2px solid #20242b;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 1.25rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.passenger-counter-row button:disabled {
+  color: #9aa0a6;
+  border-color: #9aa0a6;
+  cursor: not-allowed;
+}
+
+.passenger-counter-row span {
+  font-size: 1.8rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.passenger-confirm {
+  justify-self: center;
+  min-width: 178px;
+  padding: 0.95rem 1.4rem;
+  color: #fff;
+  background: #171717;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 1.35rem;
+  font-weight: 900;
 }
 
 .fare-weekdays,
@@ -622,9 +747,302 @@ a {
   font-weight: 800;
 }
 
+.flight-result-card {
+  margin-bottom: 0.85rem;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+}
+
+.flight-result-summary {
+  display: grid;
+  width: 100%;
+  grid-template-columns: 56px 1.15fr 1.45fr 1fr 0.9fr 112px;
+  gap: 1rem;
+  align-items: center;
+  min-height: 88px;
+  padding: 1rem 1.2rem;
+  color: var(--light);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.flight-result-summary:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.flight-result-summary strong,
+.flight-result-summary small {
+  display: block;
+}
+
+.expand-indicator {
+  color: var(--gold);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.tariff-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(6, 14, 28, 0.42);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tariff-card {
+  position: relative;
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.tariff-card.recommended {
+  border-color: rgba(30, 184, 200, 0.48);
+  box-shadow: 0 0 0 1px rgba(30, 184, 200, 0.18);
+}
+
+.tariff-card h3,
+.tariff-card p {
+  margin: 0;
+}
+
+.tariff-card p {
+  color: var(--muted);
+}
+
+.tariff-badge {
+  justify-self: start;
+  padding: 0.25rem 0.55rem;
+  color: var(--deep);
+  background: var(--teal);
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.tariff-price {
+  color: #65d88c;
+  font-size: 1.35rem;
+}
+
+.tariff-card ul {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tariff-card li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  color: var(--muted);
+}
+
+.tariff-card li span {
+  display: grid;
+  width: 1.1rem;
+  height: 1.1rem;
+  place-items: center;
+  border-radius: 999px;
+  font-weight: 900;
+}
+
+.tariff-card li.included span {
+  color: #0d321c;
+  background: #65d88c;
+}
+
+.tariff-card li.excluded span {
+  color: #4b1010;
+  background: #f7b2b2;
+}
+
+.upgrade-modal {
+  position: relative;
+  display: grid;
+  gap: 1rem;
+  width: min(520px, 100%);
+  padding: 2rem;
+  color: var(--light);
+  background: #091426;
+  border: 1px solid rgba(30, 184, 200, 0.22);
+  border-radius: 8px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+
+.upgrade-modal h2,
+.upgrade-modal p {
+  margin: 0;
+}
+
+.upgrade-modal p {
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.upgrade-comparison {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.65rem 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+}
+
+.continue-restricted {
+  justify-self: center;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.cart-page {
+  min-height: 100vh;
+  padding: 7rem 1.5rem 4rem;
+  background:
+    radial-gradient(ellipse 70% 45% at 18% 0%, rgba(30, 184, 200, 0.12), transparent 62%),
+    linear-gradient(180deg, #060e1c 0%, #0a1628 100%);
+}
+
+.cart-shell {
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.cart-shell h1 {
+  margin: 0 0 1.5rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.2rem, 5vw, 4rem);
+}
+
+.cart-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.cart-flight-card {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+}
+
+.cart-flight-icon {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  color: var(--deep);
+  background: var(--teal);
+  border-radius: 8px;
+  font-size: 1.5rem;
+  font-weight: 900;
+}
+
+.cart-flight-main {
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+}
+
+.cart-flight-title,
+.cart-flight-route,
+.cart-flight-meta {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cart-flight-title strong {
+  font-size: 1.08rem;
+}
+
+.cart-flight-title span,
+.cart-total-box strong {
+  color: #65d88c;
+  font-weight: 900;
+}
+
+.cart-flight-route {
+  justify-content: flex-start;
+  color: var(--muted);
+}
+
+.cart-flight-route b {
+  color: var(--light);
+}
+
+.cart-flight-meta {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.cart-flight-meta span {
+  display: inline-flex;
+  gap: 0.35rem;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.cart-flight-meta i {
+  display: grid;
+  width: 1.25rem;
+  height: 1.25rem;
+  place-items: center;
+  color: var(--deep);
+  background: var(--gold);
+  border-radius: 999px;
+  font-style: normal;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.cart-flight-actions {
+  display: grid;
+  gap: 0.7rem;
+  min-width: 210px;
+}
+
+.cart-flight-actions .btn {
+  min-width: 0;
+  padding-inline: 1rem;
+}
+
+.cart-total-box {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2rem;
+  margin-top: 1.2rem;
+  padding: 1rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 1.05rem;
+}
+
 .travel-result-row {
   display: grid;
-  grid-template-columns: 56px 1.2fr 1.6fr 1.2fr 0.9fr 110px;
+  grid-template-columns: 56px 1.15fr 1.45fr 1fr 0.95fr 0.9fr 110px;
   gap: 1rem;
   align-items: center;
   min-height: 86px;
@@ -664,6 +1082,27 @@ a {
 
 .result-price strong {
   color: #65d88c;
+}
+
+.result-class-select {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.result-class-select select {
+  min-height: 40px;
+  color: var(--light);
+  background: rgba(6, 14, 28, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+}
+
+.result-class-select option {
+  color: #111827;
 }
 
 .compact-section {
@@ -1256,7 +1695,7 @@ footer p {
 }
 
 .checkout-shell {
-  max-width: 980px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 2rem;
   background: rgba(255, 255, 255, 0.04);
@@ -1279,6 +1718,166 @@ footer p {
 .checkout-shell form {
   display: grid;
   gap: 1.25rem;
+}
+
+.destination-button {
+  width: 100%;
+  color: var(--light);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.destination-button:hover {
+  border-color: rgba(30, 184, 200, 0.34);
+  transform: translateY(-2px);
+}
+
+.checkout-steps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.checkout-steps span {
+  padding: 0.7rem 0.85rem;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 6px;
+  font-weight: 900;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.checkout-steps span.active {
+  color: var(--deep);
+  background: var(--teal);
+  border-color: var(--teal);
+}
+
+.checkout-card {
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 8px;
+}
+
+.checkout-card h3 {
+  margin: 0;
+  color: var(--light);
+}
+
+.checkout-flight-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.checkout-flight-summary div {
+  display: grid;
+  gap: 0.25rem;
+  min-height: 68px;
+  align-content: center;
+  padding: 0.75rem;
+  background: rgba(6, 14, 28, 0.44);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+}
+
+.checkout-flight-summary span {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.passenger-list {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.passenger-form-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr 0.45fr;
+  gap: 0.85rem;
+}
+
+.ancillary-warning {
+  padding: 0.85rem 1rem;
+  color: #ffe0a3;
+  background: rgba(214, 139, 27, 0.18);
+  border: 1px solid rgba(214, 139, 27, 0.36);
+  border-radius: 6px;
+  font-weight: 800;
+}
+
+.ancillary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.ancillary-card {
+  display: grid;
+  gap: 0.6rem;
+  min-height: 210px;
+  padding: 1rem;
+  color: var(--light);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ancillary-card.selected {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 2px rgba(30, 184, 200, 0.18);
+}
+
+.ancillary-card span {
+  display: grid;
+  width: 2.8rem;
+  height: 2.8rem;
+  place-items: center;
+  color: var(--deep);
+  background: var(--gold);
+  border-radius: 8px;
+  font-weight: 900;
+}
+
+.ancillary-card small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.ancillary-card b {
+  color: #65d88c;
+}
+
+.checkout-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.8rem;
+}
+
+.payment-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.72fr);
+  gap: 1.2rem;
+  align-items: start;
+}
+
+.sticky-summary {
+  position: sticky;
+  top: 6.5rem;
+}
+
+.sticky-summary h3 {
+  margin: 0 0 0.4rem;
 }
 
 .checkout-shell label {
@@ -1362,6 +1961,30 @@ footer {
 footer p {
   margin: 0.35rem 0;
   font-size: 0.84rem;
+}
+
+.footer-currency {
+  display: inline-flex;
+  gap: 0.7rem;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.footer-currency select {
+  min-width: 110px;
+  padding: 0.45rem 0.7rem;
+  color: var(--light);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+}
+
+.footer-currency option {
+  color: #111827;
 }
 
 .nav-admin-link {
@@ -1565,13 +2188,25 @@ footer p {
 
   .travel-topbar,
   .travel-fields,
+  .passenger-age-grid,
   .travel-result-row,
+  .flight-result-summary,
+  .tariff-grid,
+  .ancillary-grid,
+  .payment-layout,
+  .cart-flight-card,
+  .checkout-flight-summary,
+  .passenger-form-row,
   .fare-picker-body {
     grid-template-columns: 1fr 1fr;
   }
 
   .travel-result-row {
     align-items: start;
+  }
+
+  .sticky-summary {
+    position: static;
   }
 }
 
@@ -1662,7 +2297,15 @@ footer p {
 
   .travel-topbar,
   .travel-fields,
+  .passenger-age-grid,
   .travel-result-row,
+  .flight-result-summary,
+  .tariff-grid,
+  .ancillary-grid,
+  .payment-layout,
+  .cart-flight-card,
+  .checkout-flight-summary,
+  .passenger-form-row,
   .fare-picker-body,
   .fare-picker-top,
   .fare-picker-footer {
@@ -1683,6 +2326,26 @@ footer p {
     width: 100%;
     margin-top: 1rem;
     transform: none;
+  }
+
+  .flight-result-summary {
+    text-align: left;
+  }
+
+  .checkout-actions {
+    flex-direction: column;
+  }
+
+  .cart-flight-title,
+  .cart-flight-route,
+  .cart-total-box {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .cart-flight-actions {
+    min-width: 0;
   }
 
 

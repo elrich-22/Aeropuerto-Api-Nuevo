@@ -52,8 +52,17 @@ export const api = {
       body: JSON.stringify(payload)
     }),
   health: () => request('/api/health'),
+  airports: (limit = 100) => request(`/api/aeropuertos?limit=${limit}`),
   flights: (limit = 8) => request(`/api/vuelos?limit=${limit}`),
   topDestinations: (limit = 5) => request(`/api/reportes/destinos-mas-buscados?limit=${limit}`),
+  createFlightSearch: (payload) => request('/api/busquedas-vuelo', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  createDestinationClick: (payload) => request('/api/clicks-destino', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
   occupancy: (limit = 6) => request(`/api/reportes/ocupacion-vuelos?limit=${limit}`),
   incidentsBySeverity: () => request('/api/reportes/incidentes-por-severidad'),
   baggage: (limit = 6) => request(`/api/operaciones/equipaje?limit=${limit}`),

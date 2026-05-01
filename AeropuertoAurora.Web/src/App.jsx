@@ -70,6 +70,12 @@ const formatCurrency = (value) =>
     currency: 'GTQ'
   }).format(Number(value || 0));
 
+const formatMoney = (value, currency = 'GTQ') =>
+  new Intl.NumberFormat('es-GT', {
+    style: 'currency',
+    currency: CURRENCY_RATES[currency] ? currency : 'GTQ'
+  }).format(Number(value || 0) * (CURRENCY_RATES[currency] || 1));
+
 const normalize = (value = '') => value.toString().trim().toLowerCase();
 
 const statusClassName = (status = '') => {
@@ -83,16 +89,102 @@ const statusClassName = (status = '') => {
 };
 
 const SESSION_KEY = 'aeropuertoAurora.user';
+const CART_KEY = 'aeropuertoAurora.cart';
 const BASE_FARE = 1250;
-const CLASS_MULTIPLIERS = {
-  economica: 1,
-  ejecutiva: 1.55,
-  primera: 2.2
+const CURRENCY_RATES = {
+  GTQ: 1,
+  USD: 0.128,
+  EUR: 0.12,
+  COP: 512,
+  MXN: 2.35,
+  CRC: 65.5,
+  HNL: 3.18,
+  NIO: 4.72,
+  PAB: 0.128,
+  CAD: 0.176,
+  BRL: 0.66,
+  GBP: 0.103,
+  JPY: 20.1,
+  CHF: 0.117,
+  AUD: 0.197
 };
+const CURRENCIES = Object.keys(CURRENCY_RATES);
+const CLASS_LABELS = {
+  economica: 'Turista',
+  ejecutiva: 'Ejecutiva',
+  primera: 'Primera clase'
+};
+const TARIFF_FAMILIES = [
+  {
+    code: 'turista',
+    className: 'economica',
+    name: 'Turista',
+    tagline: 'Para viajar basico',
+    multiplier: 1,
+    benefits: [
+      ['check', 'Articulo personal'],
+      ['x', 'Equipaje de bodega'],
+      ['x', 'Cambios sin penalidad']
+    ]
+  },
+  {
+    code: 'ejecutiva',
+    className: 'ejecutiva',
+    name: 'Ejecutiva',
+    tagline: 'Mas comodidad',
+    multiplier: 1.32,
+    benefits: [
+      ['check', 'Articulo personal'],
+      ['check', 'Equipaje de bodega'],
+      ['x', 'Reembolso completo']
+    ]
+  },
+  {
+    code: 'primera',
+    className: 'primera',
+    name: 'Primera clase',
+    tagline: 'Mayor tranquilidad',
+    multiplier: 1.68,
+    benefits: [
+      ['check', 'Articulo personal'],
+      ['check', 'Equipaje de bodega'],
+      ['check', 'Cambios y reembolso']
+    ]
+  }
+];
+const PASSENGER_GROUPS = [
+  { key: 'adults', label: 'Adultos', hint: 'Desde 15 anos', defaultValue: 1, age: 30 },
+  { key: 'youth', label: 'Jovenes', hint: 'De 12 a 14 anos', defaultValue: 0, age: 13 },
+  { key: 'children', label: 'Ninos', hint: 'De 2 a 11 anos', defaultValue: 0, age: 8 },
+  { key: 'babies', label: 'Bebes', hint: 'Menores de 2 anos', defaultValue: 0, age: 1 }
+];
+const DEFAULT_PASSENGER_GROUPS = PASSENGER_GROUPS.reduce(
+  (groups, group) => ({ ...groups, [group.key]: group.defaultValue }),
+  {}
+);
+const KNOWN_AIRPORTS = [
+  { name: 'Aeropuerto Internacional La Aurora', country: 'Guatemala', city: 'Ciudad de Guatemala', aliases: ['guatemala', 'la aurora', 'gua'] },
+  { name: 'Aeropuerto Internacional El Dorado', country: 'Colombia', city: 'Bogota', aliases: ['colombia', 'bogota', 'el dorado'] },
+  { name: 'Miami International Airport', country: 'Estados Unidos', city: 'Miami', aliases: ['miami', 'mia'] },
+  { name: 'John F. Kennedy International Airport', country: 'Estados Unidos', city: 'Nueva York', aliases: ['new york', 'jfk'] },
+  { name: 'Los Angeles International Airport', country: 'Estados Unidos', city: 'Los Angeles', aliases: ['los angeles', 'lax'] },
+  { name: 'Aeropuerto Internacional Benito Juarez', country: 'Mexico', city: 'Ciudad de Mexico', aliases: ['mexico', 'ciudad de mexico'] },
+  { name: 'Aeropuerto Internacional de Cancun', country: 'Mexico', city: 'Cancun', aliases: ['cancun'] },
+  { name: 'Aeropuerto Internacional de Tocumen', country: 'Panama', city: 'Panama', aliases: ['panama', 'tocumen'] },
+  { name: 'Aeropuerto Internacional Juan Santamaria', country: 'Costa Rica', city: 'San Jose', aliases: ['costa rica', 'san jose'] },
+  { name: 'Aeropuerto Internacional de El Salvador San Oscar Arnulfo Romero', country: 'El Salvador', city: 'San Salvador', aliases: ['el salvador', 'san salvador'] },
+  { name: 'Aeropuerto Adolfo Suarez Madrid-Barajas', country: 'Espana', city: 'Madrid', aliases: ['madrid', 'espana'] }
+];
 const PAYMENT_METHODS = [
   { id: 1, name: 'Tarjeta de credito', requiresCard: true },
   { id: 2, name: 'Tarjeta de debito', requiresCard: true },
   { id: 3, name: 'Transferencia', requiresCard: false }
+];
+const ANCILLARY_SERVICES = [
+  { id: 'seat', title: 'Elige tu asiento', description: 'Selecciona ventana, pasillo o salida rapida.', price: 120, icon: 'AS' },
+  { id: 'bag', title: 'Equipaje adicional', description: 'Agrega una maleta documentada al viaje.', price: 280, icon: 'EQ' },
+  { id: 'vip', title: 'Sala VIP', description: 'Acceso a sala preferencial antes del vuelo.', price: 360, icon: 'VP' },
+  { id: 'priority', title: 'Prioridad de abordaje', description: 'Aborda primero y ahorra tiempo en puerta.', price: 95, icon: 'PR' }
 ];
 
 const DOCUMENT_TYPES = ['DPI', 'Pasaporte', 'Licencia'];
@@ -103,6 +195,141 @@ const SEX_OPTIONS = [
 ];
 
 const canPurchaseFlight = (status = '') => normalize(status) === 'programado';
+
+const passengerCountFromGroups = (groups = DEFAULT_PASSENGER_GROUPS) =>
+  Math.max(1, PASSENGER_GROUPS.reduce((sum, group) => sum + Number(groups[group.key] || 0), 0));
+
+const passengerCountFromCriteria = (criteria) =>
+  criteria?.passengerGroups ? passengerCountFromGroups(criteria.passengerGroups) : Math.max(1, Number(criteria?.passengers || 1));
+
+const passengerAgesFromCriteria = (criteria) => {
+  const count = passengerCountFromCriteria(criteria);
+  const ages = Array.isArray(criteria?.passengerAges) ? criteria.passengerAges : [];
+  if (ages.length > 0) return Array.from({ length: count }, (_, index) => ages[index] ?? '');
+
+  if (criteria?.passengerGroups) {
+    return PASSENGER_GROUPS.flatMap((group) =>
+      Array.from({ length: Number(criteria.passengerGroups[group.key] || 0) }, () => group.age)
+    );
+  }
+
+  return Array.from({ length: count }, (_, index) => ages[index] ?? '');
+};
+
+const tariffByClassName = (className = 'economica') =>
+  TARIFF_FAMILIES.find((family) => family.className === className) || TARIFF_FAMILIES[0];
+
+const calculateFlightFare = (className = 'economica', passengerCount = 1) => {
+  const tariff = tariffByClassName(className);
+  return Math.round(BASE_FARE * tariff.multiplier * passengerCount * 100) / 100;
+};
+
+const nextTariffFamily = (family) => {
+  const index = TARIFF_FAMILIES.findIndex((item) => item.code === family.code);
+  return index >= 0 ? TARIFF_FAMILIES[index + 1] || null : null;
+};
+
+const airportCountryFallback = (airportName = '') => {
+  const value = normalize(airportName);
+  const known = KNOWN_AIRPORTS.find((airport) => normalize(airport.name) === value);
+  if (known) return known.country;
+  if (value.includes('aurora')) return 'Guatemala';
+  if (value.includes('dorado')) return 'Colombia';
+  if (value.includes('miami')) return 'Estados Unidos';
+  return 'Internacional';
+};
+
+const airportLabel = (airport) => `${airport.name}, ${airport.country}`;
+
+const toAirportOption = (airport) => ({
+  id: airportId(airport),
+  name: airportName(airport),
+  country: airportCountry(airport),
+  city: airport?.ciudad ?? airport?.Ciudad ?? airport?.city ?? '',
+  aliases: [
+    airport?.codigoIata,
+    airport?.CodigoIata,
+    airport?.codigoIcao,
+    airport?.CodigoIcao,
+    airport?.codigo,
+    airport?.Codigo
+  ].filter(Boolean)
+});
+
+const resolveAirportQuery = (query = '', airportOptions = []) => {
+  const term = normalize(query);
+  if (!term) return '';
+
+  const match = airportOptions.find((airport) =>
+    [airport.name, airport.country, airport.city, airportLabel(airport), ...(airport.aliases || [])]
+      .filter(Boolean)
+      .some((value) => {
+        const normalized = normalize(value);
+        return normalized === term || normalized.includes(term) || term.includes(normalized);
+      })
+  );
+
+  return match?.name || query;
+};
+
+const airportId = (airport) => airport?.id ?? airport?.Id ?? null;
+const airportName = (airport) => airport?.nombre ?? airport?.Nombre ?? airport?.name ?? '';
+const airportCountry = (airport) => airport?.pais ?? airport?.Pais ?? airport?.country ?? '';
+const destinationReportId = (destination) => destination?.aeropuertoId ?? destination?.AeropuertoId ?? null;
+const destinationReportName = (destination) => destination?.aeropuerto ?? destination?.Aeropuerto ?? '';
+
+const matchAirportRecord = (airports = [], value = '') => {
+  const term = normalize(value);
+  if (!term) return null;
+
+  return airports.find((airport) => {
+    const name = normalize(airportName(airport));
+    const country = normalize(airportCountry(airport));
+    const city = normalize(airport?.ciudad ?? airport?.Ciudad ?? '');
+    return name === term || name.includes(term) || term.includes(name) || country.includes(term) || city.includes(term);
+  }) || null;
+};
+
+const incrementDestinationScore = (destinations, destinationId, field, fallbackName = '') => {
+  const exists = destinations.some((destination) => destinationReportId(destination) === destinationId);
+  const nextDestinations = exists
+    ? destinations
+    : [
+        ...destinations,
+        {
+          aeropuertoId: destinationId,
+          aeropuerto: fallbackName || 'Destino seleccionado',
+          totalBusquedas: 0,
+          totalClicks: 0,
+          totalPasajeros: 0
+        }
+      ];
+
+  return nextDestinations
+    .map((destination) =>
+      destinationReportId(destination) === destinationId
+        ? { ...destination, [field]: Number(destination[field] || 0) + 1 }
+        : destination
+    )
+    .sort((first, second) => {
+      const firstScore = Number(first.totalBusquedas || 0) + Number(first.totalClicks || 0);
+      const secondScore = Number(second.totalBusquedas || 0) + Number(second.totalClicks || 0);
+      return secondScore - firstScore || destinationReportName(first).localeCompare(destinationReportName(second));
+    });
+};
+
+const estimateDurationMinutes = (flight) => {
+  const seed = Number(flight?.id || 1) + normalize(flight?.destino).length * 11;
+  return 70 + (seed % 5) * 25;
+};
+
+const addMinutesToDate = (value, minutes) => {
+  const date = new Date(value);
+  date.setMinutes(date.getMinutes() + minutes);
+  return date;
+};
+
+const hasTechnicalStop = (flight) => Number(flight?.retrasoMinutos || 0) > 0 || Number(flight?.id || 0) % 3 === 0;
 
 const toDateInputValue = (date) => {
   const year = date.getFullYear();
@@ -183,16 +410,16 @@ const validateRegisterForm = (form) => {
   return errors;
 };
 
-function NavBar({ user, adminView, isAdmin, onAdminView, onLoginClick, onLogout }) {
+function NavBar({ user, adminView, isAdmin, activeView, cartCount, onAdminView, onNavigate, onCartClick, onLoginClick, onLogout }) {
   return (
     <nav className="site-nav">
-      <a className="nav-logo" href="#inicio" onClick={() => onAdminView('')}>
+      <a className="nav-logo" href="#inicio" onClick={(event) => onNavigate(event, 'inicio')}>
         La <span>Aurora</span>
       </a>
       <div className="nav-links">
-        <a href="#explorar" onClick={() => onAdminView('')}>Explorar</a>
-        <a href="#rastreo" onClick={() => onAdminView('')}>Rastreo</a>
-        <a href="#ubicacion" onClick={() => onAdminView('')}>Ubicacion</a>
+        <a className={activeView === 'explorar' ? 'active' : ''} href="#explorar" onClick={(event) => onNavigate(event, 'explorar')}>Explorar</a>
+        <a className={activeView === 'rastreo' ? 'active' : ''} href="#rastreo" onClick={(event) => onNavigate(event, 'rastreo')}>Rastreo</a>
+        <a className={activeView === 'ubicacion' ? 'active' : ''} href="#ubicacion" onClick={(event) => onNavigate(event, 'ubicacion')}>Ubicacion</a>
         {isAdmin && (
           <>
             <button
@@ -214,6 +441,11 @@ function NavBar({ user, adminView, isAdmin, onAdminView, onLoginClick, onLogout 
         {user ? (
           <>
             <span className="nav-user">{user.nombreCompleto || user.usuario}</span>
+            {cartCount > 0 && (
+              <button className="nav-session-button cart-nav-button" type="button" onClick={onCartClick}>
+                Carrito ({cartCount})
+              </button>
+            )}
             <button className="nav-session-button" type="button" onClick={onLogout}>Salir</button>
           </>
         ) : (
@@ -267,7 +499,7 @@ function Plane() {
   );
 }
 
-function Hero({ health, refreshing, onRefresh }) {
+function Hero() {
   return (
     <section className="hero" id="inicio">
       <Stars />
@@ -281,14 +513,6 @@ function Hero({ health, refreshing, onRefresh }) {
         <p>Puerta de entrada al corazon de Centroamerica, conectada en tiempo real con la operacion aeroportuaria.</p>
         <div className="hero-ctas">
           <a href="#explorar" className="btn btn-primary">Explorar vuelos</a>
-          <button className="btn btn-outline" onClick={onRefresh} disabled={refreshing}>
-            {refreshing ? 'Actualizando' : 'Actualizar datos'}
-          </button>
-        </div>
-        <div className="api-status">
-          <span>API</span>
-          <strong>{health ? 'Conectada' : 'Pendiente'}</strong>
-          <small>{api.baseUrl}</small>
         </div>
       </div>
     </section>
@@ -610,26 +834,41 @@ function FlightBoard({ flights, loading, user, onRequireLogin, onBuyFlight, buyi
   );
 }
 
-function CheckoutView({ flight, onBack, onConfirm, submitting, error }) {
+function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
+  const [step, setStep] = useState('passengers');
   const [form, setForm] = useState({
-    clase: 'economica',
-    equipajeFacturado: true,
-    pesoEquipaje: 18,
     metodoPagoId: 1,
+    titularNombre: '',
+    titularEmail: '',
+    titularTelefono: '',
+    titularDocumento: '',
+    pasajeros: [],
     nombreTarjeta: '',
     numeroTarjeta: '',
     vencimientoTarjeta: '',
     cvvTarjeta: ''
   });
   const [formError, setFormError] = useState('');
+  const [touched, setTouched] = useState({});
+  const [selectedServices, setSelectedServices] = useState([]);
 
   useEffect(() => {
     if (flight) {
+      const passengerAges = passengerAgesFromCriteria(flight.criteria);
+      setStep('passengers');
+      setTouched({});
+      setSelectedServices([]);
       setForm({
-        clase: 'economica',
-        equipajeFacturado: true,
-        pesoEquipaje: 18,
         metodoPagoId: 1,
+        titularNombre: user?.nombreCompleto || '',
+        titularEmail: user?.email || '',
+        titularTelefono: user?.telefono || '',
+        titularDocumento: user?.numeroDocumento || '',
+        pasajeros: passengerAges.map((age, index) => ({
+          nombre: index === 0 ? user?.nombreCompleto || '' : '',
+          documento: index === 0 ? user?.numeroDocumento || '' : '',
+          edad: age
+        })),
         nombreTarjeta: '',
         numeroTarjeta: '',
         vencimientoTarjeta: '',
@@ -637,33 +876,120 @@ function CheckoutView({ flight, onBack, onConfirm, submitting, error }) {
       });
       setFormError('');
     }
-  }, [flight?.id]);
+  }, [flight?.cartId, flight?.id, user]);
 
   if (!flight) return null;
 
   const selectedPayment = PAYMENT_METHODS.find((method) => method.id === Number(form.metodoPagoId)) ?? PAYMENT_METHODS[0];
-  const fare = Math.round(BASE_FARE * CLASS_MULTIPLIERS[form.clase] * 100) / 100;
-  const baggageFee = form.equipajeFacturado ? Math.max(0, Number(form.pesoEquipaje || 0) - 23) * 35 : 0;
-  const subtotal = fare + baggageFee;
+  const className = flight.selectedClass || 'economica';
+  const selectedTariff = tariffByClassName(className);
+  const currency = flight.criteria?.currency || 'GTQ';
+  const passengerCount = passengerCountFromCriteria(flight.criteria);
+  const fare = calculateFlightFare(className, passengerCount);
+  const servicesTotal = selectedServices.reduce((sum, serviceId) => {
+    const service = ANCILLARY_SERVICES.find((item) => item.id === serviceId);
+    return sum + (service?.price || 0) * passengerCount;
+  }, 0);
+  const subtotal = fare + servicesTotal;
   const taxes = Math.round(subtotal * 0.12 * 100) / 100;
   const total = subtotal + taxes;
+
+  const emailValid = !form.titularEmail || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.titularEmail);
+  const phoneValid = !form.titularTelefono || form.titularTelefono.replace(/\D/g, '').length >= 8;
+  const fieldErrors = {
+    titularNombre: form.titularNombre.trim() ? '' : 'Nombre obligatorio.',
+    titularEmail: !form.titularEmail.trim() ? 'Email obligatorio.' : emailValid ? '' : 'Formato de email invalido.',
+    titularTelefono: !form.titularTelefono.trim() ? 'Telefono obligatorio.' : phoneValid ? '' : 'Usa al menos 8 digitos.',
+    nombreTarjeta: selectedPayment.requiresCard && !form.nombreTarjeta.trim() ? 'Nombre obligatorio.' : '',
+    numeroTarjeta: selectedPayment.requiresCard && form.numeroTarjeta.replace(/\s/g, '').length < 13 ? 'Numero de tarjeta incompleto.' : '',
+    vencimientoTarjeta: selectedPayment.requiresCard && !/^\d{2}\/\d{2}$/.test(form.vencimientoTarjeta) ? 'Usa formato MM/AA.' : '',
+    cvvTarjeta: selectedPayment.requiresCard && form.cvvTarjeta.length < 3 ? 'CVV incompleto.' : ''
+  };
+  const passengerErrors = form.pasajeros.map((passenger) => ({
+    nombre: passenger.nombre.trim() ? '' : 'Nombre obligatorio.',
+    documento: passenger.documento.trim() ? '' : 'Documento obligatorio.',
+    edad: passenger.edad !== '' && Number(passenger.edad) >= 0 ? '' : 'Edad obligatoria.'
+  }));
+
+  const updatePassenger = (index, field, value) => {
+    setForm((current) => ({
+      ...current,
+      pasajeros: current.pasajeros.map((passenger, passengerIndex) =>
+        passengerIndex === index ? { ...passenger, [field]: value } : passenger
+      )
+    }));
+  };
+
+  const markTouched = (field) => {
+    setTouched((current) => ({ ...current, [field]: true }));
+  };
+
+  const passengerStepValid = () =>
+    passengerErrors.every((passenger) => !passenger.nombre && !passenger.documento && !passenger.edad) &&
+    !fieldErrors.titularNombre &&
+    !fieldErrors.titularEmail &&
+    !fieldErrors.titularTelefono;
+
+  const paymentStepValid = () =>
+    !fieldErrors.nombreTarjeta &&
+    !fieldErrors.numeroTarjeta &&
+    !fieldErrors.vencimientoTarjeta &&
+    !fieldErrors.cvvTarjeta;
+
+  const continueToServices = () => {
+    setTouched((current) => ({
+      ...current,
+      titularNombre: true,
+      titularEmail: true,
+      titularTelefono: true,
+      ...Object.fromEntries(form.pasajeros.flatMap((_, index) => [
+        [`pasajeros.${index}.nombre`, true],
+        [`pasajeros.${index}.documento`, true],
+        [`pasajeros.${index}.edad`, true]
+      ]))
+    }));
+
+    if (!passengerStepValid()) {
+      setFormError('Revisa los datos marcados en rojo antes de continuar.');
+      return;
+    }
+
+    setFormError('');
+    setStep('services');
+  };
+
+  const toggleService = (serviceId) => {
+    setSelectedServices((current) =>
+      current.includes(serviceId) ? current.filter((item) => item !== serviceId) : [...current, serviceId]
+    );
+  };
+
+  const continueToPayment = () => {
+    setFormError('');
+    setStep('payment');
+  };
 
   const submit = (event) => {
     event.preventDefault();
     setFormError('');
 
-    if (selectedPayment.requiresCard) {
-      const cardNumber = form.numeroTarjeta.replace(/\s/g, '');
-      if (!form.nombreTarjeta.trim() || cardNumber.length < 13 || !form.vencimientoTarjeta.trim() || form.cvvTarjeta.length < 3) {
-        setFormError('Ingresa nombre, numero, vencimiento y CVV de la tarjeta.');
-        return;
-      }
+    setTouched((current) => ({
+      ...current,
+      nombreTarjeta: true,
+      numeroTarjeta: true,
+      vencimientoTarjeta: true,
+      cvvTarjeta: true
+    }));
+
+    if (!paymentStepValid()) {
+      setFormError('Completa correctamente los datos de pago.');
+      return;
     }
 
     onConfirm({
-      clase: form.clase,
-      equipajeFacturado: form.equipajeFacturado ? 1 : 0,
-      pesoEquipaje: form.equipajeFacturado ? Number(form.pesoEquipaje || 0) : null,
+      clase: className,
+      equipajeFacturado: 0,
+      pesoEquipaje: null,
       tarifaPagada: subtotal,
       metodoPagoId: Number(form.metodoPagoId),
       total
@@ -674,108 +1000,247 @@ function CheckoutView({ flight, onBack, onConfirm, submitting, error }) {
     <section className="checkout-view">
       <div className="checkout-shell">
         <button className="back-button" type="button" onClick={onBack}>Volver a vuelos</button>
-        <div className="section-label">Confirmar compra</div>
+        <div className="section-label">Carrito de compras</div>
         <h2 id="purchase-title">{flight.numeroVuelo}</h2>
         <p>{flight.origen} a {flight.destino} - {formatDate(flight.fechaVuelo)} - {flight.aerolinea}</p>
 
         <form onSubmit={submit}>
-          <div className="form-grid">
-            <label>
-              Clase
-              <select value={form.clase} onChange={(event) => setForm((current) => ({ ...current, clase: event.target.value }))}>
-                <option value="economica">Economica</option>
-                <option value="ejecutiva">Ejecutiva</option>
-                <option value="primera">Primera</option>
-              </select>
-            </label>
-            <label>
-              Metodo de pago
-              <select value={form.metodoPagoId} onChange={(event) => setForm((current) => ({ ...current, metodoPagoId: event.target.value }))}>
-                {PAYMENT_METHODS.map((method) => (
-                  <option value={method.id} key={method.id}>{method.name}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Plazas disponibles
-              <input value={flight.plazasDisponibles} disabled readOnly />
-            </label>
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={form.equipajeFacturado}
-                onChange={(event) => setForm((current) => ({ ...current, equipajeFacturado: event.target.checked }))}
-              />
-              Equipaje facturado
-            </label>
-            <label>
-              Peso equipaje kg
-              <input
-                type="number"
-                min="0"
-                max="60"
-                value={form.pesoEquipaje}
-                disabled={!form.equipajeFacturado}
-                onChange={(event) => setForm((current) => ({ ...current, pesoEquipaje: event.target.value }))}
-              />
-            </label>
+          <div className="checkout-steps">
+            <span className={step === 'passengers' ? 'active' : ''}>Pasajeros</span>
+            <span className={step === 'services' ? 'active' : ''}>Extras</span>
+            <span className={step === 'payment' ? 'active' : ''}>Pago</span>
           </div>
 
-          {selectedPayment.requiresCard && (
-            <div className="card-details">
-              <h3>Datos de tarjeta</h3>
-              <div className="form-grid">
-                <label>
-                  Nombre en tarjeta
-                  <input
-                    value={form.nombreTarjeta}
-                    onChange={(event) => setForm((current) => ({ ...current, nombreTarjeta: event.target.value }))}
-                    placeholder="Nombre completo"
-                  />
-                </label>
-                <label>
-                  Numero de tarjeta
-                  <input
-                    value={form.numeroTarjeta}
-                    onChange={(event) => setForm((current) => ({ ...current, numeroTarjeta: event.target.value }))}
-                    placeholder="4111 1111 1111 1111"
-                    inputMode="numeric"
-                  />
-                </label>
-                <label>
-                  Vencimiento
-                  <input
-                    value={form.vencimientoTarjeta}
-                    onChange={(event) => setForm((current) => ({ ...current, vencimientoTarjeta: event.target.value }))}
-                    placeholder="MM/AA"
-                  />
-                </label>
-                <label>
-                  CVV
-                  <input
-                    value={form.cvvTarjeta}
-                    onChange={(event) => setForm((current) => ({ ...current, cvvTarjeta: event.target.value }))}
-                    placeholder="123"
-                    inputMode="numeric"
-                    maxLength="4"
-                  />
-                </label>
+          <div className="checkout-card">
+            <h3>Vuelo seleccionado</h3>
+            <div className="checkout-flight-summary">
+              <div><span>Salida</span><strong>{formatTime(flight.fechaVuelo)}</strong></div>
+              <div><span>Llegada</span><strong>{formatTime(addMinutesToDate(flight.fechaVuelo, estimateDurationMinutes(flight)))}</strong></div>
+              <div><span>Tarifa</span><strong>{selectedTariff.name}</strong></div>
+              <div><span>Viajan</span><strong>{passengerCount} pasajero(s)</strong></div>
+              <div><span>Parada</span><strong>{hasTechnicalStop(flight) ? 'Con parada' : 'Directo'}</strong></div>
+            </div>
+          </div>
+
+          {step === 'passengers' && (
+            <>
+              <div className="checkout-card">
+                <h3>Informacion de pasajeros</h3>
+                <div className="passenger-list">
+                  {form.pasajeros.map((passenger, index) => (
+                    <div className="passenger-form-row" key={`passenger-${index}`}>
+                      <label>
+                        Pasajero {index + 1}
+                        <input
+                          className={touched[`pasajeros.${index}.nombre`] && passengerErrors[index]?.nombre ? 'field-invalid' : ''}
+                          value={passenger.nombre}
+                          onBlur={() => markTouched(`pasajeros.${index}.nombre`)}
+                          onChange={(event) => updatePassenger(index, 'nombre', event.target.value)}
+                          placeholder="Nombre completo"
+                        />
+                        {touched[`pasajeros.${index}.nombre`] && passengerErrors[index]?.nombre && <small className="field-error">{passengerErrors[index].nombre}</small>}
+                      </label>
+                      <label>
+                        Documento
+                        <input
+                          className={touched[`pasajeros.${index}.documento`] && passengerErrors[index]?.documento ? 'field-invalid' : ''}
+                          value={passenger.documento}
+                          onBlur={() => markTouched(`pasajeros.${index}.documento`)}
+                          onChange={(event) => updatePassenger(index, 'documento', event.target.value)}
+                          placeholder="DPI o pasaporte"
+                        />
+                        {touched[`pasajeros.${index}.documento`] && passengerErrors[index]?.documento && <small className="field-error">{passengerErrors[index].documento}</small>}
+                      </label>
+                      <label>
+                        Edad
+                        <input
+                          className={touched[`pasajeros.${index}.edad`] && passengerErrors[index]?.edad ? 'field-invalid' : ''}
+                          type="number"
+                          min="0"
+                          max="120"
+                          value={passenger.edad}
+                          onBlur={() => markTouched(`pasajeros.${index}.edad`)}
+                          onChange={(event) => updatePassenger(index, 'edad', event.target.value)}
+                        />
+                        {touched[`pasajeros.${index}.edad`] && passengerErrors[index]?.edad && <small className="field-error">{passengerErrors[index].edad}</small>}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="checkout-card">
+                <h3>Titular de reserva</h3>
+                <div className="form-grid">
+                  <label>
+                    Nombre completo
+                    <input
+                      className={touched.titularNombre && fieldErrors.titularNombre ? 'field-invalid' : ''}
+                      value={form.titularNombre}
+                      onBlur={() => markTouched('titularNombre')}
+                      onChange={(event) => setForm((current) => ({ ...current, titularNombre: event.target.value }))}
+                    />
+                    {touched.titularNombre && fieldErrors.titularNombre && <small className="field-error">{fieldErrors.titularNombre}</small>}
+                  </label>
+                  <label>
+                    Email
+                    <input
+                      className={touched.titularEmail && fieldErrors.titularEmail ? 'field-invalid' : ''}
+                      value={form.titularEmail}
+                      onBlur={() => markTouched('titularEmail')}
+                      onChange={(event) => setForm((current) => ({ ...current, titularEmail: event.target.value }))}
+                    />
+                    {touched.titularEmail && fieldErrors.titularEmail && <small className="field-error">{fieldErrors.titularEmail}</small>}
+                  </label>
+                  <label>
+                    Telefono
+                    <input
+                      className={touched.titularTelefono && fieldErrors.titularTelefono ? 'field-invalid' : ''}
+                      value={form.titularTelefono}
+                      onBlur={() => markTouched('titularTelefono')}
+                      onChange={(event) => setForm((current) => ({ ...current, titularTelefono: event.target.value }))}
+                    />
+                    {touched.titularTelefono && fieldErrors.titularTelefono && <small className="field-error">{fieldErrors.titularTelefono}</small>}
+                  </label>
+                  <label>
+                    Documento
+                    <input value={form.titularDocumento} onChange={(event) => setForm((current) => ({ ...current, titularDocumento: event.target.value }))} />
+                  </label>
+                </div>
+              </div>
+
+              {formError && <div className="form-error">{formError}</div>}
+              <button className="btn btn-primary" type="button" onClick={continueToServices}>Continuar</button>
+            </>
+          )}
+
+          {step === 'services' && (
+            <div className="checkout-card">
+              {selectedTariff.code === 'turista' && (
+                <div className="ancillary-warning">Tu tarifa Turista no incluye equipaje de bodega. Puedes agregar extras ahora o continuar sin cambios.</div>
+              )}
+              <h3>Servicios adicionales</h3>
+              <div className="ancillary-grid">
+                {ANCILLARY_SERVICES.map((service) => {
+                  const selected = selectedServices.includes(service.id);
+                  return (
+                    <button
+                      className={`ancillary-card ${selected ? 'selected' : ''}`}
+                      type="button"
+                      key={service.id}
+                      onClick={() => toggleService(service.id)}
+                    >
+                      <span>{service.icon}</span>
+                      <strong>{service.title}</strong>
+                      <small>{service.description}</small>
+                      <b>{formatMoney(service.price, currency)} por pasajero</b>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="checkout-actions">
+                <button className="btn btn-outline" type="button" onClick={() => setStep('passengers')}>Volver</button>
+                <button className="btn btn-primary" type="button" onClick={continueToPayment}>Continuar</button>
               </div>
             </div>
           )}
 
-          <div className="purchase-summary">
-            <div><span>Tarifa</span><strong>{formatCurrency(fare)}</strong></div>
-            <div><span>Equipaje extra</span><strong>{formatCurrency(baggageFee)}</strong></div>
-            <div><span>Impuestos</span><strong>{formatCurrency(taxes)}</strong></div>
-            <div className="total-row"><span>Total</span><strong>{formatCurrency(total)}</strong></div>
-          </div>
+          {step === 'payment' && (
+            <div className="payment-layout">
+              <div className="checkout-card">
+                <h3>Pago</h3>
+                <div className="form-grid">
+                  <label>
+                    Metodo de pago
+                    <select value={form.metodoPagoId} onChange={(event) => setForm((current) => ({ ...current, metodoPagoId: event.target.value }))}>
+                      {PAYMENT_METHODS.map((method) => (
+                        <option value={method.id} key={method.id}>{method.name}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Plazas disponibles
+                    <input value={flight.plazasDisponibles} disabled readOnly />
+                  </label>
+                </div>
 
-          {formError && <div className="form-error">{formError}</div>}
-          {error && <div className="form-error">{error}</div>}
-          <button className="btn btn-primary" type="submit" disabled={submitting}>
-            {submitting ? 'Confirmando' : 'Confirmar compra'}
-          </button>
+                {selectedPayment.requiresCard && (
+                  <div className="card-details">
+                    <h3>Datos de tarjeta</h3>
+                    <div className="form-grid">
+                      <label>
+                        Nombre en tarjeta
+                        <input
+                          className={touched.nombreTarjeta && fieldErrors.nombreTarjeta ? 'field-invalid' : ''}
+                          value={form.nombreTarjeta}
+                          onBlur={() => markTouched('nombreTarjeta')}
+                          onChange={(event) => setForm((current) => ({ ...current, nombreTarjeta: event.target.value }))}
+                          placeholder="Nombre completo"
+                        />
+                        {touched.nombreTarjeta && fieldErrors.nombreTarjeta && <small className="field-error">{fieldErrors.nombreTarjeta}</small>}
+                      </label>
+                      <label>
+                        Numero de tarjeta
+                        <input
+                          className={touched.numeroTarjeta && fieldErrors.numeroTarjeta ? 'field-invalid' : ''}
+                          value={form.numeroTarjeta}
+                          onBlur={() => markTouched('numeroTarjeta')}
+                          onChange={(event) => setForm((current) => ({ ...current, numeroTarjeta: event.target.value }))}
+                          placeholder="4111 1111 1111 1111"
+                          inputMode="numeric"
+                        />
+                        {touched.numeroTarjeta && fieldErrors.numeroTarjeta && <small className="field-error">{fieldErrors.numeroTarjeta}</small>}
+                      </label>
+                      <label>
+                        Vencimiento
+                        <input
+                          className={touched.vencimientoTarjeta && fieldErrors.vencimientoTarjeta ? 'field-invalid' : ''}
+                          value={form.vencimientoTarjeta}
+                          onBlur={() => markTouched('vencimientoTarjeta')}
+                          onChange={(event) => setForm((current) => ({ ...current, vencimientoTarjeta: event.target.value }))}
+                          placeholder="MM/AA"
+                        />
+                        {touched.vencimientoTarjeta && fieldErrors.vencimientoTarjeta && <small className="field-error">{fieldErrors.vencimientoTarjeta}</small>}
+                      </label>
+                      <label>
+                        CVV
+                        <input
+                          className={touched.cvvTarjeta && fieldErrors.cvvTarjeta ? 'field-invalid' : ''}
+                          value={form.cvvTarjeta}
+                          onBlur={() => markTouched('cvvTarjeta')}
+                          onChange={(event) => setForm((current) => ({ ...current, cvvTarjeta: event.target.value }))}
+                          placeholder="123"
+                          inputMode="numeric"
+                          maxLength="4"
+                        />
+                        {touched.cvvTarjeta && fieldErrors.cvvTarjeta && <small className="field-error">{fieldErrors.cvvTarjeta}</small>}
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {formError && <div className="form-error">{formError}</div>}
+                {error && <div className="form-error">{error}</div>}
+                <div className="checkout-actions">
+                  <button className="btn btn-outline" type="button" onClick={() => setStep('services')}>Volver</button>
+                  <button className="btn btn-primary" type="submit" disabled={submitting}>
+                    {submitting ? 'Confirmando' : 'Confirmar compra'}
+                  </button>
+                </div>
+              </div>
+
+              <aside className="purchase-summary sticky-summary">
+                <h3>Resumen de compra</h3>
+                <div><span>{flight.origen} - {flight.destino}</span><strong>{formatShortDate(flight.criteria?.departureDate) || formatDate(flight.fechaVuelo)}</strong></div>
+                {flight.criteria?.tripType === 'roundtrip' && <div><span>Regreso</span><strong>{formatShortDate(flight.criteria?.returnDate)}</strong></div>}
+                <div><span>Moneda</span><strong>{currency}</strong></div>
+                <div><span>Tarifa {selectedTariff.name} x {passengerCount}</span><strong>{formatMoney(fare, currency)}</strong></div>
+                <div><span>Servicios adicionales</span><strong>{formatMoney(servicesTotal, currency)}</strong></div>
+                <div><span>Impuestos</span><strong>{formatMoney(taxes, currency)}</strong></div>
+                <div className="total-row"><span>Total</span><strong>{formatMoney(total, currency)}</strong></div>
+              </aside>
+            </div>
+          )}
         </form>
       </div>
     </section>
@@ -787,15 +1252,22 @@ function getTravelResults(flights, criteria) {
 
   const destination = normalize(criteria.destination);
   const origin = normalize(criteria.origin);
-
-  return flights
+  const routeMatches = flights
     .filter((flight) => canPurchaseFlight(flight.estado))
     .filter((flight) => {
-      const destinationMatch = !destination || normalize(flight.destino) === destination;
-      const originMatch = !origin || normalize(flight.origen) === origin;
+      const flightDestination = normalize(flight.destino);
+      const flightOrigin = normalize(flight.origen);
+      const destinationMatch = !destination || flightDestination === destination || flightDestination.includes(destination) || destination.includes(flightDestination);
+      const originMatch = !origin || flightOrigin === origin || flightOrigin.includes(origin) || origin.includes(flightOrigin);
       return destinationMatch && originMatch;
-    })
-    .slice(0, 6);
+    });
+
+  const dateMatches = criteria.departureDate
+    ? routeMatches.filter((flight) => toDateInputValue(new Date(flight.fechaVuelo)) === criteria.departureDate)
+    : routeMatches;
+
+  return (dateMatches.length > 0 ? dateMatches : routeMatches)
+    .sort((first, second) => new Date(first.fechaVuelo) - new Date(second.fechaVuelo));
 }
 
 function DateFarePicker({ open, tripType, departureDate, returnDate, onClose, onApply }) {
@@ -813,9 +1285,7 @@ function DateFarePicker({ open, tripType, departureDate, returnDate, onClose, on
 
   if (!open) return null;
 
-  const today = new Date();
-  const firstMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-  const secondMonth = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + 1, 1);
+  const months = Array.from({ length: 8 }, (_, index) => new Date(2026, 4 + index, 1));
 
   const selectDate = (date) => {
     const value = toDateInputValue(date);
@@ -897,8 +1367,8 @@ function DateFarePicker({ open, tripType, departureDate, returnDate, onClose, on
   };
 
   return (
-    <div className="modal-backdrop" role="presentation">
-      <div className="fare-picker" role="dialog" aria-modal="true">
+    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <div className="fare-picker" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
         <div className="fare-picker-top">
           <button className="fare-trip-button" type="button">{tripType === 'roundtrip' ? 'Ida y vuelta' : 'Solo ida'}</button>
           <button className="fare-reset" type="button" onClick={reset}>Restablecer</button>
@@ -908,8 +1378,7 @@ function DateFarePicker({ open, tripType, departureDate, returnDate, onClose, on
           </div>
         </div>
         <div className="fare-picker-body">
-          {renderMonth(firstMonth)}
-          {renderMonth(secondMonth)}
+          {months.map(renderMonth)}
         </div>
         <div className="fare-picker-footer">
           <span>Los precios de los viajes se muestran en GTQ</span>
@@ -920,35 +1389,124 @@ function DateFarePicker({ open, tripType, departureDate, returnDate, onClose, on
   );
 }
 
-function TravelSearchSection({ flights, onExplore }) {
+function AirportCombobox({ label, value, airportOptions, placeholder, onChange }) {
+  const datalistId = `${label.toLowerCase()}-airports`;
+
+  return (
+    <label>
+      <span className="field-title"><span className="field-icon">{label === 'Origen' ? '↗' : '⌖'}</span>{label}</span>
+      <input
+        list={datalistId}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+      />
+      <datalist id={datalistId}>
+        {airportOptions.map((airport) => (
+          <option value={airportLabel(airport)} key={`${label}-${airport.name}`} />
+        ))}
+      </datalist>
+    </label>
+  );
+}
+
+function PassengerPicker({ open, groups, onClose, onApply }) {
+  const [draftGroups, setDraftGroups] = useState(groups);
+
+  useEffect(() => {
+    if (open) setDraftGroups(groups);
+  }, [groups, open]);
+
+  if (!open) return null;
+
+  const updateGroup = (key, delta) => {
+    setDraftGroups((current) => {
+      const minimum = key === 'adults' ? 1 : 0;
+      return { ...current, [key]: Math.max(minimum, Number(current[key] || 0) + delta) };
+    });
+  };
+
+  return (
+    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
+      <div className="passenger-picker" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+        <h2>Quienes vuelan?</h2>
+        {PASSENGER_GROUPS.map((group) => (
+          <div className="passenger-counter-row" key={group.key}>
+            <div>
+              <strong>{group.label}</strong>
+              <small>{group.hint}</small>
+            </div>
+            <button type="button" onClick={() => updateGroup(group.key, -1)} disabled={group.key === 'adults' && draftGroups[group.key] <= 1}>−</button>
+            <span>{draftGroups[group.key]}</span>
+            <button type="button" onClick={() => updateGroup(group.key, 1)}>+</button>
+          </div>
+        ))}
+        <button className="passenger-confirm" type="button" onClick={() => { onApply(draftGroups); onClose(); }}>Confirmar</button>
+      </div>
+    </div>
+  );
+}
+
+function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
   const airportOptions = useMemo(() => {
-    const values = new Set();
-    flights.forEach((flight) => {
-      if (flight.origen) values.add(flight.origen);
-      if (flight.destino) values.add(flight.destino);
+    const values = new Map();
+    airports.forEach((airport) => {
+      const option = toAirportOption(airport);
+      if (option.id && option.name) values.set(normalize(option.name), option);
     });
 
-    return Array.from(values).sort((first, second) => first.localeCompare(second));
-  }, [flights]);
+    KNOWN_AIRPORTS.forEach((airport) => {
+      if (!values.has(normalize(airport.name))) values.set(normalize(airport.name), airport);
+    });
+
+    flights.forEach((flight) => {
+      if (flight.origen && !values.has(normalize(flight.origen))) {
+        values.set(normalize(flight.origen), { name: flight.origen, country: airportCountryFallback(flight.origen), aliases: [] });
+      }
+      if (flight.destino && !values.has(normalize(flight.destino))) {
+        values.set(normalize(flight.destino), { name: flight.destino, country: airportCountryFallback(flight.destino), aliases: [] });
+      }
+    });
+
+    return Array.from(values.values()).sort((first, second) => airportLabel(first).localeCompare(airportLabel(second)));
+  }, [airports, flights]);
 
   const [criteria, setCriteria] = useState({
     tripType: 'roundtrip',
     passengers: 1,
-    className: 'economica',
+    passengerGroups: DEFAULT_PASSENGER_GROUPS,
+    passengerAges: passengerAgesFromCriteria({ passengerGroups: DEFAULT_PASSENGER_GROUPS }),
     origin: '',
     destination: '',
     departureDate: '',
     returnDate: ''
   });
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [passengerPickerOpen, setPassengerPickerOpen] = useState(false);
 
   const updateCriteria = (field, value) => {
-    setCriteria((current) => ({ ...current, [field]: value }));
+    setCriteria((current) => {
+      return { ...current, [field]: value };
+    });
+  };
+
+  const updatePassengerGroups = (groups) => {
+    setCriteria((current) => ({
+      ...current,
+      passengerGroups: groups,
+      passengers: passengerCountFromGroups(groups),
+      passengerAges: passengerAgesFromCriteria({ passengerGroups: groups })
+    }));
   };
 
   const submit = (event) => {
     event.preventDefault();
-    onExplore(criteria);
+    onExplore({
+      ...criteria,
+      origin: resolveAirportQuery(criteria.origin, airportOptions),
+      destination: resolveAirportQuery(criteria.destination, airportOptions),
+      currency
+    });
   };
 
   return (
@@ -959,52 +1517,44 @@ function TravelSearchSection({ flights, onExplore }) {
         <form className="travel-search-card" onSubmit={submit}>
           <div className="travel-topbar">
             <label>
-              Tipo
+              <span className="field-title"><span className="field-icon">⇄</span>Tipo</span>
               <select value={criteria.tripType} onChange={(event) => updateCriteria('tripType', event.target.value)}>
                 <option value="roundtrip">Ida y vuelta</option>
                 <option value="oneway">Solo ida</option>
               </select>
             </label>
             <label>
-              Personas
-              <select value={criteria.passengers} onChange={(event) => updateCriteria('passengers', event.target.value)}>
-                {[1, 2, 3, 4, 5, 6].map((count) => <option value={count} key={count}>{count}</option>)}
-              </select>
-            </label>
-            <label>
-              Clase
-              <select value={criteria.className} onChange={(event) => updateCriteria('className', event.target.value)}>
-                <option value="economica">Turista</option>
-                <option value="ejecutiva">Ejecutiva</option>
-                <option value="primera">Primera</option>
-              </select>
+              <span className="field-title"><span className="field-icon">☉</span>Personas</span>
+              <button className="date-field-button" type="button" onClick={() => setPassengerPickerOpen(true)}>
+                {passengerCountFromGroups(criteria.passengerGroups)} persona(s)
+              </button>
             </label>
           </div>
 
           <div className="travel-fields">
+            <AirportCombobox
+              label="Origen"
+              value={criteria.origin}
+              airportOptions={airportOptions}
+              placeholder="Guatemala, Miami, Colombia..."
+              onChange={(value) => updateCriteria('origin', value)}
+            />
+            <AirportCombobox
+              label="Destino"
+              value={criteria.destination}
+              airportOptions={airportOptions}
+              placeholder="Guatemala, Miami, Colombia..."
+              onChange={(value) => updateCriteria('destination', value)}
+            />
             <label>
-              Origen
-              <select value={criteria.origin} onChange={(event) => updateCriteria('origin', event.target.value)}>
-                <option value="">Cualquier origen</option>
-                {airportOptions.map((airport) => <option value={airport} key={airport}>{airport}</option>)}
-              </select>
-            </label>
-            <label>
-              Destino
-              <select value={criteria.destination} onChange={(event) => updateCriteria('destination', event.target.value)}>
-                <option value="">Cualquier destino</option>
-                {airportOptions.map((airport) => <option value={airport} key={airport}>{airport}</option>)}
-              </select>
-            </label>
-            <label>
-              Salida
+              <span className="field-title"><span className="field-icon">▣</span>Salida</span>
               <button className="date-field-button" type="button" onClick={() => setDatePickerOpen(true)}>
                 {criteria.departureDate ? formatShortDate(criteria.departureDate) : 'Salida'}
               </button>
             </label>
             {criteria.tripType === 'roundtrip' && (
               <label>
-                Vuelta
+                <span className="field-title"><span className="field-icon">↩</span>Vuelta</span>
                 <button className="date-field-button" type="button" onClick={() => setDatePickerOpen(true)}>
                   {criteria.returnDate ? formatShortDate(criteria.returnDate) : 'Vuelta'}
                 </button>
@@ -1014,6 +1564,12 @@ function TravelSearchSection({ flights, onExplore }) {
 
           <button className="explore-button" type="submit">Explorar</button>
         </form>
+        <PassengerPicker
+          open={passengerPickerOpen}
+          groups={criteria.passengerGroups}
+          onClose={() => setPassengerPickerOpen(false)}
+          onApply={updatePassengerGroups}
+        />
         <DateFarePicker
           open={datePickerOpen}
           tripType={criteria.tripType}
@@ -1032,6 +1588,29 @@ function TravelSearchSection({ flights, onExplore }) {
 
 function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, onBuyFlight, buyingFlightId }) {
   const results = useMemo(() => getTravelResults(flights, criteria), [criteria, flights]);
+  const [expandedFlightId, setExpandedFlightId] = useState(null);
+  const [pendingUpgrade, setPendingUpgrade] = useState(null);
+  const passengerCount = passengerCountFromCriteria(criteria);
+  const currency = criteria.currency || 'GTQ';
+
+  useEffect(() => {
+    setExpandedFlightId(results[0]?.id || null);
+  }, [results]);
+
+  const chooseFare = (flight, family) => {
+    if (!user) {
+      onRequireLogin();
+      return;
+    }
+
+    const nextFamily = nextTariffFamily(family);
+    if (nextFamily) {
+      setPendingUpgrade({ flight, family, nextFamily });
+      return;
+    }
+
+    onBuyFlight(flight, family.className, criteria);
+  };
 
   return (
     <section className="travel-results-section">
@@ -1040,9 +1619,9 @@ function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, on
         <div className="travel-results-header">
           <div>
             <div className="section-label">Resultados</div>
-            <h2>Vuelos de ida destacados</h2>
+            <h2>Vuelos disponibles</h2>
           </div>
-          <span>{results.length} opciones</span>
+          <span>{results.length} opciones - {criteria.tripType === 'roundtrip' ? 'ida y vuelta' : 'solo ida'}</span>
         </div>
 
         {results.length === 0 && (
@@ -1050,55 +1629,190 @@ function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, on
         )}
 
         {results.map((flight) => {
-          const duration = flight.retrasoMinutos > 0 ? `${flight.retrasoMinutos} min retraso` : 'Salida programada';
+          const duration = estimateDurationMinutes(flight);
+          const arrival = addMinutesToDate(flight.fechaVuelo, duration);
+          const expanded = expandedFlightId === flight.id;
           return (
-            <article className="travel-result-row" key={flight.id}>
-              <div className="airline-mark">{flight.aerolinea?.slice(0, 2).toUpperCase() || 'AV'}</div>
-              <div>
-                <strong>{formatTime(flight.fechaVuelo)} - {flight.numeroVuelo}</strong>
-                <small>{flight.aerolinea}</small>
-              </div>
-              <div>
-                <strong>{flight.origen} - {flight.destino}</strong>
-                <small>{flight.matriculaAvion}</small>
-              </div>
-              <div>
-                <strong>{duration}</strong>
-                <small>{criteria.tripType === 'roundtrip' ? 'ida y vuelta' : 'solo ida'} Â· {criteria.passengers} pasajero(s)</small>
-              </div>
-              <div className="result-price">
-                <strong>{formatCurrency(BASE_FARE * CLASS_MULTIPLIERS[criteria.className])}</strong>
-                <small>desde</small>
-              </div>
-              <button
-                className="buy-button"
-                type="button"
-                onClick={() => (user ? onBuyFlight(flight) : onRequireLogin())}
-                disabled={buyingFlightId === flight.id}
-              >
-                {buyingFlightId === flight.id ? 'Comprando' : 'Comprar'}
+            <article className="flight-result-card" key={flight.id}>
+              <button className="flight-result-summary" type="button" onClick={() => setExpandedFlightId(expanded ? null : flight.id)}>
+                <span className="airline-mark">{flight.aerolinea?.slice(0, 2).toUpperCase() || 'AV'}</span>
+                <span>
+                  <strong>{formatTime(flight.fechaVuelo)} - {formatTime(arrival)}</strong>
+                  <small>{flight.numeroVuelo} - {flight.aerolinea}</small>
+                </span>
+                <span>
+                  <strong>{flight.origen} - {flight.destino}</strong>
+                  <small>{criteria.departureDate ? formatShortDate(criteria.departureDate) : formatShortDate(toDateInputValue(new Date(flight.fechaVuelo)))}</small>
+                </span>
+                <span>
+                  <strong>{hasTechnicalStop(flight) ? 'Con parada' : 'Directo'}</strong>
+                  <small>{duration} min - {passengerCount} pasajero(s)</small>
+                </span>
+                <span className="result-price">
+                  <strong>{formatMoney(calculateFlightFare('economica', passengerCount), currency)}</strong>
+                  <small>desde</small>
+                </span>
+                <span className="expand-indicator">{expanded ? 'Ocultar' : 'Ver tarifas'}</span>
               </button>
+
+              {expanded && (
+                <div className="tariff-grid">
+                  {TARIFF_FAMILIES.map((family) => {
+                    const fare = calculateFlightFare(family.className, passengerCount);
+                    return (
+                      <section className={`tariff-card ${family.code === 'ejecutiva' ? 'recommended' : ''}`} key={family.code}>
+                        {family.code === 'ejecutiva' && <span className="tariff-badge">Recomendada</span>}
+                        <h3>{family.name}</h3>
+                        <p>{family.tagline}</p>
+                        <strong className="tariff-price">{formatMoney(fare, currency)}</strong>
+                        <ul>
+                          {family.benefits.map(([state, benefit]) => (
+                            <li className={state === 'check' ? 'included' : 'excluded'} key={benefit}>
+                              <span>{state === 'check' ? '✓' : '×'}</span>
+                              {benefit}
+                            </li>
+                          ))}
+                        </ul>
+                        <button
+                          className={family.code === 'ejecutiva' ? 'btn btn-primary' : 'btn btn-outline'}
+                          type="button"
+                          onClick={() => chooseFare(flight, family)}
+                          disabled={buyingFlightId === flight.id}
+                        >
+                          {buyingFlightId === flight.id ? 'Procesando' : `Elegir ${family.name}`}
+                        </button>
+                      </section>
+                    );
+                  })}
+                </div>
+              )}
             </article>
           );
         })}
       </div>
+
+      {pendingUpgrade && (
+        <div className="modal-backdrop" role="presentation">
+          <div className="upgrade-modal" role="dialog" aria-modal="true">
+            <button className="modal-close" type="button" onClick={() => setPendingUpgrade(null)}>×</button>
+            <div className="section-label">Mejora tu tarifa</div>
+            <h2>Quieres subir a {pendingUpgrade.nextFamily.name}?</h2>
+            <p>{pendingUpgrade.nextFamily.name} agrega mas beneficios que {pendingUpgrade.family.name} para este viaje.</p>
+            <div className="upgrade-comparison">
+              <span>{pendingUpgrade.family.name}</span>
+              <strong>{formatMoney(calculateFlightFare(pendingUpgrade.family.className, passengerCount), currency)}</strong>
+              <span>{pendingUpgrade.nextFamily.name}</span>
+              <strong>{formatMoney(calculateFlightFare(pendingUpgrade.nextFamily.className, passengerCount), currency)}</strong>
+            </div>
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={() => {
+                onBuyFlight(pendingUpgrade.flight, pendingUpgrade.nextFamily.className, criteria);
+                setPendingUpgrade(null);
+              }}
+            >
+              Mejorar a {pendingUpgrade.nextFamily.name}
+            </button>
+            <button
+              className="continue-restricted"
+              type="button"
+              onClick={() => {
+                onBuyFlight(pendingUpgrade.flight, pendingUpgrade.family.className, criteria);
+                setPendingUpgrade(null);
+              }}
+            >
+              Continuar con {pendingUpgrade.family.name}
+            </button>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
 
-function DestinationSection({ destinations }) {
+function CartView({ items, user, onBack, onRequireLogin, onCheckoutItem, onRemoveItem }) {
+  const cartTotal = items.reduce((sum, item) => (
+    sum + calculateFlightFare(item.selectedClass || 'economica', passengerCountFromCriteria(item.criteria))
+  ), 0);
+  const currency = items[0]?.criteria?.currency || 'GTQ';
+
   return (
-    <section className="section compact-section">
+    <main className="cart-page">
+      <section className="cart-shell">
+        <button className="back-button" type="button" onClick={onBack}>Volver</button>
+        <div className="section-label">Carrito de compras</div>
+        <h1>Vuelos seleccionados</h1>
+        {items.length === 0 && <div className="board-empty">Tu carrito esta vacio.</div>}
+
+        <div className="cart-list">
+          {items.map((item) => {
+            const passengerCount = passengerCountFromCriteria(item.criteria);
+            const selectedTariff = tariffByClassName(item.selectedClass || 'economica');
+            const fare = calculateFlightFare(item.selectedClass || 'economica', passengerCount);
+            const arrival = addMinutesToDate(item.fechaVuelo, estimateDurationMinutes(item));
+
+            return (
+              <article className="cart-flight-card" key={item.cartId}>
+                <div className="cart-flight-icon">✈</div>
+                <div className="cart-flight-main">
+                  <div className="cart-flight-title">
+                    <strong>{item.numeroVuelo} - {item.aerolinea}</strong>
+                    <span>{formatMoney(fare, item.criteria?.currency || 'GTQ')}</span>
+                  </div>
+                  <div className="cart-flight-route">
+                    <span>{item.origen}</span>
+                    <b>{formatTime(item.fechaVuelo)} - {formatTime(arrival)}</b>
+                    <span>{item.destino}</span>
+                  </div>
+                  <div className="cart-flight-meta">
+                    <span><i>◷</i>{item.criteria?.tripType === 'roundtrip' ? 'Ida y vuelta' : 'Solo ida'}</span>
+                    <span><i>☉</i>{passengerCount} pasajero(s)</span>
+                    <span><i>▣</i>{selectedTariff.name}</span>
+                    <span><i>$</i>{item.criteria?.currency || 'GTQ'}</span>
+                  </div>
+                </div>
+                <div className="cart-flight-actions">
+                  <button className="btn btn-primary" type="button" onClick={() => (user ? onCheckoutItem(item) : onRequireLogin())}>Comprar este vuelo</button>
+                  <button className="btn btn-outline" type="button" onClick={() => onRemoveItem(item.cartId)}>Eliminar</button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        {items.length > 0 && (
+          <aside className="cart-total-box">
+            <span>Subtotal del carrito</span>
+            <strong>{formatMoney(cartTotal, currency)}</strong>
+          </aside>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function DestinationSection({ destinations, onDestinationClick }) {
+  const rankedDestinations = [...destinations]
+    .sort((first, second) => {
+      const firstScore = Number(first.totalBusquedas || 0) + Number(first.totalClicks || 0);
+      const secondScore = Number(second.totalBusquedas || 0) + Number(second.totalClicks || 0);
+      return secondScore - firstScore || destinationReportName(first).localeCompare(destinationReportName(second));
+    })
+    .slice(0, 5);
+
+  return (
+    <section className="section compact-section" id="destinos">
       <div className="section-label">Interes de pasajeros</div>
       <h2 className="section-title">Destinos mas buscados</h2>
       <div className="destination-grid">
-        {destinations.length === 0 && <p className="muted-text">Los destinos apareceran cuando el reporte tenga datos.</p>}
-        {destinations.map((destination, index) => (
-          <article className="destination-card" key={destination.aeropuertoId}>
+        {rankedDestinations.length === 0 && <p className="muted-text">Los destinos apareceran cuando el reporte tenga datos.</p>}
+        {rankedDestinations.map((destination, index) => (
+          <button className="destination-card destination-button" type="button" key={destinationReportId(destination)} onClick={() => onDestinationClick(destination)}>
             <span>{String(index + 1).padStart(2, '0')}</span>
-            <strong>{destination.aeropuerto}</strong>
-            <small>{destination.totalBusquedas} busquedas Â· {destination.totalClicks} clicks Â· {destination.totalPasajeros} pasajeros</small>
-          </article>
+            <strong>{destinationReportName(destination)}</strong>
+            <small>{Number(destination.totalBusquedas || 0) + Number(destination.totalClicks || 0)} puntos - {destination.totalBusquedas} busquedas - {destination.totalClicks} clicks</small>
+          </button>
         ))}
       </div>
     </section>
@@ -1418,6 +2132,9 @@ function App() {
   const [loginOpen, setLoginOpen] = useState(false);
   const [flightSearch, setFlightSearch] = useState('');
   const [travelCriteria, setTravelCriteria] = useState(null);
+  const [cartOpen, setCartOpen] = useState(false);
+  const [activeView, setActiveView] = useState('inicio');
+  const [currency, setCurrency] = useState('GTQ');
   const [user, setUser] = useState(() => {
     const stored = window.localStorage.getItem(SESSION_KEY);
     return stored ? JSON.parse(stored) : null;
@@ -1428,11 +2145,19 @@ function App() {
   const isAdmin = isAdminUser(user);
   const [buyingFlightId, setBuyingFlightId] = useState(null);
   const [selectedFlight, setSelectedFlight] = useState(null);
+  const [cartItems, setCartItems] = useState(() => {
+    const stored = window.localStorage.getItem(CART_KEY);
+    if (!stored) return [];
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  });
+  const [pendingSection, setPendingSection] = useState('');
   const [purchaseError, setPurchaseError] = useState('');
   const [purchaseMessage, setPurchaseMessage] = useState('');
   const [dashboard, setDashboard] = useState({
     health: null,
     flights: [],
+    airports: [],
     destinations: [],
     severities: [],
     baggage: [],
@@ -1445,8 +2170,9 @@ function App() {
 
     const requests = await Promise.allSettled([
       api.health(),
-      api.flights(100),
-      api.topDestinations(6),
+      api.flights(1000),
+      api.airports(500),
+      api.topDestinations(5),
       api.incidentsBySeverity(),
       api.baggage(5),
       api.incidents(5)
@@ -1457,10 +2183,11 @@ function App() {
     setDashboard({
       health: requests[0].status === 'fulfilled' ? requests[0].value : null,
       flights: requests[1].status === 'fulfilled' ? requests[1].value : [],
-      destinations: requests[2].status === 'fulfilled' ? requests[2].value : [],
-      severities: requests[3].status === 'fulfilled' ? requests[3].value : [],
-      baggage: requests[4].status === 'fulfilled' ? requests[4].value : [],
-      incidents: requests[5].status === 'fulfilled' ? requests[5].value : []
+      airports: requests[2].status === 'fulfilled' ? requests[2].value : [],
+      destinations: requests[3].status === 'fulfilled' ? requests[3].value : [],
+      severities: requests[4].status === 'fulfilled' ? requests[4].value : [],
+      baggage: requests[5].status === 'fulfilled' ? requests[5].value : [],
+      incidents: requests[6].status === 'fulfilled' ? requests[6].value : []
     });
 
     if (firstFailure) {
@@ -1474,6 +2201,17 @@ function App() {
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
+
+  useEffect(() => {
+    if (!pendingSection) return undefined;
+
+    const timeout = window.setTimeout(() => {
+      document.getElementById(pendingSection)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setPendingSection('');
+    }, 60);
+
+    return () => window.clearTimeout(timeout);
+  }, [pendingSection, selectedFlight, travelCriteria, adminView]);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -1507,6 +2245,16 @@ function App() {
     return () => window.clearTimeout(retry);
   }, [dashboard.health, error, loadDashboard]);
 
+  useEffect(() => {
+    if (activeView !== 'inicio') return undefined;
+
+    const interval = window.setInterval(() => {
+      refreshTopDestinations();
+    }, 5000);
+
+    return () => window.clearInterval(interval);
+  }, [activeView]);
+
   const openIncidents = useMemo(
     () => dashboard.severities.reduce((sum, severity) => sum + Number(severity.abiertos || 0), 0),
     [dashboard.severities]
@@ -1530,24 +2278,90 @@ function App() {
     window.localStorage.removeItem(SESSION_KEY);
     setUser(null);
     setAdminView('');
+    setSelectedFlight(null);
     setPurchaseMessage('');
   };
 
-  const handleBuyFlight = (flight) => {
+  const handleBuyFlight = (flight, selectedClass = 'economica', criteria = travelCriteria) => {
     if (!canPurchaseFlight(flight.estado)) {
       setPurchaseMessage('Solo se pueden comprar vuelos programados.');
       return;
     }
 
-    setSelectedFlight(flight);
+    const nextCartItem = {
+      ...flight,
+      cartId: `${flight.id}-${Date.now()}`,
+      selectedClass,
+      criteria: {
+        tripType: criteria?.tripType || 'oneway',
+        passengers: passengerCountFromCriteria(criteria),
+        passengerAges: passengerAgesFromCriteria(criteria),
+        origin: criteria?.origin || flight.origen || '',
+        destination: criteria?.destination || flight.destino || '',
+        departureDate: criteria?.departureDate || '',
+        returnDate: criteria?.returnDate || '',
+        currency: criteria?.currency || currency
+      }
+    };
+
+    const nextCartItems = [...cartItems, nextCartItem];
+    setCartItems(nextCartItems);
+    window.localStorage.setItem(CART_KEY, JSON.stringify(nextCartItems));
+    setSelectedFlight(nextCartItem);
     setPurchaseError('');
     setPurchaseMessage('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const refreshTopDestinations = async () => {
+    try {
+      const destinations = await api.topDestinations(5);
+      setDashboard((current) => ({ ...current, destinations }));
+    } catch {
+      // El ranking no debe bloquear el flujo de compra.
+    }
+  };
+
+  const registerFlightSearch = async (criteria) => {
+    const origin = matchAirportRecord(dashboard.airports, criteria.origin || 'La Aurora');
+    const destination = matchAirportRecord(dashboard.airports, criteria.destination);
+    const originId = airportId(origin);
+    const destinationId = airportId(destination);
+
+    const departureDate = criteria.departureDate || toDateInputValue(new Date());
+
+    if (!originId || !destinationId) return;
+
+    console.info('Registrando busqueda en AER_BUSQUEDAVUELO', { originId, destinationId, criteria });
+    setDashboard((current) => ({
+      ...current,
+      destinations: incrementDestinationScore(current.destinations, destinationId, 'totalBusquedas', airportName(destination))
+    }));
+
+    try {
+      await api.createFlightSearch({
+        sesionId: null,
+        aeropuertoOrigenId: originId,
+        aeropuertoDestinoId: destinationId,
+        fechaIda: `${departureDate}T00:00:00`,
+        fechaVuelta: criteria.returnDate ? `${criteria.returnDate}T00:00:00` : null,
+        numeroPasajeros: passengerCountFromCriteria(criteria),
+        clase: null,
+        fechaBusqueda: new Date().toISOString(),
+        seConvirtioCompra: 'N'
+      });
+      await refreshTopDestinations();
+    } catch (analyticsError) {
+      console.error('No se pudo guardar la busqueda en AER_BUSQUEDAVUELO.', analyticsError);
+    }
+  };
+
   const handleExploreFlights = (criteria) => {
     setTravelCriteria(criteria);
     setSelectedFlight(null);
+    setCartOpen(false);
+    setActiveView('explorar');
+    registerFlightSearch(criteria);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -1571,6 +2385,9 @@ function App() {
 
       setPurchaseMessage(`Compra confirmada para ${selectedFlight.numeroVuelo}. Reserva ${purchase.codigoReserva}. Total ${formatCurrency(purchase.total)}.`);
       setSelectedFlight(null);
+      const nextCartItems = cartItems.filter((item) => item.cartId !== selectedFlight.cartId);
+      setCartItems(nextCartItems);
+      window.localStorage.setItem(CART_KEY, JSON.stringify(nextCartItems));
       await loadDashboard();
     } catch (purchaseError) {
       setPurchaseError(purchaseError.message);
@@ -1590,25 +2407,129 @@ function App() {
     );
   }, [dashboard.flights, flightSearch]);
 
+  const handleNavigate = (event, section) => {
+    event.preventDefault();
+    setAdminView('');
+    setSelectedFlight(null);
+    setTravelCriteria(null);
+    setCartOpen(false);
+    setActiveView(section);
+    setPendingSection(section === 'inicio' ? 'inicio' : '');
+  };
+
+  const continueCartItem = (item = cartItems[0]) => {
+    if (!item) return;
+    if (!user) {
+      setLoginOpen(true);
+      return;
+    }
+
+    setSelectedFlight(item);
+    setCartOpen(false);
+    setPurchaseError('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const openCart = () => {
+    setAdminView('');
+    setSelectedFlight(null);
+    setTravelCriteria(null);
+    setActiveView('carrito');
+    setCartOpen(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const removeCartItem = (cartId) => {
+    const nextCartItems = cartItems.filter((item) => item.cartId !== cartId);
+    setCartItems(nextCartItems);
+    window.localStorage.setItem(CART_KEY, JSON.stringify(nextCartItems));
+  };
+
+  const handleDestinationClick = async (destination) => {
+    const destinationId = destinationReportId(destination);
+    const destinationName = destinationReportName(destination);
+
+    if (!destinationId) {
+      console.error('No se puede registrar click sin aeropuertoDestinoId.', destination);
+      return;
+    }
+
+    setDashboard((current) => ({
+      ...current,
+      destinations: incrementDestinationScore(current.destinations, destinationId, 'totalClicks', destinationName)
+    }));
+
+    try {
+      console.info('Registrando click en AER_CLICKDESTINO', destination);
+      await api.createDestinationClick({
+        sesionId: null,
+        aeropuertoDestinoId: destinationId,
+        fechaClick: new Date().toISOString(),
+        origenBusqueda: 'home',
+        fechaViajeBuscada: null,
+        numeroPasajeros: null,
+        claseBuscada: null
+      });
+      await refreshTopDestinations();
+    } catch (analyticsError) {
+      console.error('No se pudo guardar el click en AER_CLICKDESTINO.', analyticsError);
+    }
+
+    setTravelCriteria({
+      tripType: 'roundtrip',
+      passengers: 1,
+      passengerGroups: DEFAULT_PASSENGER_GROUPS,
+      passengerAges: passengerAgesFromCriteria({ passengerGroups: DEFAULT_PASSENGER_GROUPS }),
+      origin: '',
+      destination: destinationName,
+      departureDate: '',
+      returnDate: '',
+      currency
+    });
+    setActiveView('explorar');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <>
-      <NavBar user={user} adminView={adminView} isAdmin={isAdmin} onAdminView={setAdminView} onLoginClick={() => setLoginOpen(true)} onLogout={handleLogout} />
+      <NavBar
+        user={user}
+        adminView={adminView}
+        isAdmin={isAdmin}
+        activeView={activeView}
+        cartCount={cartItems.length}
+        onAdminView={setAdminView}
+        onNavigate={handleNavigate}
+        onCartClick={openCart}
+        onLoginClick={() => setLoginOpen(true)}
+        onLogout={handleLogout}
+      />
       <AuthModal open={loginOpen} onClose={() => setLoginOpen(false)} onLogin={handleLogin} onRegister={handleRegister} />
       {adminView === 'admin' && isAdmin ? (
         <AdminSection tables={tables} selectedTable={selectedTable} onSelectTable={setSelectedTable} />
       ) : adminView === 'reporteria' && isAdmin ? (
         <ReporteriaSection />
+      ) : cartOpen ? (
+        <CartView
+          items={cartItems}
+          user={user}
+          onBack={() => setCartOpen(false)}
+          onRequireLogin={() => setLoginOpen(true)}
+          onCheckoutItem={continueCartItem}
+          onRemoveItem={removeCartItem}
+        />
       ) : selectedFlight ? (
         <main>
           <CheckoutView
             flight={selectedFlight}
+            user={user}
             onBack={() => setSelectedFlight(null)}
             onConfirm={handleConfirmPurchase}
             submitting={Boolean(buyingFlightId)}
             error={purchaseError}
           />
         </main>
-      ) : travelCriteria ? (
+      ) : activeView === 'explorar' && travelCriteria ? (
         <main>
           <TravelResultsView
             criteria={travelCriteria}
@@ -1620,15 +2541,17 @@ function App() {
             buyingFlightId={buyingFlightId}
           />
         </main>
-      ) : (
-        <main>
-          <Hero health={dashboard.health} refreshing={refreshing} onRefresh={loadDashboard} />
-          {error && <div className="connection-alert">{error}</div>}
-          {purchaseMessage && <div className="connection-alert success-alert">{purchaseMessage}</div>}
+      ) : activeView === 'explorar' ? (
+        <main className="tab-page">
           <TravelSearchSection
             flights={dashboard.flights}
+            airports={dashboard.airports}
+            currency={currency}
             onExplore={handleExploreFlights}
           />
+        </main>
+      ) : activeView === 'rastreo' ? (
+        <main className="tab-page">
           <FlightBoard
             flights={filteredFlights}
             loading={loading}
@@ -1639,13 +2562,28 @@ function App() {
             searchTerm={flightSearch}
             onSearchChange={setFlightSearch}
           />
+        </main>
+      ) : activeView === 'ubicacion' ? (
+        <main className="tab-page">
           <LocationSection />
+        </main>
+      ) : (
+        <main>
+          <Hero />
+          {purchaseMessage && <div className="connection-alert success-alert">{purchaseMessage}</div>}
+          <DestinationSection destinations={dashboard.destinations} onDestinationClick={handleDestinationClick} />
         </main>
       )}
       <footer>
         <div className="footer-logo">Aeropuerto Internacional La Aurora</div>
-        <p>Ciudad de Guatemala Â· Codigo IATA: GUA Â· Codigo ICAO: MGGT</p>
+        <p>Ciudad de Guatemala - Codigo IATA: GUA - Codigo ICAO: MGGT</p>
         <p>Frontend React conectado al API del proyecto.</p>
+        <label className="footer-currency">
+          <span>Moneda</span>
+          <select value={currency} onChange={(event) => setCurrency(event.target.value)}>
+            {CURRENCIES.map((item) => <option value={item} key={item}>{item}</option>)}
+          </select>
+        </label>
       </footer>
     </>
   );

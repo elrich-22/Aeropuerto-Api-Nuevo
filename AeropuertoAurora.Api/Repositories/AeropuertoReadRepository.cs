@@ -536,7 +536,7 @@ public sealed class AeropuertoReadRepository(IOracleConnectionFactory connection
                 LEFT JOIN AER_BUSQUEDAVUELO b ON b.BUS_ID_AEROPUERTO_DESTINO = a.AER_ID
                 LEFT JOIN AER_CLICKDESTINO c ON c.CLI_ID_AEROPUERTO_DESTINO = a.AER_ID
                 GROUP BY a.AER_ID, a.AER_NOMBRE
-                ORDER BY TOTAL_BUSQUEDAS DESC, TOTAL_CLICKS DESC, a.AER_NOMBRE
+                ORDER BY (COUNT(DISTINCT b.BUS_ID_BUSQUEDA) + COUNT(DISTINCT c.CLI_ID_CLICK)) DESC, a.AER_NOMBRE
             ) WHERE ROWNUM <= :limit
             """;
 
