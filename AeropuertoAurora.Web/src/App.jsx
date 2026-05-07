@@ -4,6 +4,17 @@ import NavBar from './components/layout/NavBar';
 import Stars from './components/shared/Stars';
 import Plane from './components/shared/Plane';
 import Footer from './components/layout/Footer';
+import {
+  SESSION_KEY,
+  CART_KEY,
+  BASE_FARE,
+  CURRENCY_RATES,
+  CURRENCIES,
+  CLASS_LABELS,
+  DOCUMENT_TYPES,
+  NATIONALITIES,
+  SEX_OPTIONS
+} from './constants/appConstants';
 
 const services = [
   {
@@ -92,32 +103,12 @@ const statusClassName = (status = '') => {
   return 'neutral';
 };
 
-const SESSION_KEY = 'aeropuertoAurora.user';
-const CART_KEY = 'aeropuertoAurora.cart';
-const BASE_FARE = 1250;
-const CURRENCY_RATES = {
-  GTQ: 1,
-  USD: 0.128,
-  EUR: 0.12,
-  COP: 512,
-  MXN: 2.35,
-  CRC: 65.5,
-  HNL: 3.18,
-  NIO: 4.72,
-  PAB: 0.128,
-  CAD: 0.176,
-  BRL: 0.66,
-  GBP: 0.103,
-  JPY: 20.1,
-  CHF: 0.117,
-  AUD: 0.197
-};
-const CURRENCIES = Object.keys(CURRENCY_RATES);
-const CLASS_LABELS = {
-  economica: 'Turista',
-  ejecutiva: 'Ejecutiva',
-  primera: 'Primera clase'
-};
+
+
+
+
+
+
 const TARIFF_FAMILIES = [
   {
     code: 'turista',
@@ -191,12 +182,9 @@ const ANCILLARY_SERVICES = [
   { id: 'priority', title: 'Prioridad de abordaje', description: 'Aborda primero y ahorra tiempo en puerta.', price: 95, icon: 'PR' }
 ];
 
-const DOCUMENT_TYPES = ['DPI', 'Pasaporte', 'Licencia'];
-const NATIONALITIES = ['Guatemala', 'El Salvador', 'Honduras', 'Nicaragua', 'Costa Rica', 'Panama', 'Mexico', 'Estados Unidos', 'Otra'];
-const SEX_OPTIONS = [
-  { value: 'M', label: 'Masculino' },
-  { value: 'F', label: 'Femenino' }
-];
+
+
+
 
 const canPurchaseFlight = (status = '') => normalize(status) === 'programado';
 
