@@ -3,6 +3,7 @@ import { api } from './services/api';
 import NavBar from './components/layout/NavBar';
 import Stars from './components/shared/Stars';
 import Plane from './components/shared/Plane';
+import Footer from './components/layout/Footer';
 
 const services = [
   {
@@ -2492,17 +2493,11 @@ function App() {
           <DestinationSection destinations={dashboard.destinations} onDestinationClick={handleDestinationClick} />
         </main>
       )}
-      <footer>
-        <div className="footer-logo">Aeropuerto Internacional La Aurora</div>
-        <p>Ciudad de Guatemala - Codigo IATA: GUA - Codigo ICAO: MGGT</p>
-        <p>Frontend React conectado al API del proyecto.</p>
-        <label className="footer-currency">
-          <span>Moneda</span>
-          <select value={currency} onChange={(event) => setCurrency(event.target.value)}>
-            {CURRENCIES.map((item) => <option value={item} key={item}>{item}</option>)}
-          </select>
-        </label>
-      </footer>
+      <Footer
+  currency={currency}
+  setCurrency={setCurrency}
+  CURRENCIES={CURRENCIES}
+/>
     </>
   );
 }
