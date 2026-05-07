@@ -7,8 +7,26 @@ param(
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+
 $apiProject = Join-Path $root "AeropuertoAurora.Api\AeropuertoAurora.Api.csproj"
 $webProject = Join-Path $root "AeropuertoAurora.Web"
+
+# Rutas de programas
+$dotnetPath = "C:\Program Files\dotnet\dotnet.exe"
+
+$npmPath = (Get-Command npm.cmd -ErrorAction SilentlyContinue).Source
+if (-not $npmPath) {
+    $npmPath = "C:\Program Files\nodejs\npm.cmd"
+}
+
+# Validaciones
+if (-not (Test-Path $dotnetPath)) {
+    throw "No se encontro dotnet en: $dotnetPath"
+}
+
+if (-not (Test-Path $npmPath)) {
+    throw "No se encontro npm. Instala Node.js con: winget install OpenJS.NodeJS.LTS"
+}
 
 if (-not (Test-Path $apiProject)) {
     throw "No se encontro el proyecto API en: $apiProject"
@@ -18,17 +36,7 @@ if (-not (Test-Path $webProject)) {
     throw "No se encontro el proyecto Web en: $webProject"
 }
 
-if (-not (Test-Path (Join-Path $webProject "node_modules"))) {
-    Write-Host "Instalando dependencias del frontend..." -ForegroundColor Cyan
-    Push-Location $webProject
-    try {
-        npm install
-    }
-    finally {
-        Pop-Location
-    }
-}
-
+# Logs
 $apiLog = Join-Path $root "dev-api.log"
 $apiErrorLog = Join-Path $root "dev-api-error.log"
 $webLog = Join-Path $root "dev-web.log"
@@ -38,17 +46,35 @@ function Stop-ProcessOnPort {
     param([int]$Port)
 
     $connections = netstat -ano | Select-String ":$Port\s+.*LISTENING"
+
     foreach ($connection in $connections) {
         $parts = ($connection.Line -split "\s+") | Where-Object { $_ }
-        $processId = [int]$parts[-1]
 
-        if ($processId -gt 0) {
-            $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
-            if ($process) {
-                Write-Host "Deteniendo proceso existente en puerto $Port (PID $processId)..." -ForegroundColor Yellow
-                Stop-Process -Id $processId -Force
+        if ($parts.Count -gt 0) {
+            $processId = [int]$parts[-1]
+
+            if ($processId -gt 0) {
+                $process = Get-Process -Id $processId -ErrorAction SilentlyContinue
+
+                if ($process) {
+                    Write-Host "Deteniendo proceso existente en puerto $Port PID $processId..." -ForegroundColor Yellow
+                    Stop-Process -Id $processId -Force
+                }
             }
         }
+    }
+}
+
+# Instalar dependencias frontend si faltan
+if (-not (Test-Path (Join-Path $webProject "node_modules"))) {
+    Write-Host "Instalando dependencias del frontend..." -ForegroundColor Cyan
+
+    Push-Location $webProject
+    try {
+        & $npmPath install
+    }
+    finally {
+        Pop-Location
     }
 }
 
@@ -56,9 +82,10 @@ Stop-ProcessOnPort -Port 5185
 Stop-ProcessOnPort -Port $WebPort
 
 Write-Host "Levantando backend en $ApiUrl" -ForegroundColor Cyan
+
 $apiProcess = Start-Process `
-    -FilePath "dotnet" `
-    -ArgumentList "run --project `"$apiProject`" --urls $ApiUrl" `
+    -FilePath $dotnetPath `
+    -ArgumentList "run --project `"$apiProject`" --urls `"$ApiUrl`"" `
     -WorkingDirectory $root `
     -RedirectStandardOutput $apiLog `
     -RedirectStandardError $apiErrorLog `
@@ -66,6 +93,7 @@ $apiProcess = Start-Process `
     -WindowStyle Hidden
 
 Write-Host "Esperando a que el backend responda..." -ForegroundColor Cyan
+
 $healthUrl = "$ApiUrl/api/health"
 $apiReady = $false
 
@@ -78,6 +106,7 @@ for ($attempt = 1; $attempt -le 45; $attempt++) {
 
     try {
         $response = Invoke-WebRequest -UseBasicParsing -Uri $healthUrl -TimeoutSec 2
+
         if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 300) {
             $apiReady = $true
             break
@@ -93,9 +122,10 @@ if (-not $apiReady) {
 }
 
 Write-Host "Levantando frontend en http://${WebHost}:$WebPort" -ForegroundColor Cyan
+
 $webProcess = Start-Process `
-    -FilePath "npm.cmd" `
-    -ArgumentList "run dev -- --host $WebHost --port $WebPort" `
+    -FilePath $npmPath `
+    -ArgumentList @("run", "dev", "--", "--host", $WebHost, "--port", "$WebPort") `
     -WorkingDirectory $webProject `
     -RedirectStandardOutput $webLog `
     -RedirectStandardError $webErrorLog `

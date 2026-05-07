@@ -2382,3 +2382,1849 @@ footer p {
   }
 }
 
+/* Light professional redesign */
+:root {
+  --sky: #f5f9fc;
+  --deep: #f5f9fc;
+  --gold: #0077b6;
+  --teal: #00b4d8;
+  --light: #0f172a;
+  --muted: #64748b;
+  --line: #e2e8f0;
+  --surface: #ffffff;
+  --surface-soft: #f8fbfe;
+  --surface-alt: #edf6fb;
+  --primary: #0077b6;
+  --primary-dark: #005f91;
+  --primary-soft: #d9f1f8;
+  --shadow-soft: 0 18px 45px rgba(15, 23, 42, 0.08);
+  --shadow-card: 0 14px 34px rgba(15, 23, 42, 0.08);
+}
+
+body {
+  color: var(--light);
+  background:
+    radial-gradient(circle at top left, rgba(0, 180, 216, 0.08), transparent 24%),
+    linear-gradient(180deg, #f9fcfe 0%, #f5f9fc 100%);
+  font-family: Manrope, "Segoe UI", sans-serif;
+  line-height: 1.55;
+}
+
+.site-nav {
+  background: rgba(255, 255, 255, 0.92);
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+}
+
+.nav-logo,
+.footer-logo {
+  color: var(--primary);
+  font-family: Fraunces, Georgia, serif;
+}
+
+.nav-logo span,
+.nav-links a.active,
+.nav-admin-link.active,
+.nav-admin-link:hover,
+.section-label,
+.hero h1 span,
+.travel-results-header span,
+.destination-card span,
+.purchase-summary .total-row strong {
+  color: var(--teal);
+}
+
+.nav-links a,
+.nav-admin-link,
+.footer-currency,
+footer p,
+.api-status,
+.travel-results-header small,
+.travel-result-row small,
+.flight-result-summary small,
+.service-card p,
+.purchase-summary div,
+.checkout-shell p,
+.login-modal p,
+.login-modal small,
+.board-empty,
+.field span,
+.location-detail p,
+.destination-card p {
+  color: var(--muted);
+}
+
+.nav-links a:hover,
+.nav-user,
+.travel-results-header h2,
+.checkout-shell h2,
+.admin-header h1,
+.login-modal h2,
+.hero h1,
+.hero p strong,
+.service-card h3,
+.operation-panel h3,
+.checkout-card h3,
+.admin-form-panel h2,
+.report-panel h2,
+.travel-result-row strong,
+.flight-result-summary strong,
+.destination-card strong {
+  color: var(--light);
+}
+
+.nav-session-button,
+.buy-button,
+.btn-primary,
+.explore-button,
+.passenger-confirm,
+.fare-done {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--teal) 100%);
+  border: 0;
+  box-shadow: 0 14px 28px rgba(0, 119, 182, 0.22);
+}
+
+.nav-session-button:hover,
+.buy-button:hover,
+.btn-primary:hover,
+.explore-button:hover,
+.passenger-confirm:hover,
+.fare-done:hover {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--primary-dark) 0%, #1bc5e3 100%);
+  transform: translateY(-2px);
+}
+
+.btn-outline,
+.back-button,
+.continue-restricted,
+.fare-trip-button,
+.fare-reset,
+.row-actions button,
+.modal-close {
+  color: var(--primary);
+  background: #ffffff;
+  border: 1px solid var(--line);
+}
+
+.btn-outline:hover,
+.back-button:hover,
+.row-actions button:hover,
+.modal-close:hover {
+  color: var(--primary-dark);
+  background: var(--surface-alt);
+}
+
+.hero {
+  min-height: 92vh;
+  align-items: end;
+  padding: 8rem 2rem 5rem;
+}
+
+.hero::before {
+  background:
+    linear-gradient(115deg, rgba(245, 249, 252, 0.94) 8%, rgba(245, 249, 252, 0.78) 44%, rgba(245, 249, 252, 0.58) 100%),
+    radial-gradient(circle at 18% 22%, rgba(0, 180, 216, 0.18), transparent 24%),
+    linear-gradient(180deg, #fafdff 0%, #eef7fb 100%);
+}
+
+.hero::after {
+  opacity: 0.42;
+  mix-blend-mode: normal;
+  filter: saturate(0.92) brightness(1.08);
+}
+
+.hero-content {
+  display: grid;
+  justify-items: start;
+  text-align: left;
+}
+
+.hero-badge {
+  color: var(--primary);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(0, 119, 182, 0.18);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+}
+
+.hero h1 {
+  max-width: 760px;
+  font-family: Fraunces, Georgia, serif;
+  color: var(--light);
+}
+
+.hero p {
+  max-width: 640px;
+  margin-inline: 0;
+  color: #334155;
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.stars span {
+  background: rgba(0, 180, 216, 0.45);
+}
+
+.plane-svg {
+  opacity: 0.24;
+  filter: drop-shadow(0 10px 16px rgba(0, 119, 182, 0.12));
+}
+
+.tab-page,
+.travel-results-section,
+.cart-page,
+.checkout-view,
+.admin-page,
+footer,
+.travel-search-section,
+.location-section {
+  background: transparent;
+}
+
+.travel-search-section {
+  margin-top: -5rem;
+  padding-bottom: 4rem;
+}
+
+.travel-search-card,
+.destination-card,
+.service-card,
+.operation-panel,
+.flight-result-card,
+.tariff-card,
+.cart-flight-card,
+.checkout-shell,
+.checkout-card,
+.ancillary-card,
+.admin-table-shell,
+.admin-form-panel,
+.report-panel,
+.login-modal,
+.upgrade-modal,
+.fare-picker,
+.purchase-summary,
+.api-status,
+.map-box,
+.passenger-picker {
+  color: var(--light);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  box-shadow: var(--shadow-card);
+}
+
+.travel-search-card {
+  backdrop-filter: none;
+}
+
+.travel-search-card label,
+.checkout-shell label,
+.login-modal label {
+  color: var(--light);
+  font-size: 0.78rem;
+}
+
+.field-icon,
+.service-icon,
+.cart-flight-icon,
+.ancillary-card span {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--teal) 100%);
+}
+
+.travel-search-card input,
+.travel-search-card select,
+.date-field-button,
+.login-modal input,
+.login-modal select,
+.checkout-shell input,
+.checkout-shell select,
+.field input,
+.admin-actions select,
+.footer-currency select {
+  color: var(--light);
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.02);
+}
+
+.travel-search-card input::placeholder,
+.login-modal input::placeholder,
+.checkout-shell input::placeholder,
+.field input::placeholder {
+  color: #94a3b8;
+}
+
+.travel-search-card input:focus,
+.travel-search-card select:focus,
+.login-modal input:focus,
+.login-modal select:focus,
+.checkout-shell input:focus,
+.checkout-shell select:focus,
+.field input:focus,
+.admin-actions select:focus,
+.footer-currency select:focus {
+  border-color: var(--teal);
+  box-shadow: 0 0 0 4px rgba(0, 180, 216, 0.14);
+}
+
+.auth-tabs button,
+.checkout-steps span,
+.fare-date-summary,
+.upgrade-comparison,
+.card-details,
+.checkout-flight-summary div,
+.operation-row,
+.purchase-summary,
+.connection-alert,
+.success-alert {
+  background: var(--surface-soft);
+  border-color: var(--line);
+}
+
+.auth-tabs button {
+  color: var(--muted);
+}
+
+.auth-tabs button.active,
+.checkout-steps span.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--teal) 100%);
+  border-color: transparent;
+}
+
+.connection-alert {
+  color: #0c4a6e;
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+}
+
+.success-alert {
+  color: #166534;
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+}
+
+.fare-picker-top,
+.fare-picker-footer,
+.tariff-grid,
+.admin-table th,
+.board-header {
+  border-color: var(--line);
+}
+
+.fare-picker {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbfe 100%);
+}
+
+.fare-picker-top,
+.fare-picker-footer {
+  background: #f8fbfe;
+}
+
+.fare-date-summary span,
+.fare-weekdays span,
+.fare-picker-footer span,
+.fare-reset,
+.fare-trip-button,
+.passenger-counter-row small {
+  color: var(--muted);
+}
+
+.fare-date-summary span.active,
+.fare-day:hover,
+.fare-day.selected,
+.fare-day.in-range,
+.tariff-card.recommended,
+.ancillary-card.selected {
+  border-color: rgba(0, 180, 216, 0.36);
+  box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.12);
+}
+
+.fare-day {
+  color: var(--light);
+}
+
+.fare-day:hover,
+.fare-day.selected {
+  background: #e0f7fd;
+}
+
+.fare-day.in-range {
+  background: #f0fbfe;
+}
+
+.fare-day small,
+.tariff-card p,
+.tariff-card li,
+.ancillary-card small,
+.cart-flight-route,
+.cart-flight-meta span {
+  color: var(--muted);
+}
+
+.tariff-badge {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--teal) 100%);
+}
+
+.tariff-price,
+.cart-flight-title span,
+.cart-total-box strong,
+.ancillary-card b {
+  color: var(--primary);
+}
+
+.flight-result-card,
+.travel-result-row,
+.cart-flight-card,
+.checkout-card,
+.destination-card,
+.service-card,
+.operation-panel,
+.admin-table-shell,
+.admin-form-panel,
+.report-panel {
+  overflow: hidden;
+}
+
+.flight-result-summary,
+.travel-result-row,
+.cart-flight-card,
+.checkout-card,
+.admin-form-panel,
+.report-panel {
+  background: transparent;
+}
+
+.flight-result-summary:hover,
+.destination-button:hover,
+.service-card:hover {
+  background: var(--surface-soft);
+}
+
+.travel-result-row,
+.flight-result-summary,
+.checkout-flight-summary div,
+.cart-flight-card,
+.ancillary-card {
+  border-color: var(--line);
+}
+
+.expand-indicator {
+  color: var(--primary);
+}
+
+.board-shell,
+.board-row,
+.board-header {
+  background: #ffffff;
+  border-color: var(--line);
+}
+
+.board-header {
+  color: var(--primary);
+}
+
+.board-row:hover {
+  background: #f8fbfe;
+}
+
+.status-badge.delayed {
+  color: #9a3412;
+  background: #ffedd5;
+}
+
+.status-badge.boarding {
+  color: #0c4a6e;
+  background: #e0f2fe;
+}
+
+.status-badge.on-time {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.status-badge.neutral {
+  color: #475569;
+  background: #f1f5f9;
+}
+
+.location-detail span {
+  color: var(--primary);
+  background: #eff8fc;
+  border-color: #cfeaf4;
+}
+
+.map-box {
+  padding: 0;
+  background: #ffffff;
+}
+
+.map-box iframe {
+  filter: saturate(0.9) brightness(1.02);
+}
+
+.modal-backdrop {
+  background: rgba(15, 23, 42, 0.34);
+  backdrop-filter: blur(9px);
+}
+
+.login-modal,
+.upgrade-modal {
+  background: linear-gradient(180deg, #ffffff 0%, #f9fcfe 100%);
+}
+
+.form-error,
+.field-error {
+  color: #b91c1c !important;
+}
+
+.form-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.checkbox-label input {
+  accent-color: var(--teal);
+}
+
+.checkout-shell {
+  padding: 2rem;
+}
+
+.sticky-summary {
+  top: 6rem;
+}
+
+.card-details {
+  background: #f0fbfe;
+  border-color: #cceff7;
+}
+
+footer {
+  border-top: 1px solid var(--line);
+}
+
+.nav-admin-link {
+  font-size: 0.8rem;
+}
+
+.admin-table {
+  background: #ffffff;
+}
+
+.admin-table th {
+  color: var(--primary);
+  background: #eef7fb;
+}
+
+.admin-table td {
+  border-bottom: 1px solid #edf2f7;
+}
+
+.row-actions button {
+  color: var(--primary);
+}
+
+.row-actions button:hover {
+  background: #eef7fb;
+}
+
+@media (max-width: 900px) {
+  .hero {
+    align-items: center;
+    padding-top: 7.2rem;
+  }
+
+  .hero-content {
+    justify-items: center;
+    text-align: center;
+  }
+
+  .hero p {
+    margin-inline: auto;
+  }
+}
+
+@media (max-width: 680px) {
+  .site-nav {
+    padding: 0.9rem 1rem;
+  }
+
+  .hero {
+    min-height: 88vh;
+    padding: 7rem 1rem 4rem;
+  }
+
+  .travel-search-section {
+    margin-top: -3.5rem;
+    padding-inline: 1rem;
+  }
+
+  .travel-search-card,
+  .destination-card,
+  .service-card,
+  .operation-panel,
+  .flight-result-card,
+  .tariff-card,
+  .cart-flight-card,
+  .checkout-shell,
+  .checkout-card,
+  .ancillary-card,
+  .admin-table-shell,
+  .admin-form-panel,
+  .report-panel,
+  .login-modal,
+  .upgrade-modal,
+  .fare-picker,
+  .purchase-summary,
+  .map-box {
+    border-radius: 16px;
+  }
+}
+
+/* User-provided light base adapted to existing app classes */
+:root {
+  --primary: #0077b6;
+  --primary-light: #00b4d8;
+  --primary-dark: #023e8a;
+  --bg: #f5f9fc;
+  --card: #ffffff;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+  --radius: 18px;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+header,
+.navbar,
+.site-nav {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.04);
+}
+
+.navbar a,
+.site-nav a,
+.nav-admin-link,
+.nav-user {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.navbar a:hover,
+.site-nav a:hover,
+.nav-admin-link:hover,
+.nav-links a.active,
+.nav-admin-link.active {
+  color: var(--primary);
+}
+
+.hero {
+  position: relative;
+  min-height: 520px;
+  display: flex;
+  align-items: center;
+  background:
+    linear-gradient(90deg, rgba(245, 249, 252, 0.95), rgba(245, 249, 252, 0.55)),
+    url("../images/airplane.jpg") center/cover no-repeat;
+  overflow: hidden;
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  width: 420px;
+  height: 420px;
+  right: -120px;
+  bottom: -120px;
+  background: radial-gradient(circle, rgba(0, 180, 216, 0.25), transparent 70%);
+}
+
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(245, 249, 252, 0.95), rgba(245, 249, 252, 0.55)),
+    url("../images/airplane.jpg") center/cover no-repeat;
+  z-index: 0;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+}
+
+.hero h1,
+.travel-results-header h2,
+.cart-shell h1,
+.checkout-shell h2,
+.admin-header h1,
+.login-modal h2 {
+  font-size: clamp(2.4rem, 5vw, 4.8rem);
+  line-height: 1.05;
+  margin-bottom: 1rem;
+  color: var(--text);
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.hero h1 span {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.hero p {
+  max-width: 620px;
+  color: var(--muted);
+  font-size: 1.1rem;
+}
+
+button,
+.btn,
+.btn-primary,
+.nav-session-button,
+.buy-button,
+.explore-button,
+.passenger-confirm,
+.fare-done {
+  border: none;
+  border-radius: 999px;
+  padding: 0.85rem 1.6rem;
+  font-weight: 700;
+  color: white;
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  box-shadow: 0 10px 24px rgba(0, 119, 182, 0.25);
+  transition: all 0.25s ease;
+}
+
+button:hover,
+.btn:hover,
+.btn-primary:hover,
+.nav-session-button:hover,
+.buy-button:hover,
+.explore-button:hover,
+.passenger-confirm:hover,
+.fare-done:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 34px rgba(0, 119, 182, 0.32);
+}
+
+button:active,
+.btn:active,
+.nav-session-button:active,
+.buy-button:active {
+  transform: translateY(0);
+}
+
+.btn-outline,
+.back-button,
+.row-actions button,
+.modal-close,
+.fare-trip-button,
+.fare-reset,
+.continue-restricted {
+  color: var(--primary-dark);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.btn-outline:hover,
+.back-button:hover,
+.row-actions button:hover,
+.modal-close:hover {
+  background: #f8fcff;
+}
+
+.card,
+.search-card,
+.flight-card,
+.tracking-card,
+.travel-search-card,
+.flight-result-card,
+.destination-card,
+.service-card,
+.operation-panel,
+.cart-flight-card,
+.checkout-shell,
+.checkout-card,
+.ancillary-card,
+.admin-table-shell,
+.admin-form-panel,
+.report-panel,
+.login-modal,
+.upgrade-modal,
+.fare-picker,
+.purchase-summary,
+.api-status,
+.map-box,
+.passenger-picker,
+.board-shell {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  transition: all 0.25s ease;
+}
+
+.card:hover,
+.flight-card:hover,
+.service-card:hover,
+.destination-card:hover,
+.flight-result-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.12);
+}
+
+input,
+select,
+textarea,
+.travel-search-card input,
+.travel-search-card select,
+.login-modal input,
+.login-modal select,
+.checkout-shell input,
+.checkout-shell select,
+.field input,
+.admin-actions select,
+.footer-currency select,
+.date-field-button {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.85rem 1rem;
+  background: #ffffff;
+  color: var(--text);
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+input::placeholder,
+textarea::placeholder,
+.travel-search-card input::placeholder,
+.login-modal input::placeholder,
+.checkout-shell input::placeholder {
+  color: #94a3b8;
+}
+
+input:focus,
+select:focus,
+textarea:focus,
+.travel-search-card input:focus,
+.travel-search-card select:focus,
+.login-modal input:focus,
+.login-modal select:focus,
+.checkout-shell input:focus,
+.checkout-shell select:focus,
+.field input:focus,
+.admin-actions select:focus,
+.footer-currency select:focus {
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 4px rgba(0, 180, 216, 0.16);
+}
+
+label,
+.travel-search-card label,
+.checkout-shell label,
+.login-modal label,
+.field span {
+  font-weight: 600;
+  color: var(--primary-dark);
+  margin-bottom: 0.4rem;
+}
+
+table,
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+thead,
+.admin-table th,
+.board-header {
+  background: #eaf7fb;
+}
+
+th,
+.admin-table th,
+.board-header span {
+  color: var(--primary-dark);
+  text-align: left;
+  font-weight: 700;
+  padding: 1rem;
+}
+
+td,
+.admin-table td,
+.board-row > span {
+  padding: 1rem;
+  border-top: 1px solid var(--border);
+  color: var(--text);
+}
+
+tr:hover,
+.board-row:hover,
+.flight-result-summary:hover,
+.travel-result-row:hover {
+  background: #f8fcff;
+}
+
+.badge,
+.status,
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: #e0f7fb;
+  color: var(--primary-dark);
+}
+
+section,
+.section,
+.travel-results-section,
+.travel-search-section,
+.cart-page,
+.checkout-view,
+.admin-page,
+.location-inner {
+  padding: 4rem 1.5rem;
+}
+
+.section-title,
+.travel-results-header h2,
+.cart-shell h1,
+.admin-header h1,
+.login-modal h2 {
+  font-size: clamp(1.8rem, 3vw, 2.8rem);
+  color: var(--text);
+  margin-bottom: 0.75rem;
+}
+
+.section-subtitle,
+.hero p,
+.travel-results-header small,
+.service-card p,
+.location-detail p,
+footer p,
+.footer-currency {
+  color: var(--muted);
+  max-width: 680px;
+}
+
+.tab-page,
+.travel-results-section,
+.cart-page,
+.checkout-view,
+.admin-page,
+.travel-search-section,
+.location-section,
+footer {
+  background: var(--bg);
+}
+
+.tab-page,
+.travel-results-section,
+.cart-page,
+.checkout-view,
+.admin-page,
+.travel-search-section,
+.location-section {
+  background:
+    linear-gradient(90deg, rgba(245, 249, 252, 0.84), rgba(245, 249, 252, 0.58)),
+    url("../images/airplane.jpg") center/cover no-repeat fixed;
+}
+
+.hero-badge,
+.tariff-badge,
+.service-icon,
+.field-icon,
+.cart-flight-icon,
+.ancillary-card span,
+.location-detail span {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: #ffffff;
+}
+
+.nav-logo,
+.footer-logo {
+  color: var(--primary-dark);
+}
+
+.nav-logo span,
+.hero h1 span,
+.travel-results-header span,
+.purchase-summary .total-row strong,
+.tariff-price,
+.cart-flight-title span,
+.cart-total-box strong,
+.ancillary-card b {
+  color: var(--primary);
+}
+
+.connection-alert {
+  color: var(--primary-dark);
+  background: #e0f7fb;
+  border: 1px solid #bae6fd;
+}
+
+.success-alert {
+  color: #166534;
+  background: #dcfce7;
+  border: 1px solid #bbf7d0;
+}
+
+.auth-tabs button,
+.checkout-steps span,
+.fare-date-summary,
+.card-details,
+.upgrade-comparison,
+.checkout-flight-summary div,
+.purchase-summary,
+.operation-row {
+  background: #f8fcff;
+  border-color: var(--border);
+}
+
+.auth-tabs button.active,
+.checkout-steps span.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  border-color: transparent;
+}
+
+.fare-day:hover,
+.fare-day.selected,
+.fare-day.in-range,
+.ancillary-card.selected,
+.tariff-card.recommended {
+  background: #f0fbfe;
+  border-color: var(--primary-light);
+  box-shadow: 0 0 0 4px rgba(0, 180, 216, 0.12);
+}
+
+.admin-table td,
+.operation-row,
+.travel-result-row,
+.board-row > span {
+  border-color: var(--border);
+}
+
+@media (max-width: 768px) {
+  .hero {
+    min-height: 460px;
+    text-align: center;
+  }
+
+  .hero-content {
+    justify-items: center;
+    text-align: center;
+  }
+
+  .card,
+  .search-card,
+  .tracking-card,
+  .travel-search-card,
+  .flight-result-card,
+  .destination-card,
+  .service-card,
+  .operation-panel,
+  .cart-flight-card,
+  .checkout-shell,
+  .checkout-card,
+  .ancillary-card,
+  .admin-table-shell,
+  .admin-form-panel,
+  .report-panel {
+    padding: 1rem;
+  }
+
+  section,
+  .section,
+  .travel-results-section,
+  .travel-search-section,
+  .cart-page,
+  .checkout-view,
+  .admin-page,
+  .location-inner {
+    padding: 2.5rem 1rem;
+  }
+}
+
+/* Premium polish */
+.site-nav {
+  position: sticky;
+  top: 0;
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 10px 32px rgba(15, 23, 42, 0.06);
+}
+
+.nav-links a,
+.nav-admin-link,
+.nav-session-button,
+.destination-card,
+.service-card,
+.travel-search-card,
+.board,
+.map-box,
+.footer-column a,
+.footer-currency select,
+.travel-search-card input,
+.travel-search-card select,
+.date-field-button,
+.flight-search input {
+  transition: all 0.25s ease;
+}
+
+.hero {
+  min-height: 100vh;
+  align-items: center;
+}
+
+.hero::before {
+  background:
+    linear-gradient(90deg, rgba(245, 249, 252, 0.95), rgba(245, 249, 252, 0.62)),
+    url("../images/airplane.jpg") center/cover no-repeat;
+}
+
+.hero-content {
+  max-width: 760px;
+}
+
+.hero-content::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 24%;
+  width: 360px;
+  height: 360px;
+  background: radial-gradient(circle, rgba(0, 180, 216, 0.12), transparent 70%);
+  transform: translate(-50%, -50%);
+  filter: blur(18px);
+  z-index: -1;
+}
+
+.hero-ctas {
+  justify-content: flex-start;
+}
+
+.btn-primary,
+.explore-button {
+  box-shadow: 0 14px 34px rgba(0, 119, 182, 0.24);
+}
+
+.btn-primary:hover,
+.explore-button:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 42px rgba(0, 119, 182, 0.3);
+}
+
+.tab-page,
+.travel-results-section,
+.cart-page,
+.checkout-view,
+.admin-page,
+.travel-search-section,
+.location-section {
+  background: #f5f9fc;
+}
+
+.travel-search-section {
+  margin-top: -4.5rem;
+}
+
+.travel-search-card {
+  border-radius: 24px;
+  box-shadow: 0 22px 56px rgba(15, 23, 42, 0.1);
+}
+
+.travel-search-card:hover {
+  box-shadow: 0 26px 62px rgba(15, 23, 42, 0.12);
+}
+
+.travel-search-card input:hover,
+.travel-search-card select:hover,
+.date-field-button:hover,
+.flight-search input:hover {
+  border-color: rgba(0, 180, 216, 0.45);
+}
+
+.destination-grid {
+  gap: 1.25rem;
+}
+
+.destination-card {
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+  min-height: 250px;
+  padding: 0;
+  text-align: left;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  box-shadow: 0 16px 38px rgba(15, 23, 42, 0.08);
+}
+
+.destination-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(0, 180, 216, 0.38);
+  box-shadow: 0 22px 44px rgba(15, 23, 42, 0.14);
+}
+
+.destination-visual {
+  display: flex;
+  min-height: 88px;
+  align-items: end;
+  justify-content: space-between;
+  padding: 1.15rem 1.2rem;
+  background:
+    linear-gradient(135deg, rgba(0, 119, 182, 0.92), rgba(0, 180, 216, 0.78)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0));
+}
+
+.destination-visual span {
+  color: #ffffff;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.destination-visual small {
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.destination-card strong,
+.destination-metrics {
+  padding-inline: 1.2rem;
+}
+
+.destination-card strong {
+  font-size: 1.08rem;
+}
+
+.destination-metrics {
+  display: grid;
+  gap: 0.45rem;
+  padding-bottom: 1.25rem;
+}
+
+.destination-metrics small {
+  color: var(--muted);
+}
+
+.board {
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.96);
+  border-radius: 24px;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+}
+
+.board-header {
+  background: #eef9fd;
+}
+
+.board-empty {
+  min-height: 180px;
+  background: #ffffff;
+}
+
+.board-empty-rich {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  text-align: left;
+}
+
+.board-empty-icon {
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  place-items: center;
+  color: var(--primary);
+  background: #e0f7fb;
+  border-radius: 999px;
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.board-empty-rich strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: var(--text);
+}
+
+.board-empty-rich p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.location-section {
+  background: #f8fbfe;
+}
+
+.location-inner {
+  gap: 2.25rem;
+  padding-top: 3rem;
+  padding-bottom: 4rem;
+}
+
+.location-detail span {
+  width: 2.5rem;
+  height: 2.5rem;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  border: 0;
+  box-shadow: 0 10px 18px rgba(0, 119, 182, 0.18);
+}
+
+.map-box {
+  border-radius: 24px;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+}
+
+footer {
+  background:
+    linear-gradient(180deg, #062d46 0%, #08263a 100%);
+  border-top: 0;
+}
+
+.footer-shell {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.15fr) minmax(0, 2fr);
+  gap: 2rem;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 3.5rem 2rem 2.5rem;
+}
+
+.footer-brand p,
+.footer-column p,
+.footer-currency span {
+  color: rgba(226, 232, 240, 0.74);
+}
+
+.footer-logo {
+  margin-bottom: 0.75rem;
+  color: #ffffff;
+}
+
+.footer-columns {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.footer-column {
+  display: grid;
+  align-content: start;
+  gap: 0.6rem;
+}
+
+.footer-column h3 {
+  margin: 0 0 0.3rem;
+  color: #ffffff;
+  font-size: 0.95rem;
+}
+
+.footer-column a {
+  color: #7fe4f2;
+  text-decoration: none;
+}
+
+.footer-column a:hover {
+  color: #ffffff;
+  transform: translateX(2px);
+}
+
+.footer-column p {
+  margin: 0;
+}
+
+.footer-column-currency .footer-currency {
+  display: grid;
+  justify-items: start;
+  margin-top: 0;
+}
+
+.footer-currency select {
+  min-width: 140px;
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.footer-currency select:focus {
+  box-shadow: 0 0 0 4px rgba(0, 180, 216, 0.14);
+}
+
+@media (max-width: 900px) {
+  .hero-content::before {
+    left: 50%;
+  }
+
+  .hero-ctas {
+    justify-content: center;
+  }
+
+  .footer-shell,
+  .footer-columns {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .site-nav {
+    position: sticky;
+    padding: 0.9rem 1rem;
+  }
+
+  .hero {
+    min-height: 86vh;
+  }
+
+  .travel-search-section {
+    margin-top: -2.8rem;
+  }
+
+  .board-empty-rich {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .destination-card {
+    min-height: auto;
+  }
+
+  .footer-shell,
+  .footer-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-shell {
+    padding: 3rem 1rem 2rem;
+  }
+}
+
+/* Date picker polish */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  align-items: start;
+  justify-items: center;
+  padding: 6.75rem 1.25rem 1.5rem;
+  overflow-y: auto;
+  background: rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(5px);
+}
+
+.fare-picker {
+  position: relative;
+  z-index: 1201;
+  width: min(1080px, calc(100vw - 2rem));
+  max-height: calc(100vh - 8rem);
+  overflow: auto;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.96);
+  border-radius: 28px;
+  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.18);
+}
+
+.fare-picker-top {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr minmax(320px, 1.2fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.2rem 1.4rem;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(10px);
+}
+
+.fare-picker-mode {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.fare-trip-button,
+.fare-reset,
+.fare-month-arrow {
+  border-radius: 999px;
+}
+
+.fare-month-nav {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.fare-month-arrow {
+  display: grid;
+  width: 2.8rem;
+  height: 2.8rem;
+  place-items: center;
+  color: var(--primary-dark);
+  background: #ffffff;
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+.fare-month-arrow:hover:not(:disabled) {
+  transform: translateY(-2px);
+  background: #f8fcff;
+}
+
+.fare-month-arrow:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.fare-date-summary {
+  background: #f8fbfe;
+}
+
+.fare-date-summary span {
+  min-height: 62px;
+}
+
+.fare-date-summary span.active {
+  background: #eaf7fb;
+  box-shadow: inset 0 0 0 1px rgba(0, 180, 216, 0.28);
+}
+
+.fare-picker-body {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+  padding: 1.5rem;
+}
+
+.fare-month {
+  padding: 1rem;
+  background: #fbfdff;
+  border: 1px solid #edf2f7;
+  border-radius: 22px;
+}
+
+.fare-month h3 {
+  margin-bottom: 1.1rem;
+  color: var(--text);
+  text-transform: capitalize;
+}
+
+.fare-weekdays span {
+  color: var(--muted);
+}
+
+.fare-day {
+  min-height: 64px;
+  padding: 0.45rem 0.25rem;
+  border-radius: 12px;
+}
+
+.fare-day strong {
+  color: var(--text);
+}
+
+.fare-day.best-fare small,
+.fare-legend-low {
+  color: #16a34a;
+  font-weight: 800;
+}
+
+.fare-picker-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1rem 1.4rem 1.25rem;
+  background: rgba(255, 255, 255, 0.98);
+  border-top: 1px solid var(--border);
+}
+
+.fare-picker-legend {
+  display: grid;
+  gap: 0.3rem;
+}
+
+@media (max-width: 900px) {
+  .modal-backdrop {
+    padding-top: 6.4rem;
+  }
+
+  .fare-picker {
+    width: min(960px, calc(100vw - 1.5rem));
+  }
+
+  .fare-picker-top {
+    grid-template-columns: 1fr;
+  }
+
+  .fare-month-nav {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 680px) {
+  .modal-backdrop {
+    padding: 6rem 0.75rem 1rem;
+  }
+
+  .fare-picker {
+    width: calc(100vw - 1rem);
+    max-height: calc(100vh - 7rem);
+    border-radius: 22px;
+  }
+
+  .fare-picker-top {
+    padding: 1rem;
+  }
+
+  .fare-picker-mode {
+    flex-wrap: wrap;
+  }
+
+  .fare-picker-body {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+  }
+
+  .fare-month {
+    padding: 0.85rem;
+  }
+
+  .fare-picker-footer {
+    grid-template-columns: 1fr;
+    padding: 1rem;
+  }
+
+  .fare-done {
+    width: 100%;
+  }
+}
+
+/* Admin and user menu polish */
+.nav-user-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.45rem 0.7rem;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 999px;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+}
+
+.nav-avatar {
+  display: grid;
+  width: 2.2rem;
+  height: 2.2rem;
+  place-items: center;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.nav-user-copy {
+  display: grid;
+  gap: 0.08rem;
+}
+
+.nav-user {
+  max-width: none;
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.nav-user-role {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.nav-user-caret {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.admin-page {
+  padding-top: 5.9rem;
+}
+
+.admin-header {
+  margin-bottom: 0.9rem;
+}
+
+.admin-header h1 {
+  margin-top: 0.2rem;
+}
+
+.admin-workspace {
+  grid-template-columns: minmax(340px, 0.92fr) minmax(0, 1.6fr);
+  gap: 1rem;
+}
+
+.admin-form-panel,
+.admin-table-shell {
+  border-radius: 22px;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08);
+}
+
+.admin-form-panel {
+  padding: 1rem;
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem 0.8rem;
+}
+
+.field {
+  margin-bottom: 0;
+}
+
+.field span {
+  margin-bottom: 0.2rem;
+  font-size: 0.68rem;
+}
+
+.field input,
+.field textarea,
+.field select {
+  min-height: 42px;
+  padding: 0.72rem 0.82rem;
+  font-size: 0.9rem;
+}
+
+.field textarea {
+  min-height: 94px;
+  resize: vertical;
+}
+
+.form-actions {
+  grid-column: 1 / -1;
+  margin-top: 0.35rem;
+}
+
+.admin-table-shell {
+  overflow: hidden;
+}
+
+.admin-table-scroll {
+  overflow: auto;
+  max-width: 100%;
+  padding-bottom: 0.25rem;
+}
+
+.admin-table {
+  min-width: 1100px;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 0.78rem 0.9rem;
+}
+
+.row-actions {
+  flex-wrap: wrap;
+}
+
+.row-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 34px;
+  padding: 0.46rem 0.72rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.row-actions .action-edit {
+  color: #0c4a6e;
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+}
+
+.row-actions .action-edit:hover {
+  background: #d0ecfd;
+}
+
+.row-actions .action-delete {
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.row-actions .action-delete:hover {
+  background: #fee2e2;
+}
+
+@media (max-width: 1180px) {
+  .admin-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-form-panel {
+    position: static;
+  }
+}
+
+@media (max-width: 680px) {
+  .nav-user-copy,
+  .nav-user-caret {
+    display: none;
+  }
+
+  .nav-user-menu {
+    padding: 0.3rem;
+  }
+
+  .admin-page {
+    padding-top: 5.5rem;
+  }
+
+  .admin-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
