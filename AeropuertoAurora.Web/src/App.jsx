@@ -224,6 +224,40 @@ const calculateFlightFare = (className = 'economica', passengerCount = 1) => {
   return Math.round(BASE_FARE * tariff.multiplier * passengerCount * 100) / 100;
 };
 
+const serverCartItemToFlight = (item = {}) => {
+  const selectedClass = item.selectedClass || item.clase || 'economica';
+  const passengers = Number(item.passengerCount || item.cantidad || 1);
+
+  return {
+    ...item,
+    id: item.vueloId || item.id,
+    itemCarritoId: item.id,
+    cartId: `server-${item.id}`,
+    selectedClass,
+    criteria: {
+      passengers,
+      passengerAges: Array.from({ length: passengers }, () => 30),
+      origin: item.origen || '',
+      destination: item.destino || '',
+      departureDate: '',
+      returnDate: '',
+      currency: 'GTQ'
+    }
+  };
+};
+
+const cartItemPayload = (item = {}) => {
+  const selectedClass = item.selectedClass || item.clase || 'economica';
+  const passengers = passengerCountFromCriteria(item.criteria) || Number(item.passengerCount || 1);
+
+  return {
+    vueloId: item.id || item.vueloId,
+    clase: selectedClass,
+    precioUnitario: calculateFlightFare(selectedClass, passengers),
+    cantidad: passengers
+  };
+};
+
 const nextTariffFamily = (family) => {
   const index = TARIFF_FAMILIES.findIndex((item) => item.code === family.code);
   return index >= 0 ? TARIFF_FAMILIES[index + 1] || null : null;
@@ -2236,6 +2270,24 @@ function App() {
   }, [isAdmin]);
 
   useEffect(() => {
+    if (!user?.pasajeroId) return undefined;
+
+    let active = true;
+    api.cartItems(user.pasajeroId).then((items) => {
+      if (!active) return;
+      const normalizedItems = items.map(serverCartItemToFlight);
+      setCartItems(normalizedItems);
+      window.localStorage.setItem(CART_KEY, JSON.stringify(normalizedItems));
+    }).catch(() => {
+      // Si el carrito compartido falla, mantenemos el carrito local para no bloquear la compra.
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [user?.pasajeroId]);
+
+  useEffect(() => {
     if (!error || dashboard.health) return undefined;
 
     const retry = window.setTimeout(() => {
@@ -2262,15 +2314,35 @@ function App() {
 
   const handleLogin = async (credentials) => {
     const sessionUser = await api.login(credentials);
+    const pendingLocalItems = cartItems.filter((item) => !item.itemCarritoId);
+
+    for (const item of pendingLocalItems) {
+      await api.addCartItem(sessionUser.pasajeroId, cartItemPayload(item));
+    }
+
+    const serverItems = await api.cartItems(sessionUser.pasajeroId);
+    const normalizedItems = serverItems.map(serverCartItemToFlight);
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
+    window.localStorage.setItem(CART_KEY, JSON.stringify(normalizedItems));
     setUser(sessionUser);
+    setCartItems(normalizedItems);
     setLoginOpen(false);
   };
 
   const handleRegister = async (payload) => {
     const sessionUser = await api.register(payload);
+    const pendingLocalItems = cartItems.filter((item) => !item.itemCarritoId);
+
+    for (const item of pendingLocalItems) {
+      await api.addCartItem(sessionUser.pasajeroId, cartItemPayload(item));
+    }
+
+    const serverItems = await api.cartItems(sessionUser.pasajeroId);
+    const normalizedItems = serverItems.map(serverCartItemToFlight);
     window.localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
+    window.localStorage.setItem(CART_KEY, JSON.stringify(normalizedItems));
     setUser(sessionUser);
+    setCartItems(normalizedItems);
     setLoginOpen(false);
   };
 
@@ -2282,7 +2354,7 @@ function App() {
     setPurchaseMessage('');
   };
 
-  const handleBuyFlight = (flight, selectedClass = 'economica', criteria = travelCriteria) => {
+  const handleBuyFlight = async (flight, selectedClass = 'economica', criteria = travelCriteria) => {
     if (!canPurchaseFlight(flight.estado)) {
       setPurchaseMessage('Solo se pueden comprar vuelos programados.');
       return;
@@ -2303,6 +2375,28 @@ function App() {
         currency: criteria?.currency || currency
       }
     };
+
+    if (user?.pasajeroId) {
+      setBuyingFlightId(flight.id);
+      setPurchaseError('');
+
+      try {
+        const serverItem = await api.addCartItem(user.pasajeroId, cartItemPayload(nextCartItem));
+        const normalizedItem = serverCartItemToFlight(serverItem);
+        const nextCartItems = [...cartItems, normalizedItem];
+        setCartItems(nextCartItems);
+        window.localStorage.setItem(CART_KEY, JSON.stringify(nextCartItems));
+        setSelectedFlight(normalizedItem);
+        setPurchaseMessage('');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } catch (cartError) {
+        setPurchaseMessage(`No se pudo sincronizar el carrito: ${cartError.message}`);
+      } finally {
+        setBuyingFlightId(null);
+      }
+
+      return;
+    }
 
     const nextCartItems = [...cartItems, nextCartItem];
     setCartItems(nextCartItems);
@@ -2385,6 +2479,9 @@ function App() {
 
       setPurchaseMessage(`Compra confirmada para ${selectedFlight.numeroVuelo}. Reserva ${purchase.codigoReserva}. Total ${formatCurrency(purchase.total)}.`);
       setSelectedFlight(null);
+      if (selectedFlight.itemCarritoId && user?.pasajeroId) {
+        await api.deleteCartItem(user.pasajeroId, selectedFlight.itemCarritoId);
+      }
       const nextCartItems = cartItems.filter((item) => item.cartId !== selectedFlight.cartId);
       setCartItems(nextCartItems);
       window.localStorage.setItem(CART_KEY, JSON.stringify(nextCartItems));
@@ -2439,7 +2536,18 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const removeCartItem = (cartId) => {
+  const removeCartItem = async (cartId) => {
+    const removedItem = cartItems.find((item) => item.cartId === cartId);
+
+    if (removedItem?.itemCarritoId && user?.pasajeroId) {
+      try {
+        await api.deleteCartItem(user.pasajeroId, removedItem.itemCarritoId);
+      } catch (cartError) {
+        setPurchaseMessage(`No se pudo quitar del carrito compartido: ${cartError.message}`);
+        return;
+      }
+    }
+
     const nextCartItems = cartItems.filter((item) => item.cartId !== cartId);
     setCartItems(nextCartItems);
     window.localStorage.setItem(CART_KEY, JSON.stringify(nextCartItems));

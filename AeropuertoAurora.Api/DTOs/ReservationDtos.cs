@@ -60,6 +60,32 @@ public sealed record ActualizarItemCarritoDto(
     decimal PrecioUnitario,
     int Cantidad);
 
+public sealed record AgregarItemCarritoUsuarioDto(
+    int VueloId,
+    string? Clase,
+    decimal PrecioUnitario,
+    int Cantidad);
+
+public sealed record ItemCarritoUsuarioDto(
+    int Id,
+    int CarritoId,
+    int VueloId,
+    string NumeroVuelo,
+    string Aerolinea,
+    string Origen,
+    string Destino,
+    DateTime FechaVuelo,
+    DateTime? SalidaReal,
+    DateTime? LlegadaReal,
+    int PlazasOcupadas,
+    int PlazasDisponibles,
+    string Estado,
+    int RetrasoMinutos,
+    string MatriculaAvion,
+    string? SelectedClass,
+    int PassengerCount,
+    decimal PrecioUnitario);
+
 public sealed record VentaBoletoDto(
     int Id,
     string NumeroVenta,

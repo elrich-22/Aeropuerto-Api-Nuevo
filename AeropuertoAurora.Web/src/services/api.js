@@ -67,6 +67,14 @@ export const api = {
   incidentsBySeverity: () => request('/api/reportes/incidentes-por-severidad'),
   baggage: (limit = 6) => request(`/api/operaciones/equipaje?limit=${limit}`),
   incidents: (limit = 6) => request(`/api/operaciones/incidentes?limit=${limit}`),
+  cartItems: (passengerId) => request(`/api/carritos-compra/pasajero/${passengerId}/items`),
+  addCartItem: (passengerId, payload) => request(`/api/carritos-compra/pasajero/${passengerId}/items`, {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  deleteCartItem: (passengerId, itemId) => request(`/api/carritos-compra/pasajero/${passengerId}/items/${itemId}`, {
+    method: 'DELETE'
+  }),
   tables: () => request('/api/tablas'),
   tableRows: (table, limit = 100) => request(`/api/tablas/${table}?limit=${limit}`),
   tableMetadata: (table) => request(`/api/tablas/${table}/metadata`),

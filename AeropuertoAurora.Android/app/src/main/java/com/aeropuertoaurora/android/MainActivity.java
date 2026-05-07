@@ -12,6 +12,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -33,17 +34,24 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class MainActivity extends Activity {
-    private static final int DEEP = Color.rgb(6, 14, 28);
-    private static final int SKY = Color.rgb(10, 22, 40);
-    private static final int PANEL = Color.rgb(14, 31, 55);
-    private static final int PANEL_LIGHT = Color.rgb(20, 43, 72);
-    private static final int LINE = Color.rgb(43, 65, 94);
-    private static final int TEXT = Color.rgb(232, 238, 245);
-    private static final int MUTED = Color.rgb(122, 143, 166);
-    private static final int TEAL = Color.rgb(30, 184, 200);
-    private static final int GOLD = Color.rgb(200, 168, 75);
-    private static final int RED = Color.rgb(236, 93, 93);
+    private static final int DEEP = Color.rgb(24, 24, 24);
+    private static final int SKY = Color.rgb(255, 255, 255);
+    private static final int PANEL = Color.rgb(255, 255, 255);
+    private static final int PANEL_LIGHT = Color.rgb(247, 247, 247);
+    private static final int LINE = Color.rgb(218, 218, 218);
+    private static final int TEXT = Color.rgb(28, 29, 33);
+    private static final int MUTED = Color.rgb(105, 105, 110);
+    private static final int TEAL = Color.rgb(21, 139, 142);
+    private static final int GOLD = Color.rgb(215, 20, 38);
+    private static final int RED = Color.rgb(221, 35, 45);
+    private static final int GREEN = Color.rgb(24, 157, 65);
+    private static final int SOFT_GREEN = Color.rgb(230, 248, 234);
+    private static final int APP_BG = Color.rgb(247, 247, 247);
     private static final double BASE_FARE = 1250.0;
+    private static final double SERVICE_SEAT = 120.0;
+    private static final double SERVICE_BAG = 280.0;
+    private static final double SERVICE_VIP = 360.0;
+    private static final double SERVICE_PRIORITY = 95.0;
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -80,6 +88,17 @@ public final class MainActivity extends Activity {
     private JSONObject editingRow;
     private final Map<String, EditText> adminInputs = new HashMap<>();
     private JSONObject checkoutFlight;
+    private String criteriaTripType = "roundtrip";
+    private String criteriaOrigin = "";
+    private String criteriaDestination = "";
+    private String criteriaDepartureDate = "";
+    private String criteriaReturnDate = "";
+    private String datePickerMode = "departure";
+    private int criteriaAdults = 1;
+    private int criteriaYouth = 0;
+    private int criteriaChildren = 0;
+    private int criteriaBabies = 0;
+    private int dynamicContentStartIndex = 1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -90,6 +109,9 @@ public final class MainActivity extends Activity {
         setContentView(buildScreen());
         render();
         loadDashboard();
+        if (sessionUser != null) {
+            syncCartFromServer(false);
+        }
     }
 
     @Override
@@ -101,7 +123,7 @@ public final class MainActivity extends Activity {
     private View buildScreen() {
         ScrollView scrollView = new ScrollView(this);
         scrollView.setFillViewport(true);
-        scrollView.setBackgroundColor(DEEP);
+        scrollView.setBackgroundColor(APP_BG);
 
         rootLayout = new LinearLayout(this);
         rootLayout.setOrientation(LinearLayout.VERTICAL);
@@ -113,7 +135,7 @@ public final class MainActivity extends Activity {
         header.setPadding(dp(4), dp(4), dp(4), dp(10));
         rootLayout.addView(header, matchWrap());
 
-        TextView title = text("La Aurora", 30, GOLD, Typeface.BOLD);
+        TextView title = text("La Aurora", 30, TEXT, Typeface.BOLD);
         header.addView(title);
         TextView subtitle = text("App movil conectada al API del proyecto.", 14, MUTED, Typeface.NORMAL);
         subtitle.setPadding(0, dp(3), 0, dp(10));
@@ -121,7 +143,7 @@ public final class MainActivity extends Activity {
 
         statusText = text("Preparando panel movil...", 13, TEXT, Typeface.BOLD);
         statusText.setPadding(dp(12), dp(10), dp(12), dp(10));
-        statusText.setBackground(round(PANEL_LIGHT, LINE, dp(8)));
+        statusText.setBackground(round(SKY, LINE, dp(14)));
         header.addView(statusText, matchWrap());
 
         sessionText = text("", 13, MUTED, Typeface.NORMAL);
@@ -170,6 +192,14 @@ public final class MainActivity extends Activity {
 
         if ("explorar".equals(activeView)) {
             renderExplore();
+        } else if ("select_origin".equals(activeView)) {
+            renderAirportPicker(true, "");
+        } else if ("select_destination".equals(activeView)) {
+            renderAirportPicker(false, "");
+        } else if ("select_dates".equals(activeView)) {
+            renderDatePicker();
+        } else if ("select_passengers".equals(activeView)) {
+            renderPassengerSelector();
         } else if ("rastreo".equals(activeView)) {
             renderBoard();
         } else if ("operaciones".equals(activeView)) {
@@ -364,28 +394,295 @@ public final class MainActivity extends Activity {
 
     private void renderExplore() {
         LinearLayout card = card();
-        card.addView(sectionTitle("Buscar vuelos"));
-        EditText origin = input("Origen", "La Aurora", false);
-        EditText destination = input("Destino", "", false);
-        EditText date = input("Fecha yyyy-mm-dd", "", false);
-        EditText passengers = input("Pasajeros", "1", false);
-        passengers.setInputType(InputType.TYPE_CLASS_NUMBER);
-        card.addView(origin);
-        card.addView(destination);
-        card.addView(date);
-        card.addView(passengers);
-        card.addView(primaryButton("Buscar", v -> showTravelResults(origin.getText().toString(), destination.getText().toString(), date.getText().toString(), parseInt(passengers.getText().toString(), 1))), matchWrap());
+        card.addView(sectionTitle("Book a flight"));
+        LinearLayout typeRow = row();
+        typeRow.addView("roundtrip".equals(criteriaTripType)
+                ? primaryButton("Ida y vuelta", v -> {
+                })
+                : outlineButton("Ida y vuelta", v -> {
+                    criteriaTripType = "roundtrip";
+                    render();
+                }), weightedButtonParams());
+        typeRow.addView("oneway".equals(criteriaTripType)
+                ? primaryButton("Solo ida", v -> {
+                })
+                : outlineButton("Solo ida", v -> {
+                    criteriaTripType = "oneway";
+                    criteriaReturnDate = "";
+                    render();
+                }), weightedButtonParams());
+        card.addView(typeRow);
+
+        card.addView(label("Ruta"));
+        card.addView(selectionField("From", criteriaOrigin.isEmpty() ? "Guatemala City (GUA)" : airportDisplay(criteriaOrigin), v -> {
+            activeView = "select_origin";
+            render();
+        }));
+        card.addView(selectionField("To", criteriaDestination.isEmpty() ? "Seleccionar destino" : airportDisplay(criteriaDestination), v -> {
+            activeView = "select_destination";
+            render();
+        }));
+
+        card.addView(label("Fechas"));
+        String dateSummary = criteriaDepartureDate.isEmpty() ? "Departure" : displayDate(criteriaDepartureDate);
+        if ("roundtrip".equals(criteriaTripType)) {
+            dateSummary += "  -  " + (criteriaReturnDate.isEmpty() ? "Return" : displayDate(criteriaReturnDate));
+        }
+        card.addView(selectionField("When are you flying?", dateSummary, v -> {
+            datePickerMode = "departure";
+            activeView = "select_dates";
+            render();
+        }));
+
+        card.addView(label("Quienes vuelan"));
+        card.addView(selectionField("Passenger(s)", passengerSummary(), v -> {
+            activeView = "select_passengers";
+            render();
+        }));
+
+        card.addView(primaryButton("Explorar", v -> {
+            if (criteriaOrigin.trim().isEmpty()) {
+                criteriaOrigin = "La Aurora";
+            }
+            showTravelResults(criteriaOrigin, criteriaDestination, criteriaDepartureDate, passengerCountFromCriteria());
+        }), matchWrap());
         contentLayout.addView(card);
-        showTravelResults("", "", "", 1);
+        dynamicContentStartIndex = contentLayout.getChildCount();
+        if (!criteriaDestination.trim().isEmpty()) {
+            showTravelResults(criteriaOrigin, criteriaDestination, criteriaDepartureDate, passengerCountFromCriteria());
+        }
+    }
+
+    private void renderAirportPicker(boolean originPicker, String term) {
+        LinearLayout card = card();
+        card.addView(sectionTitle(originPicker ? "Select origin" : "Select destination"));
+        card.addView(outlineButton("Volver", v -> {
+            activeView = "explorar";
+            render();
+        }), matchWrap());
+
+        EditText search = input(originPicker ? "Buscar origen" : "Buscar destino", term, false);
+        card.addView(search);
+        card.addView(primaryButton("Buscar", v -> {
+            contentLayout.removeAllViews();
+            renderAirportPicker(originPicker, search.getText().toString());
+        }), matchWrap());
+        contentLayout.addView(card);
+
+        LinearLayout list = card();
+        list.addView(sectionTitle("Aeropuertos disponibles"));
+        int shown = 0;
+        for (int i = 0; i < airports.length(); i++) {
+            JSONObject airport = airports.optJSONObject(i);
+            if (airport == null || !matchesAirport(airport, term)) {
+                continue;
+            }
+            shown++;
+            list.addView(airportRow(airport, originPicker));
+        }
+        if (shown == 0) {
+            list.addView(text("No encontramos aeropuertos con ese texto.", 13, MUTED, Typeface.NORMAL));
+        }
+        contentLayout.addView(fixedScroll(list, 560));
+    }
+
+    private View airportRow(JSONObject airport, boolean originPicker) {
+        LinearLayout item = compactCard();
+        item.setOnClickListener(v -> selectAirport(airport, originPicker));
+        LinearLayout line = new LinearLayout(this);
+        line.setOrientation(LinearLayout.HORIZONTAL);
+        TextView names = text(airportCityCountry(airport) + "\n" + airportTitle(airport), 17, TEXT, Typeface.BOLD);
+        TextView code = text(airportCodeFromAirport(airport), 24, TEXT, Typeface.NORMAL);
+        code.setGravity(Gravity.RIGHT | Gravity.CENTER_VERTICAL);
+        line.addView(names, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        line.addView(code, new LinearLayout.LayoutParams(dp(90), LinearLayout.LayoutParams.WRAP_CONTENT));
+        item.addView(line);
+        return item;
+    }
+
+    private void selectAirport(JSONObject airport, boolean originPicker) {
+        String name = airportTitle(airport);
+        if (originPicker) {
+            criteriaOrigin = name;
+        } else {
+            criteriaDestination = name;
+            registerDestinationClick(airport);
+        }
+        activeView = "explorar";
+        render();
+    }
+
+    private void renderDatePicker() {
+        LinearLayout card = card();
+        card.addView(sectionTitle("When are you flying?"));
+        card.addView(outlineButton("Volver", v -> {
+            activeView = "explorar";
+            render();
+        }), matchWrap());
+
+        LinearLayout typeRow = row();
+        typeRow.addView("roundtrip".equals(criteriaTripType)
+                ? primaryButton("Ida y vuelta", v -> {
+                })
+                : outlineButton("Ida y vuelta", v -> {
+                    criteriaTripType = "roundtrip";
+                    render();
+                }), weightedButtonParams());
+        typeRow.addView("oneway".equals(criteriaTripType)
+                ? primaryButton("Solo ida", v -> {
+                })
+                : outlineButton("Solo ida", v -> {
+                    criteriaTripType = "oneway";
+                    criteriaReturnDate = "";
+                    datePickerMode = "departure";
+                    render();
+                }), weightedButtonParams());
+        card.addView(typeRow);
+
+        if ("roundtrip".equals(criteriaTripType)) {
+            LinearLayout modeRow = row();
+            modeRow.addView("departure".equals(datePickerMode)
+                    ? primaryButton("Departure", v -> {
+                    })
+                    : outlineButton("Departure", v -> {
+                        datePickerMode = "departure";
+                        render();
+                    }), weightedButtonParams());
+            modeRow.addView("return".equals(datePickerMode)
+                    ? primaryButton("Return", v -> {
+                    })
+                    : outlineButton("Return", v -> {
+                        datePickerMode = "return";
+                        render();
+                    }), weightedButtonParams());
+            card.addView(modeRow);
+        }
+
+        card.addView(text("Salida: " + (criteriaDepartureDate.isEmpty() ? "-" : displayDate(criteriaDepartureDate)), 14, MUTED, Typeface.NORMAL));
+        if ("roundtrip".equals(criteriaTripType)) {
+            card.addView(text("Vuelta: " + (criteriaReturnDate.isEmpty() ? "-" : displayDate(criteriaReturnDate)), 14, MUTED, Typeface.NORMAL));
+        }
+        contentLayout.addView(card);
+
+        LinearLayout calendar = card();
+        addCalendarMonth(calendar, 2026, 6);
+        addCalendarMonth(calendar, 2026, 7);
+        contentLayout.addView(calendar);
+    }
+
+    private void addCalendarMonth(LinearLayout parent, int year, int month) {
+        java.util.Calendar calendar = java.util.Calendar.getInstance();
+        calendar.set(year, month - 1, 1);
+        String title = new java.text.SimpleDateFormat("MMMM yyyy", Locale.US).format(calendar.getTime());
+        parent.addView(text(title, 22, TEXT, Typeface.BOLD));
+        String[] weekdays = {"MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"};
+        LinearLayout week = row();
+        for (String weekday : weekdays) {
+            TextView day = text(weekday, 12, TEXT, Typeface.BOLD);
+            day.setGravity(Gravity.CENTER);
+            week.addView(day, weightedButtonParams());
+        }
+        parent.addView(week);
+
+        int firstDay = calendar.get(java.util.Calendar.DAY_OF_WEEK);
+        int offset = firstDay == java.util.Calendar.SUNDAY ? 6 : firstDay - 2;
+        int maxDay = calendar.getActualMaximum(java.util.Calendar.DAY_OF_MONTH);
+        int day = 1;
+        for (int rowIndex = 0; rowIndex < 6 && day <= maxDay; rowIndex++) {
+            LinearLayout row = row();
+            for (int column = 0; column < 7; column++) {
+                if ((rowIndex == 0 && column < offset) || day > maxDay) {
+                    TextView blank = text("", 16, TEXT, Typeface.NORMAL);
+                    row.addView(blank, weightedButtonParams());
+                    continue;
+                }
+                String value = String.format(Locale.US, "%04d-%02d-%02d", year, month, day);
+                Button dateButton = baseButton(String.valueOf(day), v -> selectDate(value));
+                dateButton.setTextColor(TEXT);
+                dateButton.setBackground(round(dateColor(value), dateSelected(value) ? GREEN : Color.TRANSPARENT, dp(28)));
+                row.addView(dateButton, weightedButtonParams());
+                day++;
+            }
+            parent.addView(row);
+        }
+    }
+
+    private void selectDate(String value) {
+        if ("return".equals(datePickerMode)) {
+            criteriaReturnDate = value;
+            activeView = "explorar";
+        } else {
+            criteriaDepartureDate = value;
+            if ("roundtrip".equals(criteriaTripType)) {
+                datePickerMode = "return";
+                activeView = "select_dates";
+            } else {
+                activeView = "explorar";
+            }
+        }
+        render();
+    }
+
+    private void renderPassengerSelector() {
+        LinearLayout card = card();
+        card.addView(sectionTitle("Who is flying?"));
+        card.addView(text("Selecciona los pasajeros para esta busqueda.", 14, MUTED, Typeface.NORMAL));
+        card.addView(counterRow("Adults", "15+ years", criteriaAdults, value -> criteriaAdults = Math.max(1, value)));
+        card.addView(counterRow("Young", "12-14 years", criteriaYouth, value -> criteriaYouth = Math.max(0, value)));
+        card.addView(counterRow("Children", "2-11 years", criteriaChildren, value -> criteriaChildren = Math.max(0, value)));
+        card.addView(counterRow("Babies", "Under 2 years", criteriaBabies, value -> criteriaBabies = Math.max(0, value)));
+        card.addView(primaryButton("Listo", v -> {
+            activeView = "explorar";
+            render();
+        }), matchWrap());
+        contentLayout.addView(card);
+    }
+
+    private View counterRow(String title, String subtitle, int value, CounterSetter setter) {
+        LinearLayout item = compactCard();
+        LinearLayout line = new LinearLayout(this);
+        line.setOrientation(LinearLayout.HORIZONTAL);
+        TextView label = text(title + "\n" + subtitle, 16, TEXT, Typeface.BOLD);
+        TextView number = text(String.valueOf(value), 20, TEXT, Typeface.BOLD);
+        number.setGravity(Gravity.CENTER);
+        Button minus = outlineButton("-", v -> {
+            setter.set(value - 1);
+            render();
+        });
+        Button plus = outlineButton("+", v -> {
+            setter.set(value + 1);
+            render();
+        });
+        line.addView(label, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        line.addView(minus, new LinearLayout.LayoutParams(dp(58), LinearLayout.LayoutParams.WRAP_CONTENT));
+        line.addView(number, new LinearLayout.LayoutParams(dp(48), LinearLayout.LayoutParams.WRAP_CONTENT));
+        line.addView(plus, new LinearLayout.LayoutParams(dp(58), LinearLayout.LayoutParams.WRAP_CONTENT));
+        item.addView(line);
+        return item;
     }
 
     private void showTravelResults(String origin, String destination, String date, int passengers) {
-        if (contentLayout.getChildCount() > 1) {
-            contentLayout.removeViews(1, contentLayout.getChildCount() - 1);
+        if (contentLayout.getChildCount() > dynamicContentStartIndex) {
+            contentLayout.removeViews(dynamicContentStartIndex, contentLayout.getChildCount() - dynamicContentStartIndex);
         }
         registerFlightSearch(origin, destination, date, passengers);
         LinearLayout results = card();
-        results.addView(sectionTitle("Resultados"));
+        results.addView(bookingProgress(1));
+        results.addView(text(routeLabel(origin, destination), 28, TEXT, Typeface.BOLD));
+        results.addView(text((date == null || date.isEmpty() ? "Fecha flexible" : date) + "  •  " + passengers + " pasajero(s)", 15, MUTED, Typeface.NORMAL));
+        TextView info = text("Book now. No esperamos que los precios bajen para esta fecha.", 15, GREEN, Typeface.BOLD);
+        info.setPadding(dp(14), dp(14), dp(14), dp(14));
+        info.setBackground(round(SOFT_GREEN, Color.rgb(190, 224, 198), dp(14)));
+        results.addView(info, matchWrap());
+        addResultDateCarousel(results, date);
+        LinearLayout filters = row();
+        filters.addView(outlineButton("Business Class +", v -> {
+            lastMessage = "Filtro aplicado: Business Class.";
+            render();
+        }), weightedButtonParams());
+        results.addView(filters);
+        results.addView(sectionTitle("Vuelos disponibles"));
+        results.addView(text(("roundtrip".equals(criteriaTripType) ? "Ida y vuelta" : "Solo ida") + " - " + passengers + " pasajero(s)", 13, MUTED, Typeface.NORMAL));
         int shown = 0;
         for (int i = 0; i < flights.length(); i++) {
             JSONObject flight = flights.optJSONObject(i);
@@ -407,6 +704,34 @@ public final class MainActivity extends Activity {
         contentLayout.addView(results);
     }
 
+    private void addResultDateCarousel(LinearLayout parent, String selectedDate) {
+        java.util.Calendar calendar = java.util.Calendar.getInstance();
+        if (selectedDate != null && selectedDate.matches("\\d{4}-\\d{2}-\\d{2}")) {
+            try {
+                java.util.Date date = new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(selectedDate);
+                if (date != null) {
+                    calendar.setTime(date);
+                }
+            } catch (Exception ignored) {
+            }
+        }
+
+        for (int i = 0; i < 6; i += 3) {
+            LinearLayout row = row();
+            for (int j = i; j < Math.min(i + 3, 6); j++) {
+                java.util.Calendar day = (java.util.Calendar) calendar.clone();
+                day.add(java.util.Calendar.DAY_OF_MONTH, j);
+                String dateValue = dateInputValue(day);
+                String label = new java.text.SimpleDateFormat("EEE, dd MMM", Locale.US).format(day.getTime()) + "\n" + money(fareForDate(day));
+                row.addView(outlineButton(label, v -> {
+                    criteriaDepartureDate = dateValue;
+                    showTravelResults(criteriaOrigin, criteriaDestination, criteriaDepartureDate, passengerCountFromCriteria());
+                }), weightedButtonParams());
+            }
+            parent.addView(row);
+        }
+    }
+
     private void renderBoard() {
         LinearLayout search = card();
         search.addView(sectionTitle("Rastreo de vuelos"));
@@ -414,12 +739,13 @@ public final class MainActivity extends Activity {
         search.addView(term);
         search.addView(primaryButton("Filtrar", v -> showBoardResults(term.getText().toString())), matchWrap());
         contentLayout.addView(search);
+        dynamicContentStartIndex = contentLayout.getChildCount();
         showBoardResults("");
     }
 
     private void showBoardResults(String term) {
-        if (contentLayout.getChildCount() > 1) {
-            contentLayout.removeViews(1, contentLayout.getChildCount() - 1);
+        if (contentLayout.getChildCount() > dynamicContentStartIndex) {
+            contentLayout.removeViews(dynamicContentStartIndex, contentLayout.getChildCount() - dynamicContentStartIndex);
         }
         LinearLayout board = card();
         board.addView(sectionTitle("Tablero"));
@@ -443,19 +769,62 @@ public final class MainActivity extends Activity {
 
     private View flightCard(JSONObject flight, int passengers, boolean allowBuy) {
         LinearLayout item = compactCard();
-        item.addView(text(value(flight, "numeroVuelo", "Vuelo"), 17, TEXT, Typeface.BOLD));
-        item.addView(text(value(flight, "origen", "-") + " -> " + value(flight, "destino", "-"), 14, TEXT, Typeface.NORMAL));
-        item.addView(text("Aerolinea: " + value(flight, "aerolinea", "-") + "  Avion: " + value(flight, "matriculaAvion", "-"), 13, MUTED, Typeface.NORMAL));
-        item.addView(text("Fecha: " + shortDate(value(flight, "fechaVuelo", "-")) + "  Estado: " + value(flight, "estado", "-"), 13, statusColor(value(flight, "estado", "")), Typeface.BOLD));
-        item.addView(text("Ocupadas/disponibles: " + value(flight, "plazasOcupadas", "0") + "/" + value(flight, "plazasDisponibles", "0"), 13, MUTED, Typeface.NORMAL));
+        LinearLayout times = new LinearLayout(this);
+        times.setOrientation(LinearLayout.HORIZONTAL);
+        TextView left = text(timeOnly(value(flight, "fechaVuelo", "")) + "\n" + airportCode(value(flight, "origen", "")), 24, TEXT, Typeface.BOLD);
+        left.setGravity(Gravity.LEFT);
+        TextView center = text((hasTechnicalStop(flight) ? "1 Stop" : "Directo") + "\n------ ✈ ------", 15, TEAL, Typeface.BOLD);
+        center.setGravity(Gravity.CENTER);
+        TextView right = text(timeOnly(estimatedArrival(value(flight, "fechaVuelo", ""), estimateDurationMinutes(flight))) + "\n" + airportCode(value(flight, "destino", "")), 24, TEXT, Typeface.BOLD);
+        right.setGravity(Gravity.RIGHT);
+        times.addView(left, weightedButtonParams());
+        times.addView(center, weightedButtonParams());
+        times.addView(right, weightedButtonParams());
+        item.addView(times);
+        item.addView(text(value(flight, "numeroVuelo", "Vuelo") + " • " + estimateDurationMinutes(flight) + " min", 13, MUTED, Typeface.NORMAL));
+        item.addView(text("Operado por " + value(flight, "aerolinea", "-"), 13, MUTED, Typeface.NORMAL));
+        item.addView(text("From " + money(fare("economica", passengers)), 24, TEXT, Typeface.BOLD));
         if (allowBuy) {
-            LinearLayout fares = row();
-            fares.addView(outlineButton("Turista " + money(fare("economica", passengers)), v -> addCart(flight, "economica", passengers)), weightedButtonParams());
-            fares.addView(outlineButton("Ejecutiva", v -> addCart(flight, "ejecutiva", passengers)), weightedButtonParams());
-            fares.addView(outlineButton("Primera", v -> addCart(flight, "primera", passengers)), weightedButtonParams());
-            item.addView(fares);
+            item.addView(label("Select your fare"));
+            LinearLayout tabs = row();
+            tabs.addView(navButton("Economy", true, v -> {
+            }), weightedButtonParams());
+            tabs.addView(navButton("Business Class", false, v -> {
+            }), weightedButtonParams());
+            item.addView(tabs);
+            item.addView(tariffCard(flight, "economica", "Turista", "Para viajar basico", passengers, "Articulo personal incluido", "Equipaje de bodega opcional", false));
+            item.addView(tariffCard(flight, "ejecutiva", "Ejecutiva", "Mas comodidad", passengers, "Articulo personal y equipaje", "Mejor balance de precio/beneficios", true));
+            item.addView(tariffCard(flight, "primera", "Primera clase", "Mayor tranquilidad", passengers, "Cambios y reembolso", "Experiencia completa", false));
         }
         return item;
+    }
+
+    private View tariffCard(JSONObject flight, String className, String name, String tagline, int passengers, String benefitOne, String benefitTwo, boolean recommended) {
+        LinearLayout card = compactCard();
+        if (recommended) {
+            card.addView(text("BEST OPTION", 12, GOLD, Typeface.BOLD));
+        }
+        card.addView(text(name, 28, "ejecutiva".equals(className) ? Color.rgb(192, 0, 137) : "primera".equals(className) ? Color.rgb(245, 96, 0) : Color.rgb(192, 0, 137), Typeface.BOLD));
+        card.addView(text(tagline, 13, MUTED, Typeface.NORMAL));
+        card.addView(text("▣ " + benefitOne, 14, TEXT, Typeface.NORMAL));
+        card.addView(text("▣ " + benefitTwo, 14, TEXT, Typeface.NORMAL));
+        card.addView(text("▣ Check-in en el aeropuerto", 14, TEXT, Typeface.NORMAL));
+        card.addView(text("ⓘ Restricciones de tarifa", 14, TEAL, Typeface.NORMAL));
+        card.addView(primaryButton(money(fare(className, passengers)), v -> chooseFare(flight, className, passengers)), matchWrap());
+        TextView perPassenger = text("Precio por pasajero", 12, MUTED, Typeface.NORMAL);
+        perPassenger.setGravity(Gravity.CENTER);
+        card.addView(perPassenger);
+        return card;
+    }
+
+    private void chooseFare(JSONObject flight, String className, int passengers) {
+        if (sessionUser == null) {
+            lastMessage = "Inicia sesion para agregar vuelos al carrito, igual que en la web.";
+            render();
+            return;
+        }
+
+        addCart(flight, className, passengers);
     }
 
     private void renderOperations() {
@@ -537,24 +906,129 @@ public final class MainActivity extends Activity {
         }
 
         LinearLayout card = card();
-        card.addView(sectionTitle("Checkout"));
+        card.addView(bookingProgress(2));
+        card.addView(sectionTitle("Passenger information"));
         card.addView(text(value(checkoutFlight, "numeroVuelo", "Vuelo"), 20, TEXT, Typeface.BOLD));
         card.addView(text(value(checkoutFlight, "origen", "-") + " -> " + value(checkoutFlight, "destino", "-"), 14, MUTED, Typeface.NORMAL));
+        card.addView(text("Pasos: Pasajeros -> Extras -> Pago. Todo se confirma al final como en el web.", 13, MUTED, Typeface.NORMAL));
 
         Spinner classSpinner = spinner(new String[]{"economica", "ejecutiva", "primera"}, value(checkoutFlight, "selectedClass", "economica"));
-        EditText bags = input("Equipaje facturado", "1", false);
-        bags.setInputType(InputType.TYPE_CLASS_NUMBER);
-        EditText weight = input("Peso equipaje kg", "23", false);
-        weight.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        Spinner method = spinner(new String[]{"1 - Tarjeta de credito", "2 - Tarjeta de debito", "3 - Transferencia"}, "1 - Tarjeta de credito");
+        int passengerCount = parseInt(value(checkoutFlight, "passengerCount", "1"), 1);
 
-        card.addView(label("Clase"));
+        card.addView(label("Vuelo seleccionado"));
+        LinearLayout summary = compactCard();
+        summary.addView(text("Salida: " + shortDate(value(checkoutFlight, "fechaVuelo", "-")), 13, TEXT, Typeface.NORMAL));
+        summary.addView(text("Llegada estimada: " + shortDate(estimatedArrival(value(checkoutFlight, "fechaVuelo", ""), estimateDurationMinutes(checkoutFlight))), 13, MUTED, Typeface.NORMAL));
+        summary.addView(text("Viajan: " + passengerCount + " pasajero(s) - " + (hasTechnicalStop(checkoutFlight) ? "Con parada" : "Directo"), 13, MUTED, Typeface.NORMAL));
+        card.addView(summary);
+
+        card.addView(label("Tarifa"));
         card.addView(classSpinner);
-        card.addView(bags);
-        card.addView(weight);
-        card.addView(label("Metodo de pago"));
-        card.addView(method);
-        card.addView(primaryButton("Confirmar compra", v -> confirmPurchase(classSpinner, bags, weight, method)), matchWrap());
+
+        card.addView(label("Pasajeros"));
+        EditText[] passengerNames = new EditText[passengerCount];
+        EditText[] passengerDocs = new EditText[passengerCount];
+        EditText[] passengerAges = new EditText[passengerCount];
+        for (int i = 0; i < passengerCount; i++) {
+            LinearLayout passengerCard = compactCard();
+            passengerCard.addView(text(i == 0 ? "Adult 1" : "Pasajero " + (i + 1), 20, TEXT, Typeface.NORMAL));
+            passengerCard.addView(text("Ingresa el nombre y apellido exactamente como aparece en el pasaporte o documento.", 13, MUTED, Typeface.NORMAL));
+            Spinner gender = spinner(new String[]{"Genero", "Masculino", "Femenino"}, "Genero");
+            passengerCard.addView(gender);
+            passengerNames[i] = input("Name *", i == 0 ? value(sessionUser, "nombreCompleto", "") : "", false);
+            passengerDocs[i] = input("Last name / Documento *", "", false);
+            passengerAges[i] = input("Date of Birth / Edad *", defaultPassengerAge(i), false);
+            passengerAges[i].setInputType(InputType.TYPE_CLASS_NUMBER);
+            passengerCard.addView(passengerNames[i]);
+            passengerCard.addView(passengerDocs[i]);
+            passengerCard.addView(passengerAges[i]);
+            passengerCard.addView(input("Nationality of your travel document *", "Guatemala", false));
+            passengerCard.addView(checkbox("Tengo numero de viajero frecuente (opcional)."));
+            passengerCard.addView(checkbox("Necesito asistencia especial (opcional)."));
+            card.addView(passengerCard);
+        }
+
+        card.addView(label("Titular de reserva"));
+        EditText holderName = input("Nombre completo", value(sessionUser, "nombreCompleto", ""), false);
+        EditText holderEmail = input("Email", value(sessionUser, "email", ""), false);
+        EditText holderPhone = input("Telefono", "", false);
+        EditText holderDocument = input("Documento", "", false);
+        holderEmail.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
+        holderPhone.setInputType(InputType.TYPE_CLASS_PHONE);
+        card.addView(holderName);
+        card.addView(holderEmail);
+        card.addView(holderPhone);
+        card.addView(holderDocument);
+        CheckBox privacy = checkbox("Acepto el procesamiento de mis datos personales.");
+        privacy.setChecked(true);
+        card.addView(privacy);
+        card.addView(checkbox("Acepto recibir promociones, ofertas y noticias."));
+
+        card.addView(sectionTitle("Personalize your trip"));
+        CheckBox seat = checkbox("Elige tu asiento - " + money(SERVICE_SEAT) + " por pasajero");
+        CheckBox bag = checkbox("Equipaje adicional - " + money(SERVICE_BAG) + " por pasajero");
+        CheckBox vip = checkbox("Sala VIP - " + money(SERVICE_VIP) + " por pasajero");
+        CheckBox priority = checkbox("Prioridad de abordaje - " + money(SERVICE_PRIORITY) + " por pasajero");
+        if (!"economica".equals(value(checkoutFlight, "selectedClass", "economica"))) {
+            bag.setChecked(true);
+        }
+        if ("economica".equals(value(checkoutFlight, "selectedClass", "economica"))) {
+            TextView warning = text("Tu tarifa Turista no incluye equipaje de bodega. Puedes agregarlo aqui o continuar sin cambios.", 13, GOLD, Typeface.BOLD);
+            warning.setPadding(dp(10), dp(10), dp(10), dp(10));
+            warning.setBackground(round(Color.rgb(45, 38, 18), GOLD, dp(8)));
+            card.addView(warning, matchWrap());
+        }
+        card.addView(serviceOptionCard(seat, "Choose your seat", "Choose your favorite seat and fly at a better price than at the airport.", "From " + money(SERVICE_SEAT)));
+        card.addView(serviceOptionCard(bag, "Additional baggage", "Add it now to save time at the airport.", "From " + money(SERVICE_BAG)));
+        card.addView(serviceOptionCard(vip, "Travel assistance", "Medical, legal and contingency coverage at your next destination.", "From " + money(SERVICE_VIP)));
+        card.addView(serviceOptionCard(priority, "Priority boarding", "Skip the lines and be among the first to board the plane.", "From " + money(SERVICE_PRIORITY)));
+
+        card.addView(sectionTitle("Select your payment method"));
+        LinearLayout paymentCard = compactCard();
+        paymentCard.addView(text("● Credit and debit card", 20, TEXT, Typeface.NORMAL));
+        paymentCard.addView(text("DISCOVER   VISA   Mastercard   AMEX", 13, MUTED, Typeface.BOLD));
+        paymentCard.addView(checkbox("Split the payment of your flights into two different cards"));
+        paymentCard.addView(text("Card information", 18, TEXT, Typeface.BOLD));
+        Spinner method = spinner(new String[]{"1 - Tarjeta de credito", "2 - Tarjeta de debito", "3 - Transferencia"}, "1 - Tarjeta de credito");
+        paymentCard.addView(method);
+        EditText cardName = input("Nombre en tarjeta", value(sessionUser, "nombreCompleto", ""), false);
+        EditText cardNumber = input("Numero de tarjeta", "", false);
+        EditText cardExpiration = input("Vencimiento MM/AA", "", false);
+        EditText cardCvv = input("CVV", "", false);
+        cardNumber.setInputType(InputType.TYPE_CLASS_NUMBER);
+        cardCvv.setInputType(InputType.TYPE_CLASS_NUMBER);
+        paymentCard.addView(cardName);
+        paymentCard.addView(cardNumber);
+        LinearLayout cardRow = row();
+        cardRow.addView(cardExpiration, weightedButtonParams());
+        cardRow.addView(cardCvv, weightedButtonParams());
+        paymentCard.addView(cardRow);
+        card.addView(paymentCard);
+
+        LinearLayout purchaseSummary = compactCard();
+        purchaseSummary.addView(text("Resumen de compra", 16, TEXT, Typeface.BOLD));
+        purchaseSummary.addView(text("Vuelo: " + money(fare(value(checkoutFlight, "selectedClass", "economica"), passengerCount)), 13, MUTED, Typeface.NORMAL));
+        purchaseSummary.addView(text("Extras se calculan al confirmar segun lo seleccionado.", 13, MUTED, Typeface.NORMAL));
+        purchaseSummary.addView(text("Impuestos: 12%", 13, MUTED, Typeface.NORMAL));
+        card.addView(purchaseSummary);
+        card.addView(primaryButton("Confirmar compra", v -> confirmPurchase(
+                classSpinner,
+                passengerNames,
+                passengerDocs,
+                passengerAges,
+                holderName,
+                holderEmail,
+                holderPhone,
+                holderDocument,
+                seat,
+                bag,
+                vip,
+                priority,
+                method,
+                cardName,
+                cardNumber,
+                cardExpiration,
+                cardCvv)), matchWrap());
         card.addView(outlineButton("Volver al carrito", v -> {
             activeView = "carrito";
             render();
@@ -750,7 +1224,7 @@ public final class MainActivity extends Activity {
                 settingsStore.saveSessionJson(sessionUser.toString());
                 statusText.setText("Sesion iniciada.");
                 lastMessage = "Bienvenido " + value(sessionUser, "nombreCompleto", value(sessionUser, "usuario", "usuario")) + ".";
-                render();
+                syncCartFromServer(true);
             });
         } catch (Exception exception) {
             showError(exception);
@@ -780,7 +1254,7 @@ public final class MainActivity extends Activity {
                 statusText.setText("Cuenta creada.");
                 activeView = "inicio";
                 lastMessage = "Cuenta creada e iniciada.";
-                render();
+                syncCartFromServer(true);
             });
         } catch (Exception exception) {
             showError(exception);
@@ -818,8 +1292,10 @@ public final class MainActivity extends Activity {
             }
         }
         activeView = "explorar";
+        criteriaDestination = name;
+        criteriaOrigin = criteriaOrigin.isEmpty() ? "La Aurora" : criteriaOrigin;
         render();
-        showTravelResults("", name, "", 1);
+        showTravelResults(criteriaOrigin, criteriaDestination, criteriaDepartureDate, passengerCountFromCriteria());
     }
 
     private void registerFlightSearch(String origin, String destination, String date, int passengers) {
@@ -858,6 +1334,19 @@ public final class MainActivity extends Activity {
                     .put("cartId", value(flight, "id", "0") + "-" + System.currentTimeMillis())
                     .put("selectedClass", className)
                     .put("passengerCount", Math.max(1, passengers));
+
+            if (sessionUser != null) {
+                JSONObject payload = cartItemPayload(item);
+                runTask("Agregando al carrito compartido...", () -> apiClient.post("/api/carritos-compra/pasajero/" + passengerId() + "/items", payload.toString()), json -> {
+                    cartItems.add(serverCartItemToFlight(new JSONObject(json)));
+                    saveCart();
+                    activeView = "carrito";
+                    lastMessage = "Vuelo agregado al carrito compartido.";
+                    render();
+                });
+                return;
+            }
+
             cartItems.add(item);
             saveCart();
             activeView = "carrito";
@@ -875,36 +1364,96 @@ public final class MainActivity extends Activity {
     }
 
     private void removeCartItem(String cartId) {
+        JSONObject removed = null;
+        for (JSONObject item : cartItems) {
+            if (value(item, "cartId", "").equals(cartId)) {
+                removed = item;
+                break;
+            }
+        }
+
+        if (sessionUser != null && removed != null && !value(removed, "itemCarritoId", "").isEmpty()) {
+            JSONObject finalRemoved = removed;
+            runTask("Quitando del carrito compartido...", () -> {
+                apiClient.delete("/api/carritos-compra/pasajero/" + passengerId() + "/items/" + encode(value(finalRemoved, "itemCarritoId", "")));
+                return "";
+            }, json -> {
+                removeLocalCartItem(cartId);
+                render();
+            });
+            return;
+        }
+
+        removeLocalCartItem(cartId);
+        render();
+    }
+
+    private void removeLocalCartItem(String cartId) {
         for (int i = cartItems.size() - 1; i >= 0; i--) {
             if (value(cartItems.get(i), "cartId", "").equals(cartId)) {
                 cartItems.remove(i);
             }
         }
         saveCart();
-        render();
     }
 
-    private void confirmPurchase(Spinner classSpinner, EditText bags, EditText weight, Spinner method) {
+    private void confirmPurchase(
+            Spinner classSpinner,
+            EditText[] passengerNames,
+            EditText[] passengerDocs,
+            EditText[] passengerAges,
+            EditText holderName,
+            EditText holderEmail,
+            EditText holderPhone,
+            EditText holderDocument,
+            CheckBox seat,
+            CheckBox bag,
+            CheckBox vip,
+            CheckBox priority,
+            Spinner method,
+            EditText cardName,
+            EditText cardNumber,
+            EditText cardExpiration,
+            EditText cardCvv) {
         if (checkoutFlight == null || sessionUser == null) {
             return;
         }
         String className = classSpinner.getSelectedItem().toString();
         int passengers = parseInt(value(checkoutFlight, "passengerCount", "1"), 1);
-        double fare = fare(className, passengers);
+        String validationError = checkoutValidationError(passengerNames, passengerDocs, passengerAges, holderName, holderEmail, holderPhone, method, cardName, cardNumber, cardExpiration, cardCvv);
+        if (!validationError.isEmpty()) {
+            statusText.setText(validationError);
+            return;
+        }
+
+        double servicesTotal = 0;
+        servicesTotal += seat.isChecked() ? SERVICE_SEAT * passengers : 0;
+        servicesTotal += bag.isChecked() ? SERVICE_BAG * passengers : 0;
+        servicesTotal += vip.isChecked() ? SERVICE_VIP * passengers : 0;
+        servicesTotal += priority.isChecked() ? SERVICE_PRIORITY * passengers : 0;
+        double fare = fare(className, passengers) + servicesTotal;
         int methodId = parseInt(method.getSelectedItem().toString().substring(0, 1), 1);
         try {
+            String checkoutCartId = value(checkoutFlight, "cartId", "");
+            String checkoutItemId = value(checkoutFlight, "itemCarritoId", "");
             JSONObject body = new JSONObject()
                     .put("usuarioId", parseInt(value(sessionUser, "usuarioId", "0"), 0))
                     .put("pasajeroId", parseInt(value(sessionUser, "pasajeroId", "0"), 0))
                     .put("vueloId", parseInt(value(checkoutFlight, "id", "0"), 0))
                     .put("clase", className)
-                    .put("equipajeFacturado", parseInt(bags.getText().toString(), 0))
-                    .put("pesoEquipaje", parseDouble(weight.getText().toString()))
+                    .put("equipajeFacturado", bag.isChecked() ? 1 : 0)
+                    .put("pesoEquipaje", bag.isChecked() ? 23 : JSONObject.NULL)
                     .put("tarifaPagada", fare)
                     .put("metodoPagoId", methodId);
-            runTask("Confirmando compra...", () -> apiClient.post("/api/compras/vuelos", body.toString()), json -> {
+            runTask("Confirmando compra...", () -> {
+                String response = apiClient.post("/api/compras/vuelos", body.toString());
+                if (!checkoutItemId.isEmpty()) {
+                    apiClient.delete("/api/carritos-compra/pasajero/" + passengerId() + "/items/" + encode(checkoutItemId));
+                }
+                return response;
+            }, json -> {
                 JSONObject response = new JSONObject(json);
-                removeCartItem(value(checkoutFlight, "cartId", ""));
+                removeLocalCartItem(checkoutCartId);
                 checkoutFlight = null;
                 activeView = "carrito";
                 lastMessage = "Compra confirmada. Reserva " + value(response, "codigoReserva", "-") + ". Total " + money(parseDouble(value(response, "total", "0"))) + ".";
@@ -986,6 +1535,78 @@ public final class MainActivity extends Activity {
         });
     }
 
+    private void syncCartFromServer(boolean uploadLocalItems) {
+        if (sessionUser == null || passengerId() <= 0) {
+            return;
+        }
+
+        ArrayList<JSONObject> pendingLocalItems = new ArrayList<>();
+        if (uploadLocalItems) {
+            for (JSONObject item : cartItems) {
+                if (value(item, "itemCarritoId", "").isEmpty()) {
+                    pendingLocalItems.add(item);
+                }
+            }
+        }
+
+        runTask("Sincronizando carrito...", () -> {
+            for (JSONObject item : pendingLocalItems) {
+                apiClient.post("/api/carritos-compra/pasajero/" + passengerId() + "/items", cartItemPayload(item).toString());
+            }
+
+            return apiClient.get("/api/carritos-compra/pasajero/" + passengerId() + "/items");
+        }, json -> {
+            JSONArray serverItems = new JSONArray(json);
+            cartItems.clear();
+            for (int i = 0; i < serverItems.length(); i++) {
+                JSONObject item = serverItems.optJSONObject(i);
+                if (item != null) {
+                    cartItems.add(serverCartItemToFlight(item));
+                }
+            }
+            saveCart();
+            statusText.setText("Carrito sincronizado.");
+            render();
+        });
+    }
+
+    private JSONObject serverCartItemToFlight(JSONObject item) throws Exception {
+        String selectedClass = value(item, "selectedClass", "economica");
+        int passengerCount = parseInt(value(item, "passengerCount", "1"), 1);
+
+        return new JSONObject()
+                .put("id", parseInt(value(item, "vueloId", value(item, "id", "0")), 0))
+                .put("itemCarritoId", parseInt(value(item, "id", "0"), 0))
+                .put("carritoId", parseInt(value(item, "carritoId", "0"), 0))
+                .put("cartId", "server-" + value(item, "id", "0"))
+                .put("numeroVuelo", value(item, "numeroVuelo", "Vuelo"))
+                .put("aerolinea", value(item, "aerolinea", "-"))
+                .put("origen", value(item, "origen", "-"))
+                .put("destino", value(item, "destino", "-"))
+                .put("fechaVuelo", value(item, "fechaVuelo", ""))
+                .put("salidaReal", value(item, "salidaReal", ""))
+                .put("llegadaReal", value(item, "llegadaReal", ""))
+                .put("plazasOcupadas", parseInt(value(item, "plazasOcupadas", "0"), 0))
+                .put("plazasDisponibles", parseInt(value(item, "plazasDisponibles", "0"), 0))
+                .put("estado", value(item, "estado", "-"))
+                .put("retrasoMinutos", parseInt(value(item, "retrasoMinutos", "0"), 0))
+                .put("matriculaAvion", value(item, "matriculaAvion", "-"))
+                .put("selectedClass", selectedClass)
+                .put("passengerCount", passengerCount)
+                .put("precioUnitario", parseDouble(value(item, "precioUnitario", "0")));
+    }
+
+    private JSONObject cartItemPayload(JSONObject item) throws Exception {
+        String selectedClass = value(item, "selectedClass", "economica");
+        int passengers = parseInt(value(item, "passengerCount", "1"), 1);
+
+        return new JSONObject()
+                .put("vueloId", parseInt(value(item, "id", value(item, "vueloId", "0")), 0))
+                .put("clase", selectedClass)
+                .put("precioUnitario", fare(selectedClass, passengers))
+                .put("cantidad", Math.max(1, passengers));
+    }
+
     private void runTask(String message, Callable<String> task, ResponseRenderer renderer) {
         statusText.setText(message);
         executor.submit(() -> {
@@ -1047,11 +1668,52 @@ public final class MainActivity extends Activity {
         contentLayout.addView(alert, params);
     }
 
+    private TextView selectionField(String label, String value, View.OnClickListener listener) {
+        TextView view = text(label + "\n" + value, 17, TEXT, Typeface.BOLD);
+        view.setPadding(dp(18), dp(12), dp(18), dp(12));
+        view.setMinHeight(dp(72));
+        view.setBackground(round(Color.WHITE, Color.rgb(152, 152, 152), dp(12)));
+        view.setOnClickListener(listener);
+        LinearLayout.LayoutParams params = matchWrap();
+        params.setMargins(0, dp(8), 0, 0);
+        view.setLayoutParams(params);
+        return view;
+    }
+
+    private ScrollView fixedScroll(View child, int heightDp) {
+        ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
+        scroll.setNestedScrollingEnabled(true);
+        scroll.addView(child, matchWrap());
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(heightDp));
+        params.setMargins(0, dp(12), 0, 0);
+        scroll.setLayoutParams(params);
+        return scroll;
+    }
+
+    private View bookingProgress(int activeStep) {
+        LinearLayout progress = new LinearLayout(this);
+        progress.setOrientation(LinearLayout.HORIZONTAL);
+        progress.setPadding(0, 0, 0, dp(10));
+        String[] steps = {"1", "2", "3"};
+        for (int i = 0; i < steps.length; i++) {
+            boolean done = i + 1 < activeStep;
+            boolean active = i + 1 == activeStep;
+            TextView step = text(done ? "✓" : steps[i], 16, done || active ? Color.WHITE : MUTED, Typeface.BOLD);
+            step.setGravity(Gravity.CENTER);
+            step.setPadding(dp(8), dp(8), dp(8), dp(8));
+            step.setMinHeight(dp(46));
+            step.setBackground(round(done ? Color.rgb(120, 120, 120) : active ? (activeStep == 3 ? RED : GREEN) : Color.rgb(238, 238, 238), active ? RED : LINE, dp(28)));
+            progress.addView(step, weightedButtonParams());
+        }
+        return progress;
+    }
+
     private LinearLayout card() {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(dp(14), dp(14), dp(14), dp(14));
-        layout.setBackground(round(PANEL, LINE, dp(8)));
+        layout.setBackground(round(PANEL, LINE, dp(22)));
         LinearLayout.LayoutParams params = matchWrap();
         params.setMargins(0, dp(12), 0, 0);
         layout.setLayoutParams(params);
@@ -1061,7 +1723,7 @@ public final class MainActivity extends Activity {
     private LinearLayout compactCard() {
         LinearLayout layout = card();
         layout.setPadding(dp(12), dp(12), dp(12), dp(12));
-        layout.setBackground(round(SKY, LINE, dp(8)));
+        layout.setBackground(round(SKY, LINE, dp(22)));
         return layout;
     }
 
@@ -1091,11 +1753,11 @@ public final class MainActivity extends Activity {
         editText.setHintTextColor(MUTED);
         editText.setSingleLine(true);
         editText.setText(value);
-        editText.setTextSize(14);
+        editText.setTextSize(16);
         editText.setTextColor(TEXT);
-        editText.setPadding(dp(12), 0, dp(12), 0);
-        editText.setMinHeight(dp(48));
-        editText.setBackground(round(Color.rgb(9, 19, 34), LINE, dp(8)));
+        editText.setPadding(dp(18), 0, dp(18), 0);
+        editText.setMinHeight(dp(64));
+        editText.setBackground(round(Color.WHITE, Color.rgb(152, 152, 152), dp(12)));
         editText.setInputType(password
                 ? InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD
                 : InputType.TYPE_CLASS_TEXT);
@@ -1122,33 +1784,57 @@ public final class MainActivity extends Activity {
         return spinner;
     }
 
+    private CheckBox checkbox(String label) {
+        CheckBox checkBox = new CheckBox(this);
+        checkBox.setText(label);
+        checkBox.setTextColor(TEXT);
+        checkBox.setTextSize(13);
+        checkBox.setButtonTintList(android.content.res.ColorStateList.valueOf(TEAL));
+        checkBox.setPadding(dp(4), dp(6), dp(4), dp(6));
+        return checkBox;
+    }
+
+    private View serviceOptionCard(CheckBox checkBox, String title, String description, String price) {
+        LinearLayout option = compactCard();
+        TextView illustration = text("▰▰▰", 34, TEAL, Typeface.BOLD);
+        illustration.setGravity(Gravity.CENTER);
+        illustration.setPadding(0, dp(18), 0, dp(18));
+        illustration.setBackground(round(PANEL_LIGHT, PANEL_LIGHT, dp(18)));
+        option.addView(illustration, matchWrap());
+        option.addView(text(title, 24, TEXT, Typeface.BOLD));
+        option.addView(text(description, 15, MUTED, Typeface.NORMAL));
+        option.addView(text(price, 18, TEXT, Typeface.BOLD));
+        option.addView(checkBox);
+        return option;
+    }
+
     private Button primaryButton(String label, View.OnClickListener listener) {
         Button button = baseButton(label, listener);
-        button.setTextColor(DEEP);
-        button.setBackground(round(TEAL, TEAL, dp(8)));
+        button.setTextColor(Color.WHITE);
+        button.setBackground(round(DEEP, DEEP, dp(30)));
         return button;
     }
 
     private Button outlineButton(String label, View.OnClickListener listener) {
         Button button = baseButton(label, listener);
-        button.setTextColor(GOLD);
-        button.setBackground(round(Color.TRANSPARENT, GOLD, dp(8)));
+        button.setTextColor(DEEP);
+        button.setBackground(round(Color.TRANSPARENT, Color.rgb(165, 165, 165), dp(14)));
         return button;
     }
 
     private Button navButton(String label, boolean active, View.OnClickListener listener) {
         Button button = baseButton(label, listener);
-        button.setTextColor(active ? DEEP : TEXT);
-        button.setBackground(round(active ? GOLD : Color.rgb(9, 19, 34), active ? GOLD : LINE, dp(8)));
+        button.setTextColor(active ? Color.WHITE : TEXT);
+        button.setBackground(round(active ? DEEP : Color.WHITE, active ? DEEP : LINE, dp(18)));
         return button;
     }
 
     private Button baseButton(String label, View.OnClickListener listener) {
         Button button = new Button(this);
         button.setText(label);
-        button.setTextSize(12);
+        button.setTextSize(14);
         button.setAllCaps(false);
-        button.setMinHeight(dp(44));
+        button.setMinHeight(dp(58));
         button.setOnClickListener(listener);
         return button;
     }
@@ -1211,6 +1897,94 @@ public final class MainActivity extends Activity {
         }
         String combined = (value(sessionUser, "usuario", "") + " " + value(sessionUser, "email", "") + " " + value(sessionUser, "nombreCompleto", "")).toLowerCase(Locale.ROOT);
         return combined.contains("admin.aurora") || combined.contains("administrador");
+    }
+
+    private int passengerId() {
+        return parseInt(value(sessionUser, "pasajeroId", "0"), 0);
+    }
+
+    private int passengerCountFromCriteria() {
+        return Math.max(1, criteriaAdults + criteriaYouth + criteriaChildren + criteriaBabies);
+    }
+
+    private String defaultPassengerAge(int index) {
+        if (index < criteriaAdults) {
+            return "30";
+        }
+        if (index < criteriaAdults + criteriaYouth) {
+            return "13";
+        }
+        if (index < criteriaAdults + criteriaYouth + criteriaChildren) {
+            return "8";
+        }
+        return "1";
+    }
+
+    private String checkoutValidationError(
+            EditText[] passengerNames,
+            EditText[] passengerDocs,
+            EditText[] passengerAges,
+            EditText holderName,
+            EditText holderEmail,
+            EditText holderPhone,
+            Spinner method,
+            EditText cardName,
+            EditText cardNumber,
+            EditText cardExpiration,
+            EditText cardCvv) {
+        for (int i = 0; i < passengerNames.length; i++) {
+            if (isBlank(passengerNames[i]) || isBlank(passengerDocs[i]) || parseInt(passengerAges[i].getText().toString(), -1) < 0) {
+                markInvalid(passengerNames[i]);
+                markInvalid(passengerDocs[i]);
+                markInvalid(passengerAges[i]);
+                return "Completa nombre, documento y edad de todos los pasajeros.";
+            }
+        }
+
+        if (isBlank(holderName) || isBlank(holderEmail) || isBlank(holderPhone)) {
+            markInvalid(holderName);
+            markInvalid(holderEmail);
+            markInvalid(holderPhone);
+            return "Completa los datos del titular de la reserva.";
+        }
+
+        String email = holderEmail.getText().toString().trim();
+        if (!email.contains("@") || !email.contains(".")) {
+            markInvalid(holderEmail);
+            return "Ingresa un email valido para el titular.";
+        }
+
+        String phone = holderPhone.getText().toString().replaceAll("\\D", "");
+        if (phone.length() < 8) {
+            markInvalid(holderPhone);
+            return "Ingresa un telefono valido para el titular.";
+        }
+
+        boolean requiresCard = !method.getSelectedItem().toString().startsWith("3");
+        if (requiresCard) {
+            if (isBlank(cardName) || cardNumber.getText().toString().replaceAll("\\s", "").length() < 13) {
+                markInvalid(cardName);
+                markInvalid(cardNumber);
+                return "Completa correctamente los datos de tarjeta.";
+            }
+            if (!cardExpiration.getText().toString().trim().matches("\\d{2}/\\d{2}") || cardCvv.getText().toString().trim().length() < 3) {
+                markInvalid(cardExpiration);
+                markInvalid(cardCvv);
+                return "Usa vencimiento MM/AA y CVV valido.";
+            }
+        }
+
+        return "";
+    }
+
+    private boolean isBlank(EditText input) {
+        return input == null || input.getText().toString().trim().isEmpty();
+    }
+
+    private void markInvalid(EditText input) {
+        if (input != null) {
+            input.setBackground(round(Color.rgb(255, 241, 243), RED, dp(12)));
+        }
     }
 
     private boolean canPurchase(JSONObject flight) {
@@ -1289,6 +2063,210 @@ public final class MainActivity extends Activity {
         }
         String clean = value.replace("T", " ");
         return clean.length() > 16 ? clean.substring(0, 16) : clean;
+    }
+
+    private String dateInputValue(java.util.Calendar calendar) {
+        return new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(calendar.getTime());
+    }
+
+    private double fareForDate(java.util.Calendar calendar) {
+        int seed = calendar.get(java.util.Calendar.YEAR) + (calendar.get(java.util.Calendar.MONTH) + 1) * 19 + calendar.get(java.util.Calendar.DAY_OF_MONTH) * 37;
+        return 710 + (seed % 58) * 10;
+    }
+
+    private String priceLegend(java.util.Calendar calendar) {
+        int seed = calendar.get(java.util.Calendar.YEAR) + (calendar.get(java.util.Calendar.MONTH) + 1) * 19 + calendar.get(java.util.Calendar.DAY_OF_MONTH) * 37;
+        int bucket = seed % 3;
+        return bucket == 0 ? "$" : bucket == 1 ? "$$" : "$$$";
+    }
+
+    private String shortAirportName(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return "Destino";
+        }
+        String clean = value
+                .replace("Aeropuerto Internacional", "")
+                .replace("International Airport", "")
+                .replace("Aeropuerto", "")
+                .trim();
+        return clean.length() > 18 ? clean.substring(0, 18) : clean;
+    }
+
+    private String airportDisplay(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return "";
+        }
+        return shortAirportName(value) + " (" + airportCode(value) + ")";
+    }
+
+    private String airportTitle(JSONObject airport) {
+        String name = value(airport, "nombre", "");
+        return name.isEmpty() ? value(airport, "aeropuerto", "Aeropuerto") : name;
+    }
+
+    private String airportCityCountry(JSONObject airport) {
+        String city = value(airport, "ciudad", "");
+        String country = value(airport, "pais", "");
+        if (city.isEmpty()) {
+            return country.isEmpty() ? "Ciudad" : country;
+        }
+        return country.isEmpty() ? city : city + ", " + country;
+    }
+
+    private String airportCodeFromAirport(JSONObject airport) {
+        String code = value(airport, "codigoIata", "");
+        if (code.isEmpty() || "null".equalsIgnoreCase(code)) {
+            code = value(airport, "codigo", "");
+        }
+        if (code.isEmpty() || "null".equalsIgnoreCase(code)) {
+            code = airportCode(airportTitle(airport));
+        }
+        return code.toUpperCase(Locale.ROOT);
+    }
+
+    private boolean matchesAirport(JSONObject airport, String term) {
+        String clean = normalize(term);
+        if (clean.isEmpty()) {
+            return true;
+        }
+        return normalize(airportTitle(airport)).contains(clean)
+                || normalize(airportCityCountry(airport)).contains(clean)
+                || normalize(airportCodeFromAirport(airport)).contains(clean);
+    }
+
+    private void registerDestinationClick(JSONObject airport) {
+        String id = value(airport, "id", "");
+        if (id.isEmpty()) {
+            id = value(airport, "aeropuertoId", "");
+        }
+        if (id.isEmpty()) {
+            return;
+        }
+        try {
+            JSONObject body = new JSONObject()
+                    .put("sesionId", JSONObject.NULL)
+                    .put("aeropuertoDestinoId", parseInt(id, 0))
+                    .put("fechaClick", nowIso())
+                    .put("origenBusqueda", "android")
+                    .put("fechaViajeBuscada", JSONObject.NULL)
+                    .put("numeroPasajeros", JSONObject.NULL)
+                    .put("claseBuscada", JSONObject.NULL);
+            executor.submit(() -> {
+                try {
+                    apiClient.post("/api/clicks-destino", body.toString());
+                } catch (Exception ignored) {
+                }
+            });
+        } catch (Exception ignored) {
+        }
+    }
+
+    private String displayDate(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return "";
+        }
+        try {
+            java.text.SimpleDateFormat parser = new java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US);
+            java.util.Date date = parser.parse(value);
+            return date == null ? value : new java.text.SimpleDateFormat("EEE, dd MMM", Locale.US).format(date);
+        } catch (Exception ignored) {
+            return value;
+        }
+    }
+
+    private boolean dateSelected(String value) {
+        return value.equals(criteriaDepartureDate) || value.equals(criteriaReturnDate);
+    }
+
+    private int dateColor(String value) {
+        if (dateSelected(value)) {
+            return SOFT_GREEN;
+        }
+        int day = parseInt(value.substring(value.length() - 2), 1);
+        if (day % 7 == 0 || day % 11 == 0) {
+            return Color.rgb(255, 224, 218);
+        }
+        if (day % 3 == 0) {
+            return Color.rgb(255, 241, 190);
+        }
+        return Color.rgb(202, 237, 226);
+    }
+
+    private String passengerSummary() {
+        int total = passengerCountFromCriteria();
+        return total + (total == 1 ? " adult" : " passengers");
+    }
+
+    private String routeLabel(String origin, String destination) {
+        String from = airportCode(origin == null || origin.trim().isEmpty() ? "Guatemala City" : origin);
+        String to = airportCode(destination == null || destination.trim().isEmpty() ? "Destino" : destination);
+        return from + " ↔ " + to;
+    }
+
+    private String airportCode(String value) {
+        String normalized = normalize(value);
+        if (normalized.contains("miami")) {
+            return "MIA";
+        }
+        if (normalized.contains("fort lauderdale")) {
+            return "FLL";
+        }
+        if (normalized.contains("guatemala") || normalized.contains("aurora")) {
+            return "GUA";
+        }
+        if (normalized.contains("bogota") || normalized.contains("dorado")) {
+            return "BOG";
+        }
+        if (normalized.contains("mexico")) {
+            return "MEX";
+        }
+        if (normalized.contains("cancun")) {
+            return "CUN";
+        }
+        if (normalized.contains("panama")) {
+            return "PTY";
+        }
+        if (normalized.length() >= 3) {
+            return normalized.substring(0, 3).toUpperCase(Locale.ROOT);
+        }
+        return "---";
+    }
+
+    private String timeOnly(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return "--:--";
+        }
+        String clean = value.replace("T", " ");
+        return clean.length() >= 16 ? clean.substring(11, 16) : "--:--";
+    }
+
+    private int estimateDurationMinutes(JSONObject flight) {
+        int seed = parseInt(value(flight, "id", "1"), 1) + normalize(value(flight, "destino", "")).length() * 11;
+        return 70 + (seed % 5) * 25;
+    }
+
+    private boolean hasTechnicalStop(JSONObject flight) {
+        return parseInt(value(flight, "retrasoMinutos", "0"), 0) > 0 || parseInt(value(flight, "id", "0"), 0) % 3 == 0;
+    }
+
+    private String estimatedArrival(String value, int minutes) {
+        if (value == null || value.trim().isEmpty()) {
+            return "";
+        }
+
+        try {
+            java.text.SimpleDateFormat parser = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US);
+            java.util.Date date = parser.parse(value.length() > 19 ? value.substring(0, 19) : value);
+            if (date == null) {
+                return value;
+            }
+            java.util.Calendar calendar = java.util.Calendar.getInstance();
+            calendar.setTime(date);
+            calendar.add(java.util.Calendar.MINUTE, minutes);
+            return parser.format(calendar.getTime());
+        } catch (Exception ignored) {
+            return value;
+        }
     }
 
     private int statusColor(String status) {
@@ -1388,6 +2366,10 @@ public final class MainActivity extends Activity {
 
     private interface JsonConsumer {
         void accept(JSONObject item);
+    }
+
+    private interface CounterSetter {
+        void set(int value);
     }
 
     private interface RowFormatter {
