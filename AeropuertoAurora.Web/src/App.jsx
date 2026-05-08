@@ -405,7 +405,6 @@ const validateRegisterForm = (form) => {
 
 
 
-
 function Hero() {
   return (
     <section className="hero" id="inicio">
@@ -704,11 +703,23 @@ function FlightBoard({ flights, loading, user, onRequireLogin, onBuyFlight, buyi
         )}
 
         {!loading && !searchTerm.trim() && (
-          <div className="board-empty">Ingresa destino, vuelo, origen o aerolinea para rastrear vuelos en abordaje, vuelo o cancelados.</div>
+          <div className="board-empty board-empty-rich">
+            <span className="board-empty-icon">✈</span>
+            <div>
+              <strong>Comienza una busqueda</strong>
+              <p>Ingresa destino, vuelo, origen o aerolinea para rastrear vuelos en abordaje, vuelo o cancelados.</p>
+            </div>
+          </div>
         )}
 
         {!loading && searchTerm.trim() && flights.length === 0 && (
-          <div className="board-empty">No encontramos vuelos operativos con esa busqueda.</div>
+          <div className="board-empty board-empty-rich">
+            <span className="board-empty-icon">◌</span>
+            <div>
+              <strong>Sin resultados operativos</strong>
+              <p>No encontramos vuelos operativos con esa busqueda.</p>
+            </div>
+          </div>
         )}
 
         {!loading && searchTerm.trim() && flights.map((flight) => (
@@ -1181,18 +1192,34 @@ function DateFarePicker({ open, tripType, departureDate, returnDate, onClose, on
   const [draftDeparture, setDraftDeparture] = useState(departureDate);
   const [draftReturn, setDraftReturn] = useState(returnDate);
   const [selecting, setSelecting] = useState(departureDate && tripType === 'roundtrip' ? 'return' : 'departure');
+  const [visibleStart, setVisibleStart] = useState(0);
+  const [monthsPerView, setMonthsPerView] = useState(() => (window.innerWidth <= 680 ? 1 : 2));
 
   useEffect(() => {
     if (open) {
       setDraftDeparture(departureDate);
       setDraftReturn(returnDate);
       setSelecting(departureDate && tripType === 'roundtrip' ? 'return' : 'departure');
+      setVisibleStart(0);
     }
   }, [departureDate, open, returnDate, tripType]);
+
+  useEffect(() => {
+    const updateViewport = () => {
+      setMonthsPerView(window.innerWidth <= 680 ? 1 : 2);
+    };
+
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
+  }, []);
 
   if (!open) return null;
 
   const months = Array.from({ length: 8 }, (_, index) => new Date(2026, 4 + index, 1));
+  const visibleMonths = months.slice(visibleStart, visibleStart + monthsPerView);
+  const canGoPrev = visibleStart > 0;
+  const canGoNext = visibleStart + monthsPerView < months.length;
 
   const selectDate = (date) => {
     const value = toDateInputValue(date);
@@ -1231,6 +1258,14 @@ function DateFarePicker({ open, tripType, departureDate, returnDate, onClose, on
   const apply = () => {
     onApply({ departureDate: draftDeparture, returnDate: tripType === 'roundtrip' ? draftReturn : '' });
     onClose();
+  };
+
+  const goPrev = () => {
+    setVisibleStart((current) => Math.max(0, current - monthsPerView));
+  };
+
+  const goNext = () => {
+    setVisibleStart((current) => Math.min(months.length - monthsPerView, current + monthsPerView));
   };
 
   const renderMonth = (monthDate) => {
@@ -1277,18 +1312,27 @@ function DateFarePicker({ open, tripType, departureDate, returnDate, onClose, on
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
       <div className="fare-picker" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
         <div className="fare-picker-top">
-          <button className="fare-trip-button" type="button">{tripType === 'roundtrip' ? 'Ida y vuelta' : 'Solo ida'}</button>
-          <button className="fare-reset" type="button" onClick={reset}>Restablecer</button>
+          <div className="fare-picker-mode">
+            <button className="fare-trip-button" type="button">{tripType === 'roundtrip' ? 'Ida y vuelta' : 'Solo ida'}</button>
+            <button className="fare-reset" type="button" onClick={reset}>Restablecer</button>
+          </div>
           <div className="fare-date-summary">
             <span className={selecting === 'departure' ? 'active' : ''}>Salida {draftDeparture && <strong>{formatShortDate(draftDeparture)}</strong>}</span>
             {tripType === 'roundtrip' && <span className={selecting === 'return' ? 'active' : ''}>Vuelta {draftReturn && <strong>{formatShortDate(draftReturn)}</strong>}</span>}
           </div>
+          <div className="fare-month-nav">
+            <button className="fare-month-arrow" type="button" onClick={goPrev} disabled={!canGoPrev} aria-label="Mes anterior">←</button>
+            <button className="fare-month-arrow" type="button" onClick={goNext} disabled={!canGoNext} aria-label="Mes siguiente">→</button>
+          </div>
         </div>
         <div className="fare-picker-body">
-          {months.map(renderMonth)}
+          {visibleMonths.map(renderMonth)}
         </div>
         <div className="fare-picker-footer">
-          <span>Los precios de los viajes se muestran en GTQ</span>
+          <div className="fare-picker-legend">
+            <span>Los precios de los viajes se muestran en GTQ</span>
+            <span className="fare-legend-low">Los precios en verde son los mas bajos</span>
+          </div>
           <button className="fare-done" type="button" onClick={apply} disabled={!draftDeparture || (tripType === 'roundtrip' && !draftReturn)}>Hecho</button>
         </div>
       </div>
@@ -1716,9 +1760,16 @@ function DestinationSection({ destinations, onDestinationClick }) {
         {rankedDestinations.length === 0 && <p className="muted-text">Los destinos apareceran cuando el reporte tenga datos.</p>}
         {rankedDestinations.map((destination, index) => (
           <button className="destination-card destination-button" type="button" key={destinationReportId(destination)} onClick={() => onDestinationClick(destination)}>
-            <span>{String(index + 1).padStart(2, '0')}</span>
+            <div className="destination-visual">
+              <span>{String(index + 1).padStart(2, '0')}</span>
+              <small>{destinationReportName(destination).slice(0, 3).toUpperCase()}</small>
+            </div>
             <strong>{destinationReportName(destination)}</strong>
-            <small>{Number(destination.totalBusquedas || 0) + Number(destination.totalClicks || 0)} puntos - {destination.totalBusquedas} busquedas - {destination.totalClicks} clicks</small>
+            <div className="destination-metrics">
+              <small>{Number(destination.totalBusquedas || 0) + Number(destination.totalClicks || 0)} puntos de interes</small>
+              <small>{destination.totalBusquedas} busquedas</small>
+              <small>{destination.totalClicks} clicks</small>
+            </div>
           </button>
         ))}
       </div>
@@ -1790,15 +1841,15 @@ function LocationSection() {
           <div className="section-label">Como llegar</div>
           <h2 className="section-title">Ubicacion</h2>
           <div className="location-detail">
-            <span>01</span>
+            <span>⌖</span>
             <p>7a Avenida 11-03, Zona 13, Ciudad de Guatemala.</p>
           </div>
           <div className="location-detail">
-            <span>02</span>
+            <span>⇄</span>
             <p>Acceso a taxis autorizados, parqueo y transporte hacia puntos principales de la ciudad.</p>
           </div>
           <div className="location-detail">
-            <span>03</span>
+            <span>◔</span>
             <p>Operacion aeroportuaria disponible todos los dias del aÃ±o.</p>
           </div>
         </div>
@@ -1935,14 +1986,14 @@ function AdminSection({ tables, selectedTable, onSelectTable }) {
     }
 
     if (type.includes('NUMBER') || type.includes('FLOAT') || type.includes('INTEGER')) {
-      return <input type="number" step="any" value={value} onChange={onChange} placeholder={column.tipoDato} />;
+      return <input type="number" step="any" value={value} onChange={onChange} />;
     }
 
     if ((column.longitud || 0) > 180) {
-      return <textarea value={value} onChange={onChange} placeholder={column.tipoDato} rows="3" />;
+      return <textarea value={value} onChange={onChange} rows="3" />;
     }
 
-    return <input value={value} onChange={onChange} placeholder={column.tipoDato} maxLength={column.longitud || undefined} />;
+    return <input value={value} onChange={onChange} maxLength={column.longitud || undefined} />;
   };
 
   return (
@@ -1970,7 +2021,7 @@ function AdminSection({ tables, selectedTable, onSelectTable }) {
           {!metadata && <p className="muted-text">Selecciona una tabla para empezar.</p>}
           {metadata && editableColumns.length === 0 && <p className="muted-text">Esta tabla no tiene columnas editables desde el panel.</p>}
           {metadata && editableColumns.length > 0 && (
-            <form onSubmit={saveRow}>
+            <form className="admin-form-grid" onSubmit={saveRow}>
               {editableColumns.map((column) => (
                 <label className="field" key={column.nombre}>
                   <span>{column.nombre}{!column.esNullable && ' *'}</span>
@@ -2003,8 +2054,8 @@ function AdminSection({ tables, selectedTable, onSelectTable }) {
                     <tr key={`${row[metadata?.llavePrimaria] || index}`}>
                       <td>
                         <div className="row-actions">
-                          <button type="button" onClick={() => startEdit(row)} disabled={saving || editableColumns.length === 0}>Editar</button>
-                          <button type="button" onClick={() => deleteRow(row)} disabled={saving || !metadata?.llavePrimaria}>Borrar</button>
+                          <button className="action-edit" type="button" onClick={() => startEdit(row)} disabled={saving || editableColumns.length === 0}>✎ Editar</button>
+                          <button className="action-delete" type="button" onClick={() => deleteRow(row)} disabled={saving || !metadata?.llavePrimaria}>🗑 Borrar</button>
                         </div>
                       </td>
                       {visibleColumns.map((column) => <td key={column.nombre}>{stringifyValue(row[column.nombre]) || '-'}</td>)}
@@ -2324,6 +2375,17 @@ function App() {
     setPendingSection(section === 'inicio' ? 'inicio' : '');
   };
 
+  const handleFooterNavigate = (event, view, section = '') => {
+    event.preventDefault();
+    setAdminView('');
+    setSelectedFlight(null);
+    setTravelCriteria(null);
+    setCartOpen(false);
+    setActiveView(view);
+    setPendingSection(section || (view === 'inicio' ? 'inicio' : ''));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const continueCartItem = (item = cartItems[0]) => {
     if (!item) return;
     if (!user) {
@@ -2481,11 +2543,7 @@ function App() {
           <DestinationSection destinations={dashboard.destinations} onDestinationClick={handleDestinationClick} />
         </main>
       )}
-      <Footer
-  currency={currency}
-  setCurrency={setCurrency}
-  CURRENCIES={CURRENCIES}
-/>
+
     </>
   );
 }
