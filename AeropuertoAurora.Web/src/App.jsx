@@ -41,8 +41,18 @@ import Hero from './components/layout/Hero';
 import FlightBoard from './components/flights/FlightBoard';
 import {
   toDateInputValue,
-  getTravelResults
+  getTravelResults,
+  addMinutesToDate,
+  estimateDurationMinutes
 } from './utils/flightHelpers';
+import {
+  tariffByClassName,
+  passengerCountFromGroups,
+  passengerCountFromCriteria,
+  calculateFlightFare,
+  formatMoney
+} from './utils/pricingHelpers';
+import CartView from './components/cart/CartView';
 
 
 
@@ -63,21 +73,6 @@ const formatCurrency = (value) =>
     currency: 'GTQ'
   }).format(Number(value || 0));
 
-const formatMoney = (value, currency = 'GTQ') =>
-  new Intl.NumberFormat('es-GT', {
-    style: 'currency',
-    currency: CURRENCY_RATES[currency] ? currency : 'GTQ'
-  }).format(Number(value || 0) * (CURRENCY_RATES[currency] || 1));
-
-
-
-
-
-
-
-
-
-
 
 
 const DEFAULT_PASSENGER_GROUPS = PASSENGER_GROUPS.reduce(
@@ -97,11 +92,6 @@ const ANCILLARY_SERVICES = [
   { id: 'priority', title: 'Prioridad de abordaje', description: 'Aborda primero y ahorra tiempo en puerta.', price: 95, icon: 'PR' }
 ];
 
-const passengerCountFromGroups = (groups = DEFAULT_PASSENGER_GROUPS) =>
-  Math.max(1, PASSENGER_GROUPS.reduce((sum, group) => sum + Number(groups[group.key] || 0), 0));
-
-const passengerCountFromCriteria = (criteria) =>
-  criteria?.passengerGroups ? passengerCountFromGroups(criteria.passengerGroups) : Math.max(1, Number(criteria?.passengers || 1));
 
 const passengerAgesFromCriteria = (criteria) => {
   const count = passengerCountFromCriteria(criteria);
@@ -117,13 +107,6 @@ const passengerAgesFromCriteria = (criteria) => {
   return Array.from({ length: count }, (_, index) => ages[index] ?? '');
 };
 
-const tariffByClassName = (className = 'economica') =>
-  TARIFF_FAMILIES.find((family) => family.className === className) || TARIFF_FAMILIES[0];
-
-const calculateFlightFare = (className = 'economica', passengerCount = 1) => {
-  const tariff = tariffByClassName(className);
-  return Math.round(BASE_FARE * tariff.multiplier * passengerCount * 100) / 100;
-};
 
 const nextTariffFamily = (family) => {
   const index = TARIFF_FAMILIES.findIndex((item) => item.code === family.code);
@@ -189,19 +172,6 @@ const matchAirportRecord = (airports = [], value = '') => {
     const city = normalize(airport?.ciudad ?? airport?.Ciudad ?? '');
     return name === term || name.includes(term) || term.includes(name) || country.includes(term) || city.includes(term);
   }) || null;
-};
-
-
-
-const estimateDurationMinutes = (flight) => {
-  const seed = Number(flight?.id || 1) + normalize(flight?.destino).length * 11;
-  return 70 + (seed % 5) * 25;
-};
-
-const addMinutesToDate = (value, minutes) => {
-  const date = new Date(value);
-  date.setMinutes(date.getMinutes() + minutes);
-  return date;
 };
 
 const hasTechnicalStop = (flight) => Number(flight?.retrasoMinutos || 0) > 0 || Number(flight?.id || 0) % 3 === 0;
@@ -1408,69 +1378,6 @@ function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, on
     </section>
   );
 }
-
-function CartView({ items, user, onBack, onRequireLogin, onCheckoutItem, onRemoveItem }) {
-  const cartTotal = items.reduce((sum, item) => (
-    sum + calculateFlightFare(item.selectedClass || 'economica', passengerCountFromCriteria(item.criteria))
-  ), 0);
-  const currency = items[0]?.criteria?.currency || 'GTQ';
-
-  return (
-    <main className="cart-page">
-      <section className="cart-shell">
-        <button className="back-button" type="button" onClick={onBack}>Volver</button>
-        <div className="section-label">Carrito de compras</div>
-        <h1>Vuelos seleccionados</h1>
-        {items.length === 0 && <div className="board-empty">Tu carrito esta vacio.</div>}
-
-        <div className="cart-list">
-          {items.map((item) => {
-            const passengerCount = passengerCountFromCriteria(item.criteria);
-            const selectedTariff = tariffByClassName(item.selectedClass || 'economica');
-            const fare = calculateFlightFare(item.selectedClass || 'economica', passengerCount);
-            const arrival = addMinutesToDate(item.fechaVuelo, estimateDurationMinutes(item));
-
-            return (
-              <article className="cart-flight-card" key={item.cartId}>
-                <div className="cart-flight-icon">✈</div>
-                <div className="cart-flight-main">
-                  <div className="cart-flight-title">
-                    <strong>{item.numeroVuelo} - {item.aerolinea}</strong>
-                    <span>{formatMoney(fare, item.criteria?.currency || 'GTQ')}</span>
-                  </div>
-                  <div className="cart-flight-route">
-                    <span>{item.origen}</span>
-                    <b>{formatTime(item.fechaVuelo)} - {formatTime(arrival)}</b>
-                    <span>{item.destino}</span>
-                  </div>
-                  <div className="cart-flight-meta">
-                    <span><i>◷</i>{item.criteria?.tripType === 'roundtrip' ? 'Ida y vuelta' : 'Solo ida'}</span>
-                    <span><i>☉</i>{passengerCount} pasajero(s)</span>
-                    <span><i>▣</i>{selectedTariff.name}</span>
-                    <span><i>$</i>{item.criteria?.currency || 'GTQ'}</span>
-                  </div>
-                </div>
-                <div className="cart-flight-actions">
-                  <button className="btn btn-primary" type="button" onClick={() => (user ? onCheckoutItem(item) : onRequireLogin())}>Comprar este vuelo</button>
-                  <button className="btn btn-outline" type="button" onClick={() => onRemoveItem(item.cartId)}>Eliminar</button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-
-        {items.length > 0 && (
-          <aside className="cart-total-box">
-            <span>Subtotal del carrito</span>
-            <strong>{formatMoney(cartTotal, currency)}</strong>
-          </aside>
-        )}
-      </section>
-    </main>
-  );
-}
-
-
 
 
 function AdminSection({ tables, selectedTable, onSelectTable }) {

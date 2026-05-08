@@ -78,3 +78,25 @@ export function getTravelResults(
       new Date(second.fechaVuelo)
   );
 }
+export const addMinutesToDate = (
+  value,
+  minutes
+) => {
+  const date = new Date(value);
+
+  date.setMinutes(
+    date.getMinutes() + minutes
+  );
+
+  return date;
+};
+
+export const estimateDurationMinutes = (
+  flight
+) => {
+  const seed =
+    Number(flight?.id || 1) +
+    normalize(flight?.destino).length * 11;
+
+  return 70 + (seed % 5) * 25;
+};
