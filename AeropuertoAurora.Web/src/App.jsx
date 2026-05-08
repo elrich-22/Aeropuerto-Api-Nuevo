@@ -27,20 +27,16 @@ import {
 } from './utils/destinationHelpers';
 import DestinationSection from './components/home/DestinationSection';
 import LocationSection from './components/home/LocationSection';
+import StatsStrip from './components/home/StatsStrip';
+import ServicesSection from './components/home/ServicesSection';
+import {
+  normalize,
+  statusClassName,
+  formatDate
+} from './utils/formatters';
+import OperationsSection from './components/home/OperationsSection';
 
 
-
-
-const formatDate = (value) => {
-  if (!value) return 'Pendiente';
-
-  return new Intl.DateTimeFormat('es-GT', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(new Date(value));
-};
 
 const formatTime = (value) => {
   if (!value) return '--:--';
@@ -73,17 +69,8 @@ const formatMoney = (value, currency = 'GTQ') =>
     currency: CURRENCY_RATES[currency] ? currency : 'GTQ'
   }).format(Number(value || 0) * (CURRENCY_RATES[currency] || 1));
 
-const normalize = (value = '') => value.toString().trim().toLowerCase();
 
-const statusClassName = (status = '') => {
-  const value = normalize(status);
 
-  if (value.includes('cancel') || value.includes('demor') || value.includes('retras')) return 'delayed';
-  if (value.includes('abord') || value.includes('proceso') || value.includes('program')) return 'boarding';
-  if (value.includes('final') || value.includes('complet') || value.includes('activo')) return 'on-time';
-
-  return 'neutral';
-};
 
 
 
@@ -327,32 +314,7 @@ function Hero() {
   );
 }
 
-function StatsStrip({ flights, destinations, baggage, openIncidents }) {
-  const routes = new Set(flights.map((flight) => flight.destino).filter(Boolean)).size || destinations.length;
 
-  return (
-    <section className="info-strip" aria-label="Resumen">
-      <div className="section stat-grid">
-        <div className="stat-item">
-          <div className="stat-num">{flights.length}</div>
-          <div className="stat-label">Vuelos cargados</div>
-        </div>
-        <div className="stat-item">
-          <div className="stat-num">{routes}</div>
-          <div className="stat-label">Destinos activos</div>
-        </div>
-        <div className="stat-item">
-          <div className="stat-num">{baggage.length}</div>
-          <div className="stat-label">Equipajes monitoreados</div>
-        </div>
-        <div className="stat-item">
-          <div className="stat-num">{openIncidents}</div>
-          <div className="stat-label">Incidentes abiertos</div>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function AuthModal({ open, onClose, onLogin, onRegister }) {
   const [mode, setMode] = useState('login');
@@ -1645,63 +1607,6 @@ function CartView({ items, user, onBack, onRequireLogin, onCheckoutItem, onRemov
   );
 }
 
-
-
-function ServicesSection() {
-  return (
-    <section className="section" id="servicios">
-      <div className="section-label">Para viajeros</div>
-      <h2 className="section-title">Servicios del aeropuerto</h2>
-      <div className="services-grid">
-        {services.map((service) => (
-          <article className="service-card" key={service.title}>
-            <div className="service-icon">{service.code}</div>
-            <h3>{service.title}</h3>
-            <p>{service.text}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function OperationsSection({ baggage, incidents }) {
-  return (
-    <section className="section" id="operaciones">
-      <div className="section-label">Operacion diaria</div>
-      <h2 className="section-title">Equipaje e incidentes</h2>
-      <div className="operations-grid">
-        <div className="operation-panel">
-          <h3>Equipaje reciente</h3>
-          {baggage.length === 0 && <p className="muted-text">Sin movimientos de equipaje para mostrar.</p>}
-          {baggage.map((item) => (
-            <div className="operation-row" key={item.id}>
-              <div>
-                <strong>{item.codigoBarras}</strong>
-                <small>{item.pasajero} Â· {item.numeroVuelo}</small>
-              </div>
-              <span className={`status ${statusClassName(item.estado)}`}>{item.estado}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="operation-panel">
-          <h3>Incidentes</h3>
-          {incidents.length === 0 && <p className="muted-text">Sin incidentes para mostrar.</p>}
-          {incidents.map((incident) => (
-            <div className="operation-row" key={incident.id}>
-              <div>
-                <strong>{incident.tipoIncidente}</strong>
-                <small>{incident.ubicacion} Â· {formatDate(incident.fechaIncidente)}</small>
-              </div>
-              <span className={`status ${statusClassName(incident.estado)}`}>{incident.severidad}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
 
 
 
