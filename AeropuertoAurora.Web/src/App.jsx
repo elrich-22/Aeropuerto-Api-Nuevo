@@ -32,20 +32,20 @@ import ServicesSection from './components/home/ServicesSection';
 import {
   normalize,
   statusClassName,
-  formatDate
+  formatDate,
+  formatTime,
+  canPurchaseFlight
 } from './utils/formatters';
 import OperationsSection from './components/home/OperationsSection';
+import Hero from './components/layout/Hero';
+import FlightBoard from './components/flights/FlightBoard';
+import {
+  toDateInputValue,
+  getTravelResults
+} from './utils/flightHelpers';
 
 
 
-const formatTime = (value) => {
-  if (!value) return '--:--';
-
-  return new Intl.DateTimeFormat('es-GT', {
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(new Date(value));
-};
 
 const formatShortDate = (value) => {
   if (!value) return '';
@@ -96,12 +96,6 @@ const ANCILLARY_SERVICES = [
   { id: 'vip', title: 'Sala VIP', description: 'Acceso a sala preferencial antes del vuelo.', price: 360, icon: 'VP' },
   { id: 'priority', title: 'Prioridad de abordaje', description: 'Aborda primero y ahorra tiempo en puerta.', price: 95, icon: 'PR' }
 ];
-
-
-
-
-
-const canPurchaseFlight = (status = '') => normalize(status) === 'programado';
 
 const passengerCountFromGroups = (groups = DEFAULT_PASSENGER_GROUPS) =>
   Math.max(1, PASSENGER_GROUPS.reduce((sum, group) => sum + Number(groups[group.key] || 0), 0));
@@ -212,12 +206,6 @@ const addMinutesToDate = (value, minutes) => {
 
 const hasTechnicalStop = (flight) => Number(flight?.retrasoMinutos || 0) > 0 || Number(flight?.id || 0) % 3 === 0;
 
-const toDateInputValue = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
 
 const dateFromInputValue = (value) => {
   if (!value) return null;
@@ -290,30 +278,6 @@ const validateRegisterForm = (form) => {
 
   return errors;
 };
-
-
-
-
-function Hero() {
-  return (
-    <section className="hero" id="inicio">
-      <Stars />
-      <Plane />
-      <div className="hero-content">
-        <div className="hero-badge">Guatemala City Â· GUA</div>
-        <h1>
-          Aeropuerto Internacional
-          <span> La Aurora</span>
-        </h1>
-        <p>Puerta de entrada al corazon de Centroamerica, conectada en tiempo real con la operacion aeroportuaria.</p>
-        <div className="hero-ctas">
-          <a href="#explorar" className="btn btn-primary">Explorar vuelos</a>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 
 
 function AuthModal({ open, onClose, onLogin, onRegister }) {
@@ -536,85 +500,6 @@ function AuthModal({ open, onClose, onLogin, onRegister }) {
   );
 }
 
-function FlightBoard({ flights, loading, user, onRequireLogin, onBuyFlight, buyingFlightId, searchTerm, onSearchChange }) {
-  return (
-    <section className="section" id="rastreo">
-      <div className="section-label">Tablero de vuelos</div>
-      <h2 className="section-title">Rastrea el estado de un vuelo</h2>
-      <div className="flight-search">
-        <input
-          value={searchTerm}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Buscar por vuelo, destino, origen o aerolinea"
-        />
-      </div>
-
-      <div className="board">
-        <div className="board-header">
-          <span>Vuelo</span>
-          <span>Destino</span>
-          <span>Hora</span>
-          <span>Avion</span>
-          <span>Estado</span>
-          <span>Detalle</span>
-        </div>
-
-        {loading && (
-          <div className="board-empty">
-            <span className="loader"></span>
-            Cargando vuelos desde el API
-          </div>
-        )}
-
-        {!loading && !searchTerm.trim() && (
-          <div className="board-empty board-empty-rich">
-            <span className="board-empty-icon">✈</span>
-            <div>
-              <strong>Comienza una busqueda</strong>
-              <p>Ingresa destino, vuelo, origen o aerolinea para rastrear vuelos en abordaje, vuelo o cancelados.</p>
-            </div>
-          </div>
-        )}
-
-        {!loading && searchTerm.trim() && flights.length === 0 && (
-          <div className="board-empty board-empty-rich">
-            <span className="board-empty-icon">◌</span>
-            <div>
-              <strong>Sin resultados operativos</strong>
-              <p>No encontramos vuelos operativos con esa busqueda.</p>
-            </div>
-          </div>
-        )}
-
-        {!loading && searchTerm.trim() && flights.map((flight) => (
-          <div className={`board-row ${!canPurchaseFlight(flight.estado) ? 'unavailable-row' : ''}`} key={flight.id}>
-            <span className="flight-num">{flight.numeroVuelo}</span>
-            <span className="dest">
-              {flight.destino}
-              <small>{flight.origen} Â· {flight.aerolinea}</small>
-            </span>
-            <span className="time">{formatTime(flight.fechaVuelo)}</span>
-            <span className="time">{flight.matriculaAvion || 'Sin asignar'}</span>
-            <span>
-              <span className={`status ${statusClassName(flight.estado)}`}>{flight.estado}</span>
-            </span>
-            <span>
-              <button
-                className="buy-button"
-                type="button"
-                onClick={() => (user ? onBuyFlight(flight) : onRequireLogin())}
-                disabled
-                title="Este tablero solo sirve para rastrear vuelos"
-              >
-                Rastreo
-              </button>
-            </span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
   const [step, setStep] = useState('passengers');
@@ -1029,28 +914,6 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
   );
 }
 
-function getTravelResults(flights, criteria) {
-  if (!criteria) return [];
-
-  const destination = normalize(criteria.destination);
-  const origin = normalize(criteria.origin);
-  const routeMatches = flights
-    .filter((flight) => canPurchaseFlight(flight.estado))
-    .filter((flight) => {
-      const flightDestination = normalize(flight.destino);
-      const flightOrigin = normalize(flight.origen);
-      const destinationMatch = !destination || flightDestination === destination || flightDestination.includes(destination) || destination.includes(flightDestination);
-      const originMatch = !origin || flightOrigin === origin || flightOrigin.includes(origin) || origin.includes(flightOrigin);
-      return destinationMatch && originMatch;
-    });
-
-  const dateMatches = criteria.departureDate
-    ? routeMatches.filter((flight) => toDateInputValue(new Date(flight.fechaVuelo)) === criteria.departureDate)
-    : routeMatches;
-
-  return (dateMatches.length > 0 ? dateMatches : routeMatches)
-    .sort((first, second) => new Date(first.fechaVuelo) - new Date(second.fechaVuelo));
-}
 
 function DateFarePicker({ open, tripType, departureDate, returnDate, onClose, onApply }) {
   const [draftDeparture, setDraftDeparture] = useState(departureDate);

@@ -41,3 +41,15 @@ export const formatDate = (value) => {
     minute: '2-digit'
   }).format(new Date(value));
 };
+
+export const formatTime = (value) => {
+  if (!value) return '--:--';
+
+  return new Intl.DateTimeFormat('es-GT', {
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(value));
+};
+
+export const canPurchaseFlight = (status = '') =>
+  normalize(status) === 'programado';
