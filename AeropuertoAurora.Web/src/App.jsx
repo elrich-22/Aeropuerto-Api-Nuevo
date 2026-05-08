@@ -20,7 +20,13 @@ import {
   TARIFF_FAMILIES
 } from './constants/appConstants';
 import AlertMessage from './components/shared/AlertMessage';
-
+import {
+  destinationReportName,
+  destinationReportId,
+  incrementDestinationScore
+} from './utils/destinationHelpers';
+import DestinationSection from './components/home/DestinationSection';
+import LocationSection from './components/home/LocationSection';
 
 
 
@@ -189,8 +195,8 @@ const resolveAirportQuery = (query = '', airportOptions = []) => {
 const airportId = (airport) => airport?.id ?? airport?.Id ?? null;
 const airportName = (airport) => airport?.nombre ?? airport?.Nombre ?? airport?.name ?? '';
 const airportCountry = (airport) => airport?.pais ?? airport?.Pais ?? airport?.country ?? '';
-const destinationReportId = (destination) => destination?.aeropuertoId ?? destination?.AeropuertoId ?? null;
-const destinationReportName = (destination) => destination?.aeropuerto ?? destination?.Aeropuerto ?? '';
+
+
 
 const matchAirportRecord = (airports = [], value = '') => {
   const term = normalize(value);
@@ -204,33 +210,7 @@ const matchAirportRecord = (airports = [], value = '') => {
   }) || null;
 };
 
-const incrementDestinationScore = (destinations, destinationId, field, fallbackName = '') => {
-  const exists = destinations.some((destination) => destinationReportId(destination) === destinationId);
-  const nextDestinations = exists
-    ? destinations
-    : [
-        ...destinations,
-        {
-          aeropuertoId: destinationId,
-          aeropuerto: fallbackName || 'Destino seleccionado',
-          totalBusquedas: 0,
-          totalClicks: 0,
-          totalPasajeros: 0
-        }
-      ];
 
-  return nextDestinations
-    .map((destination) =>
-      destinationReportId(destination) === destinationId
-        ? { ...destination, [field]: Number(destination[field] || 0) + 1 }
-        : destination
-    )
-    .sort((first, second) => {
-      const firstScore = Number(first.totalBusquedas || 0) + Number(first.totalClicks || 0);
-      const secondScore = Number(second.totalBusquedas || 0) + Number(second.totalClicks || 0);
-      return secondScore - firstScore || destinationReportName(first).localeCompare(destinationReportName(second));
-    });
-};
 
 const estimateDurationMinutes = (flight) => {
   const seed = Number(flight?.id || 1) + normalize(flight?.destino).length * 11;
@@ -1665,39 +1645,7 @@ function CartView({ items, user, onBack, onRequireLogin, onCheckoutItem, onRemov
   );
 }
 
-function DestinationSection({ destinations, onDestinationClick }) {
-  const rankedDestinations = [...destinations]
-    .sort((first, second) => {
-      const firstScore = Number(first.totalBusquedas || 0) + Number(first.totalClicks || 0);
-      const secondScore = Number(second.totalBusquedas || 0) + Number(second.totalClicks || 0);
-      return secondScore - firstScore || destinationReportName(first).localeCompare(destinationReportName(second));
-    })
-    .slice(0, 5);
 
-  return (
-    <section className="section compact-section" id="destinos">
-      <div className="section-label">Interes de pasajeros</div>
-      <h2 className="section-title">Destinos mas buscados</h2>
-      <div className="destination-grid">
-        {rankedDestinations.length === 0 && <p className="muted-text">Los destinos apareceran cuando el reporte tenga datos.</p>}
-        {rankedDestinations.map((destination, index) => (
-          <button className="destination-card destination-button" type="button" key={destinationReportId(destination)} onClick={() => onDestinationClick(destination)}>
-            <div className="destination-visual">
-              <span>{String(index + 1).padStart(2, '0')}</span>
-              <small>{destinationReportName(destination).slice(0, 3).toUpperCase()}</small>
-            </div>
-            <strong>{destinationReportName(destination)}</strong>
-            <div className="destination-metrics">
-              <small>{Number(destination.totalBusquedas || 0) + Number(destination.totalClicks || 0)} puntos de interes</small>
-              <small>{destination.totalBusquedas} busquedas</small>
-              <small>{destination.totalClicks} clicks</small>
-            </div>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 function ServicesSection() {
   return (
@@ -1755,38 +1703,7 @@ function OperationsSection({ baggage, incidents }) {
   );
 }
 
-function LocationSection() {
-  return (
-    <section className="location-section" id="ubicacion">
-      <div className="location-inner">
-        <div>
-          <div className="section-label">Como llegar</div>
-          <h2 className="section-title">Ubicacion</h2>
-          <div className="location-detail">
-            <span>⌖</span>
-            <p>7a Avenida 11-03, Zona 13, Ciudad de Guatemala.</p>
-          </div>
-          <div className="location-detail">
-            <span>⇄</span>
-            <p>Acceso a taxis autorizados, parqueo y transporte hacia puntos principales de la ciudad.</p>
-          </div>
-          <div className="location-detail">
-            <span>◔</span>
-            <p>Operacion aeroportuaria disponible todos los dias del aÃ±o.</p>
-          </div>
-        </div>
-        <div className="map-box">
-          <iframe
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3861.0!2d-90.527775!3d14.583272!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8589a3f8a0e3e405%3A0x5e3c8e66a7ef44e!2sAeropuerto%20Internacional%20La%20Aurora!5e0!3m2!1ses!2sgt!4v1700000000000"
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            title="Mapa Aeropuerto La Aurora"
-          />
-        </div>
-      </div>
-    </section>
-  );
-}
+
 
 function AdminSection({ tables, selectedTable, onSelectTable }) {
   const [metadata, setMetadata] = useState(null);
@@ -2338,7 +2255,7 @@ function App() {
 
   const handleDestinationClick = async (destination) => {
     const destinationId = destinationReportId(destination);
-    const destinationName = destinationReportName(destination);
+    
 
     if (!destinationId) {
       console.error('No se puede registrar click sin aeropuertoDestinoId.', destination);
