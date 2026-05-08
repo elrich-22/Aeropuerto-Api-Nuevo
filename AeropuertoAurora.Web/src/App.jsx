@@ -1,58 +1,61 @@
 ﻿import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from './services/api';
+import NavBar from './components/layout/NavBar';
+import Stars from './components/shared/Stars';
+import Plane from './components/shared/Plane';
+import Footer from './components/layout/Footer';
+import {
+  SESSION_KEY,
+  CART_KEY,
+  BASE_FARE,
+  CURRENCY_RATES,
+  CURRENCIES,
+  CLASS_LABELS,
+  DOCUMENT_TYPES,
+  NATIONALITIES,
+  SEX_OPTIONS,
+  SERVICES,
+  PASSENGER_GROUPS,
+  KNOWN_AIRPORTS,
+  TARIFF_FAMILIES
+} from './constants/appConstants';
+import AlertMessage from './components/shared/AlertMessage';
+import {
+  destinationReportName,
+  destinationReportId,
+  incrementDestinationScore
+} from './utils/destinationHelpers';
+import DestinationSection from './components/home/DestinationSection';
+import LocationSection from './components/home/LocationSection';
+import StatsStrip from './components/home/StatsStrip';
+import ServicesSection from './components/home/ServicesSection';
+import {
+  normalize,
+  statusClassName,
+  formatDate,
+  formatTime,
+  canPurchaseFlight
+} from './utils/formatters';
+import OperationsSection from './components/home/OperationsSection';
+import Hero from './components/layout/Hero';
+import FlightBoard from './components/flights/FlightBoard';
+import {
+  toDateInputValue,
+  getTravelResults,
+  addMinutesToDate,
+  estimateDurationMinutes
+} from './utils/flightHelpers';
+import {
+  tariffByClassName,
+  passengerCountFromGroups,
+  passengerCountFromCriteria,
+  calculateFlightFare,
+  formatMoney
+} from './utils/pricingHelpers';
+import CartView from './components/cart/CartView';
 
-const services = [
-  {
-    code: 'DF',
-    title: 'Tiendas y Duty Free',
-    text: 'Compras, recuerdos, tecnologia y productos de viaje antes de abordar.'
-  },
-  {
-    code: 'RS',
-    title: 'Restaurantes',
-    text: 'Opciones rapidas y espacios comodos para esperar el vuelo.'
-  },
-  {
-    code: 'TR',
-    title: 'Parqueo y Transporte',
-    text: 'Acceso a taxis autorizados, parqueo y movilidad hacia la ciudad.'
-  },
-  {
-    code: 'VIP',
-    title: 'Sala VIP',
-    text: 'Areas privadas para descanso, trabajo y espera prioritaria.'
-  },
-  {
-    code: 'WF',
-    title: 'WiFi Gratuito',
-    text: 'Conexion disponible para pasajeros dentro de la terminal.'
-  },
-  {
-    code: 'MD',
-    title: 'Servicio Medico',
-    text: 'Atencion de primeros auxilios y apoyo ante emergencias.'
-  }
-];
 
-const formatDate = (value) => {
-  if (!value) return 'Pendiente';
 
-  return new Intl.DateTimeFormat('es-GT', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(new Date(value));
-};
-
-const formatTime = (value) => {
-  if (!value) return '--:--';
-
-  return new Intl.DateTimeFormat('es-GT', {
-    hour: '2-digit',
-    minute: '2-digit'
-  }).format(new Date(value));
-};
 
 const formatShortDate = (value) => {
   if (!value) return '';
@@ -70,111 +73,13 @@ const formatCurrency = (value) =>
     currency: 'GTQ'
   }).format(Number(value || 0));
 
-const formatMoney = (value, currency = 'GTQ') =>
-  new Intl.NumberFormat('es-GT', {
-    style: 'currency',
-    currency: CURRENCY_RATES[currency] ? currency : 'GTQ'
-  }).format(Number(value || 0) * (CURRENCY_RATES[currency] || 1));
 
-const normalize = (value = '') => value.toString().trim().toLowerCase();
 
-const statusClassName = (status = '') => {
-  const value = normalize(status);
-
-  if (value.includes('cancel') || value.includes('demor') || value.includes('retras')) return 'delayed';
-  if (value.includes('abord') || value.includes('proceso') || value.includes('program')) return 'boarding';
-  if (value.includes('final') || value.includes('complet') || value.includes('activo')) return 'on-time';
-
-  return 'neutral';
-};
-
-const SESSION_KEY = 'aeropuertoAurora.user';
-const CART_KEY = 'aeropuertoAurora.cart';
-const BASE_FARE = 1250;
-const CURRENCY_RATES = {
-  GTQ: 1,
-  USD: 0.128,
-  EUR: 0.12,
-  COP: 512,
-  MXN: 2.35,
-  CRC: 65.5,
-  HNL: 3.18,
-  NIO: 4.72,
-  PAB: 0.128,
-  CAD: 0.176,
-  BRL: 0.66,
-  GBP: 0.103,
-  JPY: 20.1,
-  CHF: 0.117,
-  AUD: 0.197
-};
-const CURRENCIES = Object.keys(CURRENCY_RATES);
-const CLASS_LABELS = {
-  economica: 'Turista',
-  ejecutiva: 'Ejecutiva',
-  primera: 'Primera clase'
-};
-const TARIFF_FAMILIES = [
-  {
-    code: 'turista',
-    className: 'economica',
-    name: 'Turista',
-    tagline: 'Para viajar basico',
-    multiplier: 1,
-    benefits: [
-      ['check', 'Articulo personal'],
-      ['x', 'Equipaje de bodega'],
-      ['x', 'Cambios sin penalidad']
-    ]
-  },
-  {
-    code: 'ejecutiva',
-    className: 'ejecutiva',
-    name: 'Ejecutiva',
-    tagline: 'Mas comodidad',
-    multiplier: 1.32,
-    benefits: [
-      ['check', 'Articulo personal'],
-      ['check', 'Equipaje de bodega'],
-      ['x', 'Reembolso completo']
-    ]
-  },
-  {
-    code: 'primera',
-    className: 'primera',
-    name: 'Primera clase',
-    tagline: 'Mayor tranquilidad',
-    multiplier: 1.68,
-    benefits: [
-      ['check', 'Articulo personal'],
-      ['check', 'Equipaje de bodega'],
-      ['check', 'Cambios y reembolso']
-    ]
-  }
-];
-const PASSENGER_GROUPS = [
-  { key: 'adults', label: 'Adultos', hint: 'Desde 15 anos', defaultValue: 1, age: 30 },
-  { key: 'youth', label: 'Jovenes', hint: 'De 12 a 14 anos', defaultValue: 0, age: 13 },
-  { key: 'children', label: 'Ninos', hint: 'De 2 a 11 anos', defaultValue: 0, age: 8 },
-  { key: 'babies', label: 'Bebes', hint: 'Menores de 2 anos', defaultValue: 0, age: 1 }
-];
 const DEFAULT_PASSENGER_GROUPS = PASSENGER_GROUPS.reduce(
   (groups, group) => ({ ...groups, [group.key]: group.defaultValue }),
   {}
 );
-const KNOWN_AIRPORTS = [
-  { name: 'Aeropuerto Internacional La Aurora', country: 'Guatemala', city: 'Ciudad de Guatemala', aliases: ['guatemala', 'la aurora', 'gua'] },
-  { name: 'Aeropuerto Internacional El Dorado', country: 'Colombia', city: 'Bogota', aliases: ['colombia', 'bogota', 'el dorado'] },
-  { name: 'Miami International Airport', country: 'Estados Unidos', city: 'Miami', aliases: ['miami', 'mia'] },
-  { name: 'John F. Kennedy International Airport', country: 'Estados Unidos', city: 'Nueva York', aliases: ['new york', 'jfk'] },
-  { name: 'Los Angeles International Airport', country: 'Estados Unidos', city: 'Los Angeles', aliases: ['los angeles', 'lax'] },
-  { name: 'Aeropuerto Internacional Benito Juarez', country: 'Mexico', city: 'Ciudad de Mexico', aliases: ['mexico', 'ciudad de mexico'] },
-  { name: 'Aeropuerto Internacional de Cancun', country: 'Mexico', city: 'Cancun', aliases: ['cancun'] },
-  { name: 'Aeropuerto Internacional de Tocumen', country: 'Panama', city: 'Panama', aliases: ['panama', 'tocumen'] },
-  { name: 'Aeropuerto Internacional Juan Santamaria', country: 'Costa Rica', city: 'San Jose', aliases: ['costa rica', 'san jose'] },
-  { name: 'Aeropuerto Internacional de El Salvador San Oscar Arnulfo Romero', country: 'El Salvador', city: 'San Salvador', aliases: ['el salvador', 'san salvador'] },
-  { name: 'Aeropuerto Adolfo Suarez Madrid-Barajas', country: 'Espana', city: 'Madrid', aliases: ['madrid', 'espana'] }
-];
+
 const PAYMENT_METHODS = [
   { id: 1, name: 'Tarjeta de credito', requiresCard: true },
   { id: 2, name: 'Tarjeta de debito', requiresCard: true },
@@ -187,20 +92,6 @@ const ANCILLARY_SERVICES = [
   { id: 'priority', title: 'Prioridad de abordaje', description: 'Aborda primero y ahorra tiempo en puerta.', price: 95, icon: 'PR' }
 ];
 
-const DOCUMENT_TYPES = ['DPI', 'Pasaporte', 'Licencia'];
-const NATIONALITIES = ['Guatemala', 'El Salvador', 'Honduras', 'Nicaragua', 'Costa Rica', 'Panama', 'Mexico', 'Estados Unidos', 'Otra'];
-const SEX_OPTIONS = [
-  { value: 'M', label: 'Masculino' },
-  { value: 'F', label: 'Femenino' }
-];
-
-const canPurchaseFlight = (status = '') => normalize(status) === 'programado';
-
-const passengerCountFromGroups = (groups = DEFAULT_PASSENGER_GROUPS) =>
-  Math.max(1, PASSENGER_GROUPS.reduce((sum, group) => sum + Number(groups[group.key] || 0), 0));
-
-const passengerCountFromCriteria = (criteria) =>
-  criteria?.passengerGroups ? passengerCountFromGroups(criteria.passengerGroups) : Math.max(1, Number(criteria?.passengers || 1));
 
 const passengerAgesFromCriteria = (criteria) => {
   const count = passengerCountFromCriteria(criteria);
@@ -216,13 +107,6 @@ const passengerAgesFromCriteria = (criteria) => {
   return Array.from({ length: count }, (_, index) => ages[index] ?? '');
 };
 
-const tariffByClassName = (className = 'economica') =>
-  TARIFF_FAMILIES.find((family) => family.className === className) || TARIFF_FAMILIES[0];
-
-const calculateFlightFare = (className = 'economica', passengerCount = 1) => {
-  const tariff = tariffByClassName(className);
-  return Math.round(BASE_FARE * tariff.multiplier * passengerCount * 100) / 100;
-};
 
 const nextTariffFamily = (family) => {
   const index = TARIFF_FAMILIES.findIndex((item) => item.code === family.code);
@@ -275,8 +159,8 @@ const resolveAirportQuery = (query = '', airportOptions = []) => {
 const airportId = (airport) => airport?.id ?? airport?.Id ?? null;
 const airportName = (airport) => airport?.nombre ?? airport?.Nombre ?? airport?.name ?? '';
 const airportCountry = (airport) => airport?.pais ?? airport?.Pais ?? airport?.country ?? '';
-const destinationReportId = (destination) => destination?.aeropuertoId ?? destination?.AeropuertoId ?? null;
-const destinationReportName = (destination) => destination?.aeropuerto ?? destination?.Aeropuerto ?? '';
+
+
 
 const matchAirportRecord = (airports = [], value = '') => {
   const term = normalize(value);
@@ -290,53 +174,8 @@ const matchAirportRecord = (airports = [], value = '') => {
   }) || null;
 };
 
-const incrementDestinationScore = (destinations, destinationId, field, fallbackName = '') => {
-  const exists = destinations.some((destination) => destinationReportId(destination) === destinationId);
-  const nextDestinations = exists
-    ? destinations
-    : [
-        ...destinations,
-        {
-          aeropuertoId: destinationId,
-          aeropuerto: fallbackName || 'Destino seleccionado',
-          totalBusquedas: 0,
-          totalClicks: 0,
-          totalPasajeros: 0
-        }
-      ];
-
-  return nextDestinations
-    .map((destination) =>
-      destinationReportId(destination) === destinationId
-        ? { ...destination, [field]: Number(destination[field] || 0) + 1 }
-        : destination
-    )
-    .sort((first, second) => {
-      const firstScore = Number(first.totalBusquedas || 0) + Number(first.totalClicks || 0);
-      const secondScore = Number(second.totalBusquedas || 0) + Number(second.totalClicks || 0);
-      return secondScore - firstScore || destinationReportName(first).localeCompare(destinationReportName(second));
-    });
-};
-
-const estimateDurationMinutes = (flight) => {
-  const seed = Number(flight?.id || 1) + normalize(flight?.destino).length * 11;
-  return 70 + (seed % 5) * 25;
-};
-
-const addMinutesToDate = (value, minutes) => {
-  const date = new Date(value);
-  date.setMinutes(date.getMinutes() + minutes);
-  return date;
-};
-
 const hasTechnicalStop = (flight) => Number(flight?.retrasoMinutos || 0) > 0 || Number(flight?.id || 0) % 3 === 0;
 
-const toDateInputValue = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
 
 const dateFromInputValue = (value) => {
   if (!value) return null;
@@ -410,151 +249,6 @@ const validateRegisterForm = (form) => {
   return errors;
 };
 
-function NavBar({ user, adminView, isAdmin, activeView, cartCount, onAdminView, onNavigate, onCartClick, onLoginClick, onLogout }) {
-  const shortUserName = isAdmin ? 'Administrador' : (user?.nombreCompleto?.split(' ')[0] || user?.usuario || 'Usuario');
-  const avatarLetter = (user?.nombreCompleto || user?.usuario || 'A').trim().charAt(0).toUpperCase();
-
-  return (
-    <nav className="site-nav">
-      <a className="nav-logo" href="#inicio" onClick={(event) => onNavigate(event, 'inicio')}>
-        La <span>Aurora</span>
-      </a>
-      <div className="nav-links">
-        <a className={activeView === 'explorar' ? 'active' : ''} href="#explorar" onClick={(event) => onNavigate(event, 'explorar')}>Explorar</a>
-        <a className={activeView === 'rastreo' ? 'active' : ''} href="#rastreo" onClick={(event) => onNavigate(event, 'rastreo')}>Rastreo</a>
-        <a className={activeView === 'ubicacion' ? 'active' : ''} href="#ubicacion" onClick={(event) => onNavigate(event, 'ubicacion')}>Ubicacion</a>
-        {isAdmin && (
-          <>
-            <button
-              className={adminView === 'reporteria' ? 'nav-admin-link active' : 'nav-admin-link'}
-              type="button"
-              onClick={() => onAdminView('reporteria')}
-            >
-              Reporteria
-            </button>
-            <button
-              className={adminView === 'admin' ? 'nav-admin-link active' : 'nav-admin-link'}
-              type="button"
-              onClick={() => onAdminView('admin')}
-            >
-              Admin
-            </button>
-          </>
-        )}
-        {user ? (
-          <>
-            <div className="nav-user-menu">
-              <div className="nav-avatar" aria-hidden="true">{avatarLetter}</div>
-              <div className="nav-user-copy">
-                <span className="nav-user">{shortUserName}</span>
-                <small className="nav-user-role">{isAdmin ? 'Panel activo' : 'Sesion activa'}</small>
-              </div>
-              <span className="nav-user-caret" aria-hidden="true">▾</span>
-            </div>
-            {cartCount > 0 && (
-              <button className="nav-session-button cart-nav-button" type="button" onClick={onCartClick}>
-                Carrito ({cartCount})
-              </button>
-            )}
-            <button className="nav-session-button" type="button" onClick={onLogout}>Salir</button>
-          </>
-        ) : (
-          <button className="nav-session-button" type="button" onClick={onLoginClick}>Iniciar sesion</button>
-        )}
-      </div>
-    </nav>
-  );
-}
-
-function Stars() {
-  const stars = useMemo(
-    () =>
-      Array.from({ length: 95 }, (_, index) => ({
-        id: index,
-        size: `${Math.random() * 2.2 + 0.6}px`,
-        top: `${Math.random() * 100}%`,
-        left: `${Math.random() * 100}%`,
-        duration: `${2 + Math.random() * 4}s`,
-        delay: `${Math.random() * 5}s`
-      })),
-    []
-  );
-
-  return (
-    <div className="stars" aria-hidden="true">
-      {stars.map((star) => (
-        <span
-          key={star.id}
-          style={{
-            width: star.size,
-            height: star.size,
-            top: star.top,
-            left: star.left,
-            '--duration': star.duration,
-            '--delay': star.delay
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function Plane() {
-  return (
-    <svg className="plane-svg" viewBox="0 0 160 54" fill="none" aria-hidden="true">
-      <path d="M5 28L120 6L155 27L120 34L5 28Z" fill="rgba(30,184,200,0.66)" />
-      <path d="M75 27L105 14L119 28L104 36L75 27Z" fill="rgba(200,168,75,0.58)" />
-      <path d="M38 27L60 49L75 29L38 27Z" fill="rgba(30,184,200,0.42)" />
-    </svg>
-  );
-}
-
-function Hero() {
-  return (
-    <section className="hero" id="inicio">
-      <Stars />
-      <Plane />
-      <div className="hero-content">
-        <div className="hero-badge">Guatemala City Â· GUA</div>
-        <h1>
-          Aeropuerto Internacional
-          <span> La Aurora</span>
-        </h1>
-        <p>Puerta de entrada al corazon de Centroamerica, conectada en tiempo real con la operacion aeroportuaria.</p>
-        <div className="hero-ctas">
-          <a href="#explorar" className="btn btn-primary">Explorar vuelos</a>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function StatsStrip({ flights, destinations, baggage, openIncidents }) {
-  const routes = new Set(flights.map((flight) => flight.destino).filter(Boolean)).size || destinations.length;
-
-  return (
-    <section className="info-strip" aria-label="Resumen">
-      <div className="section stat-grid">
-        <div className="stat-item">
-          <div className="stat-num">{flights.length}</div>
-          <div className="stat-label">Vuelos cargados</div>
-        </div>
-        <div className="stat-item">
-          <div className="stat-num">{routes}</div>
-          <div className="stat-label">Destinos activos</div>
-        </div>
-        <div className="stat-item">
-          <div className="stat-num">{baggage.length}</div>
-          <div className="stat-label">Equipajes monitoreados</div>
-        </div>
-        <div className="stat-item">
-          <div className="stat-num">{openIncidents}</div>
-          <div className="stat-label">Incidentes abiertos</div>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function AuthModal({ open, onClose, onLogin, onRegister }) {
   const [mode, setMode] = useState('login');
@@ -776,85 +470,6 @@ function AuthModal({ open, onClose, onLogin, onRegister }) {
   );
 }
 
-function FlightBoard({ flights, loading, user, onRequireLogin, onBuyFlight, buyingFlightId, searchTerm, onSearchChange }) {
-  return (
-    <section className="section" id="rastreo">
-      <div className="section-label">Tablero de vuelos</div>
-      <h2 className="section-title">Rastrea el estado de un vuelo</h2>
-      <div className="flight-search">
-        <input
-          value={searchTerm}
-          onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Buscar por vuelo, destino, origen o aerolinea"
-        />
-      </div>
-
-      <div className="board">
-        <div className="board-header">
-          <span>Vuelo</span>
-          <span>Destino</span>
-          <span>Hora</span>
-          <span>Avion</span>
-          <span>Estado</span>
-          <span>Detalle</span>
-        </div>
-
-        {loading && (
-          <div className="board-empty">
-            <span className="loader"></span>
-            Cargando vuelos desde el API
-          </div>
-        )}
-
-        {!loading && !searchTerm.trim() && (
-          <div className="board-empty board-empty-rich">
-            <span className="board-empty-icon">✈</span>
-            <div>
-              <strong>Comienza una busqueda</strong>
-              <p>Ingresa destino, vuelo, origen o aerolinea para rastrear vuelos en abordaje, vuelo o cancelados.</p>
-            </div>
-          </div>
-        )}
-
-        {!loading && searchTerm.trim() && flights.length === 0 && (
-          <div className="board-empty board-empty-rich">
-            <span className="board-empty-icon">◌</span>
-            <div>
-              <strong>Sin resultados operativos</strong>
-              <p>No encontramos vuelos operativos con esa busqueda.</p>
-            </div>
-          </div>
-        )}
-
-        {!loading && searchTerm.trim() && flights.map((flight) => (
-          <div className={`board-row ${!canPurchaseFlight(flight.estado) ? 'unavailable-row' : ''}`} key={flight.id}>
-            <span className="flight-num">{flight.numeroVuelo}</span>
-            <span className="dest">
-              {flight.destino}
-              <small>{flight.origen} Â· {flight.aerolinea}</small>
-            </span>
-            <span className="time">{formatTime(flight.fechaVuelo)}</span>
-            <span className="time">{flight.matriculaAvion || 'Sin asignar'}</span>
-            <span>
-              <span className={`status ${statusClassName(flight.estado)}`}>{flight.estado}</span>
-            </span>
-            <span>
-              <button
-                className="buy-button"
-                type="button"
-                onClick={() => (user ? onBuyFlight(flight) : onRequireLogin())}
-                disabled
-                title="Este tablero solo sirve para rastrear vuelos"
-              >
-                Rastreo
-              </button>
-            </span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
   const [step, setStep] = useState('passengers');
@@ -1269,28 +884,6 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
   );
 }
 
-function getTravelResults(flights, criteria) {
-  if (!criteria) return [];
-
-  const destination = normalize(criteria.destination);
-  const origin = normalize(criteria.origin);
-  const routeMatches = flights
-    .filter((flight) => canPurchaseFlight(flight.estado))
-    .filter((flight) => {
-      const flightDestination = normalize(flight.destino);
-      const flightOrigin = normalize(flight.origen);
-      const destinationMatch = !destination || flightDestination === destination || flightDestination.includes(destination) || destination.includes(flightDestination);
-      const originMatch = !origin || flightOrigin === origin || flightOrigin.includes(origin) || origin.includes(flightOrigin);
-      return destinationMatch && originMatch;
-    });
-
-  const dateMatches = criteria.departureDate
-    ? routeMatches.filter((flight) => toDateInputValue(new Date(flight.fechaVuelo)) === criteria.departureDate)
-    : routeMatches;
-
-  return (dateMatches.length > 0 ? dateMatches : routeMatches)
-    .sort((first, second) => new Date(first.fechaVuelo) - new Date(second.fechaVuelo));
-}
 
 function DateFarePicker({ open, tripType, departureDate, returnDate, onClose, onApply }) {
   const [draftDeparture, setDraftDeparture] = useState(departureDate);
@@ -1786,189 +1379,6 @@ function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, on
   );
 }
 
-function CartView({ items, user, onBack, onRequireLogin, onCheckoutItem, onRemoveItem }) {
-  const cartTotal = items.reduce((sum, item) => (
-    sum + calculateFlightFare(item.selectedClass || 'economica', passengerCountFromCriteria(item.criteria))
-  ), 0);
-  const currency = items[0]?.criteria?.currency || 'GTQ';
-
-  return (
-    <main className="cart-page">
-      <section className="cart-shell">
-        <button className="back-button" type="button" onClick={onBack}>Volver</button>
-        <div className="section-label">Carrito de compras</div>
-        <h1>Vuelos seleccionados</h1>
-        {items.length === 0 && <div className="board-empty">Tu carrito esta vacio.</div>}
-
-        <div className="cart-list">
-          {items.map((item) => {
-            const passengerCount = passengerCountFromCriteria(item.criteria);
-            const selectedTariff = tariffByClassName(item.selectedClass || 'economica');
-            const fare = calculateFlightFare(item.selectedClass || 'economica', passengerCount);
-            const arrival = addMinutesToDate(item.fechaVuelo, estimateDurationMinutes(item));
-
-            return (
-              <article className="cart-flight-card" key={item.cartId}>
-                <div className="cart-flight-icon">✈</div>
-                <div className="cart-flight-main">
-                  <div className="cart-flight-title">
-                    <strong>{item.numeroVuelo} - {item.aerolinea}</strong>
-                    <span>{formatMoney(fare, item.criteria?.currency || 'GTQ')}</span>
-                  </div>
-                  <div className="cart-flight-route">
-                    <span>{item.origen}</span>
-                    <b>{formatTime(item.fechaVuelo)} - {formatTime(arrival)}</b>
-                    <span>{item.destino}</span>
-                  </div>
-                  <div className="cart-flight-meta">
-                    <span><i>◷</i>{item.criteria?.tripType === 'roundtrip' ? 'Ida y vuelta' : 'Solo ida'}</span>
-                    <span><i>☉</i>{passengerCount} pasajero(s)</span>
-                    <span><i>▣</i>{selectedTariff.name}</span>
-                    <span><i>$</i>{item.criteria?.currency || 'GTQ'}</span>
-                  </div>
-                </div>
-                <div className="cart-flight-actions">
-                  <button className="btn btn-primary" type="button" onClick={() => (user ? onCheckoutItem(item) : onRequireLogin())}>Comprar este vuelo</button>
-                  <button className="btn btn-outline" type="button" onClick={() => onRemoveItem(item.cartId)}>Eliminar</button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-
-        {items.length > 0 && (
-          <aside className="cart-total-box">
-            <span>Subtotal del carrito</span>
-            <strong>{formatMoney(cartTotal, currency)}</strong>
-          </aside>
-        )}
-      </section>
-    </main>
-  );
-}
-
-function DestinationSection({ destinations, onDestinationClick }) {
-  const rankedDestinations = [...destinations]
-    .sort((first, second) => {
-      const firstScore = Number(first.totalBusquedas || 0) + Number(first.totalClicks || 0);
-      const secondScore = Number(second.totalBusquedas || 0) + Number(second.totalClicks || 0);
-      return secondScore - firstScore || destinationReportName(first).localeCompare(destinationReportName(second));
-    })
-    .slice(0, 5);
-
-  return (
-    <section className="section compact-section" id="destinos">
-      <div className="section-label">Interes de pasajeros</div>
-      <h2 className="section-title">Destinos mas buscados</h2>
-      <div className="destination-grid">
-        {rankedDestinations.length === 0 && <p className="muted-text">Los destinos apareceran cuando el reporte tenga datos.</p>}
-        {rankedDestinations.map((destination, index) => (
-          <button className="destination-card destination-button" type="button" key={destinationReportId(destination)} onClick={() => onDestinationClick(destination)}>
-            <div className="destination-visual">
-              <span>{String(index + 1).padStart(2, '0')}</span>
-              <small>{destinationReportName(destination).slice(0, 3).toUpperCase()}</small>
-            </div>
-            <strong>{destinationReportName(destination)}</strong>
-            <div className="destination-metrics">
-              <small>{Number(destination.totalBusquedas || 0) + Number(destination.totalClicks || 0)} puntos de interes</small>
-              <small>{destination.totalBusquedas} busquedas</small>
-              <small>{destination.totalClicks} clicks</small>
-            </div>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function ServicesSection() {
-  return (
-    <section className="section" id="servicios">
-      <div className="section-label">Para viajeros</div>
-      <h2 className="section-title">Servicios del aeropuerto</h2>
-      <div className="services-grid">
-        {services.map((service) => (
-          <article className="service-card" key={service.title}>
-            <div className="service-icon">{service.code}</div>
-            <h3>{service.title}</h3>
-            <p>{service.text}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function OperationsSection({ baggage, incidents }) {
-  return (
-    <section className="section" id="operaciones">
-      <div className="section-label">Operacion diaria</div>
-      <h2 className="section-title">Equipaje e incidentes</h2>
-      <div className="operations-grid">
-        <div className="operation-panel">
-          <h3>Equipaje reciente</h3>
-          {baggage.length === 0 && <p className="muted-text">Sin movimientos de equipaje para mostrar.</p>}
-          {baggage.map((item) => (
-            <div className="operation-row" key={item.id}>
-              <div>
-                <strong>{item.codigoBarras}</strong>
-                <small>{item.pasajero} Â· {item.numeroVuelo}</small>
-              </div>
-              <span className={`status ${statusClassName(item.estado)}`}>{item.estado}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="operation-panel">
-          <h3>Incidentes</h3>
-          {incidents.length === 0 && <p className="muted-text">Sin incidentes para mostrar.</p>}
-          {incidents.map((incident) => (
-            <div className="operation-row" key={incident.id}>
-              <div>
-                <strong>{incident.tipoIncidente}</strong>
-                <small>{incident.ubicacion} Â· {formatDate(incident.fechaIncidente)}</small>
-              </div>
-              <span className={`status ${statusClassName(incident.estado)}`}>{incident.severidad}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function LocationSection() {
-  return (
-    <section className="location-section" id="ubicacion">
-      <div className="location-inner">
-        <div>
-          <div className="section-label">Como llegar</div>
-          <h2 className="section-title">Ubicacion</h2>
-          <div className="location-detail">
-            <span>⌖</span>
-            <p>7a Avenida 11-03, Zona 13, Ciudad de Guatemala.</p>
-          </div>
-          <div className="location-detail">
-            <span>⇄</span>
-            <p>Acceso a taxis autorizados, parqueo y transporte hacia puntos principales de la ciudad.</p>
-          </div>
-          <div className="location-detail">
-            <span>◔</span>
-            <p>Operacion aeroportuaria disponible todos los dias del aÃ±o.</p>
-          </div>
-        </div>
-        <div className="map-box">
-          <iframe
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3861.0!2d-90.527775!3d14.583272!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x8589a3f8a0e3e405%3A0x5e3c8e66a7ef44e!2sAeropuerto%20Internacional%20La%20Aurora!5e0!3m2!1ses!2sgt!4v1700000000000"
-            loading="lazy"
-            referrerPolicy="no-referrer-when-downgrade"
-            title="Mapa Aeropuerto La Aurora"
-          />
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function AdminSection({ tables, selectedTable, onSelectTable }) {
   const [metadata, setMetadata] = useState(null);
@@ -2520,7 +1930,7 @@ function App() {
 
   const handleDestinationClick = async (destination) => {
     const destinationId = destinationReportId(destination);
-    const destinationName = destinationReportName(destination);
+    
 
     if (!destinationId) {
       console.error('No se puede registrar click sin aeropuertoDestinoId.', destination);
@@ -2643,48 +2053,14 @@ function App() {
       ) : (
         <main>
           <Hero />
-          {purchaseMessage && <div className="connection-alert success-alert">{purchaseMessage}</div>}
+          <AlertMessage
+             message={purchaseMessage}
+             type="success"
+          />
           <DestinationSection destinations={dashboard.destinations} onDestinationClick={handleDestinationClick} />
         </main>
       )}
-      <footer>
-        <div className="footer-shell">
-          <div className="footer-brand">
-            <div className="footer-logo">Aeropuerto Internacional La Aurora</div>
-            <p>Conectando Ciudad de Guatemala con operaciones, rastreo y experiencia digital de viaje en tiempo real.</p>
-          </div>
-          <div className="footer-columns">
-            <div className="footer-column">
-              <h3>Navegacion</h3>
-              <a href="#inicio" onClick={(event) => handleFooterNavigate(event, 'inicio', 'inicio')}>Inicio</a>
-              <a href="#explorar" onClick={(event) => handleFooterNavigate(event, 'explorar')}>Explorar vuelos</a>
-              <a href="#rastreo" onClick={(event) => handleFooterNavigate(event, 'rastreo')}>Rastreo</a>
-              <a href="#ubicacion" onClick={(event) => handleFooterNavigate(event, 'ubicacion')}>Ubicacion</a>
-            </div>
-            <div className="footer-column">
-              <h3>Aeropuerto</h3>
-              <p>Ciudad de Guatemala</p>
-              <p>Codigo IATA: GUA</p>
-              <p>Codigo ICAO: MGGT</p>
-            </div>
-            <div className="footer-column">
-              <h3>Soporte</h3>
-              <a href="#destinos" onClick={(event) => handleFooterNavigate(event, 'inicio', 'destinos')}>Destinos</a>
-              <a href="#explorar" onClick={(event) => handleFooterNavigate(event, 'explorar')}>Reservas</a>
-              <a href="#ubicacion" onClick={(event) => handleFooterNavigate(event, 'ubicacion')}>Transporte</a>
-            </div>
-            <div className="footer-column footer-column-currency">
-              <h3>Moneda</h3>
-              <label className="footer-currency">
-                <span>Seleccion actual</span>
-                <select value={currency} onChange={(event) => setCurrency(event.target.value)}>
-                  {CURRENCIES.map((item) => <option value={item} key={item}>{item}</option>)}
-                </select>
-              </label>
-            </div>
-          </div>
-        </div>
-      </footer>
+
     </>
   );
 }
