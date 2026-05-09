@@ -747,6 +747,42 @@ a {
   font-weight: 800;
 }
 
+.selected-leg-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem 1.1rem;
+  background: rgba(30, 184, 200, 0.08);
+  border: 1px solid rgba(30, 184, 200, 0.24);
+  border-radius: 8px;
+}
+
+.selected-leg-banner div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.selected-leg-banner span,
+.selected-leg-banner small {
+  color: var(--muted);
+}
+
+.selected-leg-banner strong {
+  color: var(--light);
+}
+
+.selected-leg-banner button {
+  padding: 0.65rem 0.9rem;
+  color: var(--gold);
+  background: transparent;
+  border: 1px solid rgba(212, 175, 55, 0.48);
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 900;
+}
+
 .flight-result-card {
   margin-bottom: 0.85rem;
   overflow: hidden;
@@ -3863,7 +3899,7 @@ footer {
   top: 0;
   z-index: 2;
   display: grid;
-  grid-template-columns: 1fr minmax(320px, 1.2fr) auto;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(320px, 1.2fr) auto;
   gap: 1rem;
   align-items: center;
   padding: 1.2rem 1.4rem;
@@ -3951,6 +3987,11 @@ footer {
   min-height: 64px;
   padding: 0.45rem 0.25rem;
   border-radius: 12px;
+}
+
+.fare-day:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
 }
 
 .fare-day strong {

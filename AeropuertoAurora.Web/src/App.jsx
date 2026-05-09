@@ -383,7 +383,43 @@ const fareForDate = (date) => {
   return 710 + (seed % 58) * 10;
 };
 
-const formatCompactFare = (value) => `Q${value >= 1000 ? `${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)} mil` : value}`;
+const formatCompactFare = (value, currency = 'GTQ') =>
+  new Intl.NumberFormat('es-GT', {
+    style: 'currency',
+    currency: CURRENCY_RATES[currency] ? currency : 'GTQ',
+    notation: 'compact',
+    maximumFractionDigits: 1
+  }).format(Number(value || 0) * (CURRENCY_RATES[currency] || 1));
+
+const flightMatchesRoute = (flight, origin, destination) => {
+  const normalizedOrigin = normalize(origin);
+  const normalizedDestination = normalize(destination);
+  const flightOrigin = normalize(flight?.origen);
+  const flightDestination = normalize(flight?.destino);
+  const originMatch = !normalizedOrigin || flightOrigin === normalizedOrigin || flightOrigin.includes(normalizedOrigin) || (flightOrigin && normalizedOrigin.includes(flightOrigin));
+  const destinationMatch = !normalizedDestination || flightDestination === normalizedDestination || flightDestination.includes(normalizedDestination) || (flightDestination && normalizedDestination.includes(flightDestination));
+  return originMatch && destinationMatch;
+};
+
+const lowestRouteFareForDate = ({ date, flights = [], origin = '', destination = '', direction = 'departure', passengerCount = 1 }) => {
+  const dateValue = toDateInputValue(date);
+  const routeOrigin = direction === 'return' ? destination : origin;
+  const routeDestination = direction === 'return' ? origin : destination;
+
+  if (!routeOrigin || !routeDestination) return null;
+
+  const matchingFlights = flights
+    .filter((flight) => canPurchaseFlight(flight.estado))
+    .filter((flight) => toDateInputValue(new Date(flight.fechaVuelo)) === dateValue)
+    .filter((flight) => flightMatchesRoute(flight, routeOrigin, routeDestination));
+
+  if (matchingFlights.length === 0) return null;
+
+  const baseDateFare = fareForDate(date);
+  const lowestFare = Math.min(...matchingFlights.map((flight) => baseDateFare + (Number(flight.id || 0) % 5) * 25 - (hasTechnicalStop(flight) ? 35 : 0)));
+
+  return Math.max(650, Math.round(lowestFare * Math.max(1, Number(passengerCount || 1)) * 100) / 100);
+};
 
 const sameDateValue = (date, value) => toDateInputValue(date) === value;
 
@@ -1303,30 +1339,23 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
   );
 }
 
-function getTravelResults(flights, criteria) {
+function getTravelResults(flights, criteria, direction = 'departure') {
   if (!criteria) return [];
 
-  const destination = normalize(criteria.destination);
-  const origin = normalize(criteria.origin);
-  const routeMatches = flights
+  const origin = direction === 'return' ? criteria.destination : criteria.origin;
+  const destination = direction === 'return' ? criteria.origin : criteria.destination;
+  const dateValue = direction === 'return' ? criteria.returnDate : criteria.departureDate;
+
+  if (!origin || !destination) return [];
+
+  return flights
     .filter((flight) => canPurchaseFlight(flight.estado))
-    .filter((flight) => {
-      const flightDestination = normalize(flight.destino);
-      const flightOrigin = normalize(flight.origen);
-      const destinationMatch = !destination || flightDestination === destination || flightDestination.includes(destination) || destination.includes(flightDestination);
-      const originMatch = !origin || flightOrigin === origin || flightOrigin.includes(origin) || origin.includes(flightOrigin);
-      return destinationMatch && originMatch;
-    });
-
-  const dateMatches = criteria.departureDate
-    ? routeMatches.filter((flight) => toDateInputValue(new Date(flight.fechaVuelo)) === criteria.departureDate)
-    : routeMatches;
-
-  return (dateMatches.length > 0 ? dateMatches : routeMatches)
+    .filter((flight) => flightMatchesRoute(flight, origin, destination))
+    .filter((flight) => !dateValue || toDateInputValue(new Date(flight.fechaVuelo)) === dateValue)
     .sort((first, second) => new Date(first.fechaVuelo) - new Date(second.fechaVuelo));
 }
 
-function DateFarePicker({ open, tripType, departureDate, returnDate, onClose, onApply }) {
+function DateFarePicker({ open, tripType, departureDate, returnDate, flights = [], origin = '', destination = '', passengerCount = 1, currency = 'GTQ', onClose, onApply }) {
   const [draftDeparture, setDraftDeparture] = useState(departureDate);
   const [draftReturn, setDraftReturn] = useState(returnDate);
   const [selecting, setSelecting] = useState(departureDate && tripType === 'roundtrip' ? 'return' : 'departure');
@@ -1354,7 +1383,10 @@ function DateFarePicker({ open, tripType, departureDate, returnDate, onClose, on
 
   if (!open) return null;
 
-  const months = Array.from({ length: 8 }, (_, index) => new Date(2026, 4 + index, 1));
+  const currentDate = new Date();
+  const todayStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+  const firstMonth = currentDate.getFullYear() === 2026 ? currentDate.getMonth() : 0;
+  const months = Array.from({ length: 12 - firstMonth }, (_, index) => new Date(2026, firstMonth + index, 1));
   const visibleMonths = months.slice(visibleStart, visibleStart + monthsPerView);
   const canGoPrev = visibleStart > 0;
   const canGoNext = visibleStart + monthsPerView < months.length;
@@ -1365,6 +1397,8 @@ function DateFarePicker({ open, tripType, departureDate, returnDate, onClose, on
     if (tripType === 'oneway') {
       setDraftDeparture(value);
       setDraftReturn('');
+      onApply({ departureDate: value, returnDate: '' });
+      onClose();
       return;
     }
 
@@ -1385,6 +1419,8 @@ function DateFarePicker({ open, tripType, departureDate, returnDate, onClose, on
     }
 
     setDraftReturn(value);
+    onApply({ departureDate: draftDeparture, returnDate: value });
+    onClose();
   };
 
   const reset = () => {
@@ -1425,19 +1461,32 @@ function DateFarePicker({ open, tripType, departureDate, returnDate, onClose, on
           {blanks.map((blank) => <span className="fare-blank" key={blank}></span>)}
           {days.map((date) => {
             const value = toDateInputValue(date);
+            const isPastDate = date < todayStart;
+            const isBeforeDeparture = selecting === 'return' && draftDeparture && date < dateFromInputValue(draftDeparture);
             const selected = sameDateValue(date, draftDeparture) || sameDateValue(date, draftReturn);
             const inRange = draftDeparture && draftReturn && date > dateFromInputValue(draftDeparture) && date < dateFromInputValue(draftReturn);
-            const fare = fareForDate(date);
+            const fareDirection = selecting === 'return' ? 'return' : 'departure';
+            const fare = lowestRouteFareForDate({
+              date,
+              flights,
+              origin,
+              destination,
+              direction: fareDirection,
+              passengerCount
+            });
+            const bestFareLimit = 820 * Math.max(1, Number(passengerCount || 1));
+            const disabled = isPastDate || isBeforeDeparture || fare === null;
 
             return (
               <button
-                className={`fare-day ${selected ? 'selected' : ''} ${inRange ? 'in-range' : ''} ${fare <= 820 ? 'best-fare' : ''}`}
+                className={`fare-day ${selected ? 'selected' : ''} ${inRange ? 'in-range' : ''} ${fare !== null && fare <= bestFareLimit ? 'best-fare' : ''}`}
                 type="button"
                 key={value}
                 onClick={() => selectDate(date)}
+                disabled={disabled}
               >
                 <strong>{date.getDate()}</strong>
-                <small>{formatCompactFare(fare)}</small>
+                <small>{fare === null ? 'Sin vuelos' : formatCompactFare(fare, currency)}</small>
               </button>
             );
           })}
@@ -1468,7 +1517,7 @@ function DateFarePicker({ open, tripType, departureDate, returnDate, onClose, on
         </div>
         <div className="fare-picker-footer">
           <div className="fare-picker-legend">
-            <span>Los precios de los viajes se muestran en GTQ</span>
+            <span>{selecting === 'return' ? 'Precios de vuelta' : 'Precios de ida'} para la ruta seleccionada</span>
             <span className="fare-legend-low">Los precios en verde son los mas bajos</span>
           </div>
           <button className="fare-done" type="button" onClick={apply} disabled={!draftDeparture || (tripType === 'roundtrip' && !draftReturn)}>Hecho</button>
@@ -1575,6 +1624,10 @@ function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
 
   const updateCriteria = (field, value) => {
     setCriteria((current) => {
+      if (field === 'tripType' && value === 'oneway') {
+        return { ...current, tripType: value, returnDate: '' };
+      }
+
       return { ...current, [field]: value };
     });
   };
@@ -1664,6 +1717,11 @@ function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
           tripType={criteria.tripType}
           departureDate={criteria.departureDate}
           returnDate={criteria.returnDate}
+          flights={flights}
+          origin={resolveAirportQuery(criteria.origin, airportOptions)}
+          destination={resolveAirportQuery(criteria.destination, airportOptions)}
+          passengerCount={passengerCountFromGroups(criteria.passengerGroups)}
+          currency={currency}
           onClose={() => setDatePickerOpen(false)}
           onApply={({ departureDate, returnDate }) => {
             updateCriteria('departureDate', departureDate);
@@ -1676,15 +1734,55 @@ function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
 }
 
 function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, onBuyFlight, buyingFlightId }) {
-  const results = useMemo(() => getTravelResults(flights, criteria), [criteria, flights]);
+  const outboundResults = useMemo(() => getTravelResults(flights, criteria, 'departure'), [criteria, flights]);
+  const returnResults = useMemo(() => getTravelResults(flights, criteria, 'return'), [criteria, flights]);
   const [expandedFlightId, setExpandedFlightId] = useState(null);
   const [pendingUpgrade, setPendingUpgrade] = useState(null);
+  const [selectedDeparture, setSelectedDeparture] = useState(null);
   const passengerCount = passengerCountFromCriteria(criteria);
   const currency = criteria.currency || 'GTQ';
+  const isRoundtrip = criteria.tripType === 'roundtrip';
+  const activeDirection = isRoundtrip && selectedDeparture ? 'return' : 'departure';
+  const results = activeDirection === 'return' ? returnResults : outboundResults;
+  const activeDate = activeDirection === 'return' ? criteria.returnDate : criteria.departureDate;
+  const activeTitle = activeDirection === 'return' ? 'Elige tu vuelo de vuelta' : 'Elige tu vuelo de ida';
 
   useEffect(() => {
     setExpandedFlightId(results[0]?.id || null);
   }, [results]);
+
+  useEffect(() => {
+    setSelectedDeparture(null);
+    setPendingUpgrade(null);
+  }, [criteria]);
+
+  const completeFareSelection = (flight, family) => {
+    if (isRoundtrip && activeDirection === 'departure') {
+      setSelectedDeparture({ flight, selectedClass: family.className, family });
+      setPendingUpgrade(null);
+      setExpandedFlightId(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    if (isRoundtrip && selectedDeparture) {
+      onBuyFlight([
+        {
+          flight: selectedDeparture.flight,
+          selectedClass: selectedDeparture.selectedClass
+        },
+        {
+          flight,
+          selectedClass: family.className
+        }
+      ], null, criteria);
+      setPendingUpgrade(null);
+      return;
+    }
+
+    onBuyFlight(flight, family.className, criteria);
+    setPendingUpgrade(null);
+  };
 
   const chooseFare = (flight, family) => {
     if (!user) {
@@ -1694,11 +1792,11 @@ function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, on
 
     const nextFamily = nextTariffFamily(family);
     if (nextFamily) {
-      setPendingUpgrade({ flight, family, nextFamily });
+      setPendingUpgrade({ flight, family, nextFamily, direction: activeDirection });
       return;
     }
 
-    onBuyFlight(flight, family.className, criteria);
+    completeFareSelection(flight, family);
   };
 
   return (
@@ -1708,13 +1806,24 @@ function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, on
         <div className="travel-results-header">
           <div>
             <div className="section-label">Resultados</div>
-            <h2>Vuelos disponibles</h2>
+            <h2>{activeTitle}</h2>
           </div>
-          <span>{results.length} opciones - {criteria.tripType === 'roundtrip' ? 'ida y vuelta' : 'solo ida'}</span>
+          <span>{results.length} opciones - {isRoundtrip ? (activeDirection === 'return' ? 'vuelta' : 'ida') : 'solo ida'}</span>
         </div>
 
+        {selectedDeparture && (
+          <div className="selected-leg-banner">
+            <div>
+              <span>Ida seleccionada</span>
+              <strong>{selectedDeparture.flight.numeroVuelo} - {selectedDeparture.flight.origen} a {selectedDeparture.flight.destino}</strong>
+              <small>{formatShortDate(criteria.departureDate)} - {tariffByClassName(selectedDeparture.selectedClass).name}</small>
+            </div>
+            <button type="button" onClick={() => setSelectedDeparture(null)}>Cambiar ida</button>
+          </div>
+        )}
+
         {results.length === 0 && (
-          <div className="board-empty">No hay vuelos programados que coincidan con tu busqueda.</div>
+          <div className="board-empty">No hay vuelos programados para esta ruta y fecha.</div>
         )}
 
         {results.map((flight) => {
@@ -1722,7 +1831,7 @@ function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, on
           const arrival = addMinutesToDate(flight.fechaVuelo, duration);
           const expanded = expandedFlightId === flight.id;
           return (
-            <article className="flight-result-card" key={flight.id}>
+            <article className="flight-result-card" key={`${activeDirection}-${flight.id}`}>
               <button className="flight-result-summary" type="button" onClick={() => setExpandedFlightId(expanded ? null : flight.id)}>
                 <span className="airline-mark">{flight.aerolinea?.slice(0, 2).toUpperCase() || 'AV'}</span>
                 <span>
@@ -1731,7 +1840,7 @@ function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, on
                 </span>
                 <span>
                   <strong>{flight.origen} - {flight.destino}</strong>
-                  <small>{criteria.departureDate ? formatShortDate(criteria.departureDate) : formatShortDate(toDateInputValue(new Date(flight.fechaVuelo)))}</small>
+                  <small>{activeDate ? formatShortDate(activeDate) : formatShortDate(toDateInputValue(new Date(flight.fechaVuelo)))}</small>
                 </span>
                 <span>
                   <strong>{hasTechnicalStop(flight) ? 'Con parada' : 'Directo'}</strong>
@@ -1766,9 +1875,9 @@ function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, on
                           className={family.code === 'ejecutiva' ? 'btn btn-primary' : 'btn btn-outline'}
                           type="button"
                           onClick={() => chooseFare(flight, family)}
-                          disabled={buyingFlightId === flight.id}
+                          disabled={buyingFlightId === flight.id || buyingFlightId === 'bundle'}
                         >
-                          {buyingFlightId === flight.id ? 'Procesando' : `Elegir ${family.name}`}
+                          {buyingFlightId === flight.id || buyingFlightId === 'bundle' ? 'Procesando' : `Elegir ${family.name}`}
                         </button>
                       </section>
                     );
@@ -1797,8 +1906,7 @@ function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, on
               className="btn btn-primary"
               type="button"
               onClick={() => {
-                onBuyFlight(pendingUpgrade.flight, pendingUpgrade.nextFamily.className, criteria);
-                setPendingUpgrade(null);
+                completeFareSelection(pendingUpgrade.flight, pendingUpgrade.nextFamily);
               }}
             >
               Mejorar a {pendingUpgrade.nextFamily.name}
@@ -1807,8 +1915,7 @@ function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, on
               className="continue-restricted"
               type="button"
               onClick={() => {
-                onBuyFlight(pendingUpgrade.flight, pendingUpgrade.family.className, criteria);
-                setPendingUpgrade(null);
+                completeFareSelection(pendingUpgrade.flight, pendingUpgrade.family);
               }}
             >
               Continuar con {pendingUpgrade.family.name}
@@ -2416,27 +2523,85 @@ function App() {
     setPurchaseMessage('');
   };
 
+  const buildCartItem = (flight, selectedClass = 'economica', criteria = travelCriteria) => ({
+    ...flight,
+    cartId: `${flight.id}-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    selectedClass,
+    criteria: {
+      tripType: criteria?.tripType || 'oneway',
+      passengers: passengerCountFromCriteria(criteria),
+      passengerAges: passengerAgesFromCriteria(criteria),
+      origin: criteria?.origin || flight.origen || '',
+      destination: criteria?.destination || flight.destino || '',
+      departureDate: criteria?.departureDate || '',
+      returnDate: criteria?.returnDate || '',
+      currency: criteria?.currency || currency
+    }
+  });
+
   const handleBuyFlight = async (flight, selectedClass = 'economica', criteria = travelCriteria) => {
+    if (Array.isArray(flight)) {
+      const selections = flight;
+      const invalidSelection = selections.find((selection) => !canPurchaseFlight(selection.flight?.estado));
+
+      if (invalidSelection) {
+        setPurchaseMessage('Solo se pueden comprar vuelos programados.');
+        return;
+      }
+
+      const nextLocalItems = selections.map((selection) => buildCartItem(selection.flight, selection.selectedClass || 'economica', criteria));
+
+      if (user?.pasajeroId) {
+        setBuyingFlightId('bundle');
+        setPurchaseError('');
+
+        try {
+          const serverItems = [];
+          for (const item of nextLocalItems) {
+            const serverItem = await api.addCartItem(user.pasajeroId, cartItemPayload(item));
+            serverItems.push({
+              ...serverCartItemToFlight(serverItem),
+              criteria: item.criteria
+            });
+          }
+
+          const nextCartItems = [...cartItems, ...serverItems];
+          setCartItems(nextCartItems);
+          window.localStorage.setItem(CART_KEY, JSON.stringify(nextCartItems));
+          setSelectedFlight(null);
+          setTravelCriteria(null);
+          setActiveView('carrito');
+          setCartOpen(true);
+          setPurchaseMessage('Agregamos la ida y la vuelta al carrito.');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch (cartError) {
+          setPurchaseMessage(`No se pudo sincronizar el carrito: ${cartError.message}`);
+        } finally {
+          setBuyingFlightId(null);
+        }
+
+        return;
+      }
+
+      const nextCartItems = [...cartItems, ...nextLocalItems];
+      setCartItems(nextCartItems);
+      window.localStorage.setItem(CART_KEY, JSON.stringify(nextCartItems));
+      setSelectedFlight(null);
+      setTravelCriteria(null);
+      setActiveView('carrito');
+      setCartOpen(true);
+      setPurchaseError('');
+      setPurchaseMessage('Agregamos la ida y la vuelta al carrito.');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     if (!canPurchaseFlight(flight.estado)) {
       setPurchaseMessage('Solo se pueden comprar vuelos programados.');
       return;
     }
 
-    const nextCartItem = {
-      ...flight,
-      cartId: `${flight.id}-${Date.now()}`,
-      selectedClass,
-      criteria: {
-        tripType: criteria?.tripType || 'oneway',
-        passengers: passengerCountFromCriteria(criteria),
-        passengerAges: passengerAgesFromCriteria(criteria),
-        origin: criteria?.origin || flight.origen || '',
-        destination: criteria?.destination || flight.destino || '',
-        departureDate: criteria?.departureDate || '',
-        returnDate: criteria?.returnDate || '',
-        currency: criteria?.currency || currency
-      }
-    };
+    const nextCartItem = buildCartItem(flight, selectedClass, criteria);
 
     if (user?.pasajeroId) {
       setBuyingFlightId(flight.id);
@@ -2444,7 +2609,10 @@ function App() {
 
       try {
         const serverItem = await api.addCartItem(user.pasajeroId, cartItemPayload(nextCartItem));
-        const normalizedItem = serverCartItemToFlight(serverItem);
+        const normalizedItem = {
+          ...serverCartItemToFlight(serverItem),
+          criteria: nextCartItem.criteria
+        };
         const nextCartItems = [...cartItems, normalizedItem];
         setCartItems(nextCartItems);
         window.localStorage.setItem(CART_KEY, JSON.stringify(nextCartItems));
