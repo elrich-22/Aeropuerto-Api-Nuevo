@@ -275,13 +275,26 @@ const serverCartItemToFlight = (item = {}) => {
 const cartItemPayload = (item = {}) => {
   const selectedClass = item.selectedClass || item.clase || 'economica';
   const passengers = passengerCountFromCriteria(item.criteria) || Number(item.passengerCount || 1);
+  const flightId = Number(item.vueloId || item.id);
+
+  if (!Number.isFinite(flightId) || flightId <= 0) {
+    return null;
+  }
 
   return {
-    vueloId: item.id || item.vueloId,
+    vueloId: flightId,
     clase: selectedClass,
     precioUnitario: calculateFlightFare(selectedClass, passengers),
     cantidad: passengers
   };
+};
+
+const cartItemPayloads = (item = {}) => {
+  if (Array.isArray(item.flights) && item.flights.length > 0) {
+    return item.flights.map(cartItemPayload).filter(Boolean);
+  }
+
+  return [cartItemPayload(item)].filter(Boolean);
 };
 
 const nextTariffFamily = (family) => {
@@ -797,7 +810,7 @@ function AuthModal({ open, onClose, onLogin, onRegister }) {
               <input
                 value={form.contrasena}
                 onChange={(event) => setForm((current) => ({ ...current, contrasena: event.target.value }))}
-                placeholder="demo"
+                placeholder="1234"
                 type="password"
                 autoComplete="current-password"
                 required
@@ -807,7 +820,7 @@ function AuthModal({ open, onClose, onLogin, onRegister }) {
             <button className="btn btn-primary" type="submit" disabled={submitting}>
               {submitting ? 'Entrando' : 'Entrar'}
             </button>
-            <small>Usuarios seed: luis.perez, maria.ruiz o daniel.soto. Clave: demo.</small>
+            <small>Usuarios seed: viajero001, viajero002 o admin.aurora. Clave: 1234.</small>
           </form>
         ) : (
           <form onSubmit={submitRegister} noValidate>
@@ -1138,6 +1151,7 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
       pesoEquipaje: null,
       tarifaPagada: subtotal,
       metodoPagoId: Number(form.metodoPagoId),
+      emailConfirmacion: form.titularEmail.trim(),
       total,
       legs: checkoutFlights.map((item) => ({
         vueloId: item.id,
@@ -2612,7 +2626,9 @@ function App() {
     const pendingLocalItems = cartItems.filter((item) => !item.itemCarritoId);
 
     for (const item of pendingLocalItems) {
-      await api.addCartItem(sessionUser.pasajeroId, cartItemPayload(item));
+      for (const payload of cartItemPayloads(item)) {
+        await api.addCartItem(sessionUser.pasajeroId, payload);
+      }
     }
 
     const serverItems = await api.cartItems(sessionUser.pasajeroId);
@@ -2629,7 +2645,9 @@ function App() {
     const pendingLocalItems = cartItems.filter((item) => !item.itemCarritoId);
 
     for (const item of pendingLocalItems) {
-      await api.addCartItem(sessionUser.pasajeroId, cartItemPayload(item));
+      for (const payload of cartItemPayloads(item)) {
+        await api.addCartItem(sessionUser.pasajeroId, payload);
+      }
     }
 
     const serverItems = await api.cartItems(sessionUser.pasajeroId);
@@ -2823,6 +2841,7 @@ function App() {
 
     try {
       const purchases = [];
+      const shouldSendIndividualEmail = purchaseLegs.length === 1;
       for (const leg of purchaseLegs) {
         purchases.push(await api.buyFlight({
           usuarioId: user.usuarioId,
@@ -2833,13 +2852,40 @@ function App() {
           equipajeFacturado: purchaseOptions.equipajeFacturado,
           pesoEquipaje: purchaseOptions.pesoEquipaje,
           tarifaPagada: Number(leg.tarifaPagada || 0) + extraPerLeg,
-          metodoPagoId: purchaseOptions.metodoPagoId
+          metodoPagoId: purchaseOptions.metodoPagoId,
+          emailConfirmacion: shouldSendIndividualEmail ? purchaseOptions.emailConfirmacion : null,
+          enviarCorreoConfirmacion: shouldSendIndividualEmail
         }));
       }
 
       const reservationCodes = purchases.map((purchase) => purchase.codigoReserva).filter(Boolean);
       const boughtFlights = checkoutFlights.map((item) => item.numeroVuelo).join(' / ');
       const totalPaid = purchases.reduce((sum, purchase) => sum + Number(purchase.total || 0), 0);
+      if (!shouldSendIndividualEmail && purchaseOptions.emailConfirmacion) {
+        try {
+          await api.sendPurchaseConfirmation({
+            emailConfirmacion: purchaseOptions.emailConfirmacion,
+            pasajeroNombre: user.nombreCompleto || '',
+            total: totalPaid,
+            reservas: purchases.map((purchase, index) => {
+              const flight = checkoutFlights[index] || checkoutFlights[0];
+              return {
+                codigoReserva: purchase.codigoReserva,
+                numeroVenta: purchase.numeroVenta,
+                numeroVuelo: flight.numeroVuelo,
+                aerolinea: flight.aerolinea,
+                origen: flight.origen,
+                destino: flight.destino,
+                fechaVuelo: flight.fechaVuelo,
+                clase: tariffByClassName(flight.selectedClass || purchaseOptions.clase).name,
+                total: purchase.total
+              };
+            })
+          });
+        } catch (emailError) {
+          console.warn('No se pudo enviar el correo de confirmacion. La compra ya fue registrada.', emailError);
+        }
+      }
       const successCurrency = selectedFlight.criteria?.currency || currency;
       setPurchaseSuccess({
         reservationCodes,

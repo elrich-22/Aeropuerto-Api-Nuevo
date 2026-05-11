@@ -1249,11 +1249,13 @@ public final class MainActivity extends Activity {
         double confirmedTotal = tripTotal();
         runTask("Confirmando compra...", () -> {
             JSONArray responses = new JSONArray();
+            boolean multipleFlights = "roundtrip".equals(criteriaTripType) && selectedReturnFlight != null;
             if (selectedOutboundFlight != null) {
-                responses.put(new JSONObject(apiClient.post("/api/compras/vuelos", purchasePayload(selectedOutboundFlight, method).toString())));
+                responses.put(new JSONObject(apiClient.post("/api/compras/vuelos", purchasePayload(selectedOutboundFlight, method, !multipleFlights).toString())));
             }
-            if ("roundtrip".equals(criteriaTripType) && selectedReturnFlight != null) {
-                responses.put(new JSONObject(apiClient.post("/api/compras/vuelos", purchasePayload(selectedReturnFlight, method).toString())));
+            if (multipleFlights) {
+                responses.put(new JSONObject(apiClient.post("/api/compras/vuelos", purchasePayload(selectedReturnFlight, method, false).toString())));
+                apiClient.post("/api/compras/confirmacion-correo", purchaseSummaryPayload(responses, confirmedTotal).toString());
             }
             return new JSONObject().put("compras", responses).put("total", confirmedTotal).toString();
         }, json -> {
@@ -1278,7 +1280,7 @@ public final class MainActivity extends Activity {
         });
     }
 
-    private JSONObject purchasePayload(JSONObject flight, Spinner method) throws Exception {
+    private JSONObject purchasePayload(JSONObject flight, Spinner method, boolean sendConfirmationEmail) throws Exception {
         int passengers = parseInt(value(flight, "passengerCount", "1"), 1);
         double servicesTotal = selectedSeat ? SERVICE_SEAT * passengers : 0;
         servicesTotal += selectedBag ? SERVICE_BAG * passengers : 0;
@@ -1293,7 +1295,34 @@ public final class MainActivity extends Activity {
                 .put("equipajeFacturado", selectedBag ? 1 : 0)
                 .put("pesoEquipaje", selectedBag ? 23 : JSONObject.NULL)
                 .put("tarifaPagada", flightFare(flight, value(flight, "selectedClass", "economica"), passengers) + servicesTotal)
-                .put("metodoPagoId", parseInt(method.getSelectedItem().toString().substring(0, 1), 1));
+                .put("metodoPagoId", parseInt(method.getSelectedItem().toString().substring(0, 1), 1))
+                .put("emailConfirmacion", sendConfirmationEmail ? savedHolderEmail : JSONObject.NULL)
+                .put("enviarCorreoConfirmacion", sendConfirmationEmail);
+    }
+
+    private JSONObject purchaseSummaryPayload(JSONArray responses, double total) throws Exception {
+        JSONArray reservations = new JSONArray();
+        JSONObject[] flights = {selectedOutboundFlight, selectedReturnFlight};
+        for (int i = 0; i < responses.length() && i < flights.length; i++) {
+            JSONObject response = responses.optJSONObject(i);
+            JSONObject flight = flights[i];
+            if (response == null || flight == null) continue;
+            reservations.put(new JSONObject()
+                    .put("codigoReserva", value(response, "codigoReserva", "-"))
+                    .put("numeroVenta", value(response, "numeroVenta", "-"))
+                    .put("numeroVuelo", value(flight, "numeroVuelo", "-"))
+                    .put("aerolinea", value(flight, "aerolinea", "-"))
+                    .put("origen", value(flight, "origen", "-"))
+                    .put("destino", value(flight, "destino", "-"))
+                    .put("fechaVuelo", value(flight, "fechaVuelo", ""))
+                    .put("clase", value(flight, "selectedClass", "economica"))
+                    .put("total", response.optDouble("total", 0)));
+        }
+        return new JSONObject()
+                .put("emailConfirmacion", savedHolderEmail)
+                .put("pasajeroNombre", savedHolderName)
+                .put("total", total)
+                .put("reservas", reservations);
     }
 
     private JSONObject successFlightSummary(JSONObject flight, JSONObject response, String label) throws Exception {
@@ -2034,7 +2063,9 @@ public final class MainActivity extends Activity {
                     .put("equipajeFacturado", bag ? 1 : 0)
                     .put("pesoEquipaje", bag ? 23 : JSONObject.NULL)
                     .put("tarifaPagada", fare)
-                    .put("metodoPagoId", methodId);
+                    .put("metodoPagoId", methodId)
+                    .put("emailConfirmacion", holderEmail.getText().toString().trim())
+                    .put("enviarCorreoConfirmacion", true);
             runTask("Confirmando compra...", () -> {
                 String response = apiClient.post("/api/compras/vuelos", body.toString());
                 if (!checkoutItemId.isEmpty()) {

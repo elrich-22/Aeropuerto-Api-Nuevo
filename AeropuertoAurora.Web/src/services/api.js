@@ -19,7 +19,13 @@ async function request(path, options = {}) {
 
     try {
       const body = await response.json();
-      message = body.message || body.title || message;
+      if (body.errors && typeof body.errors === 'object') {
+        const validationMessages = Object.entries(body.errors)
+          .flatMap(([field, errors]) => (Array.isArray(errors) ? errors.map((error) => `${field}: ${error}`) : []));
+        message = validationMessages.length > 0 ? validationMessages.join(' ') : body.title || message;
+      } else {
+        message = body.message || body.title || message;
+      }
     } catch {
       message = response.statusText || message;
     }
@@ -48,6 +54,11 @@ export const api = {
     }),
   buyFlight: (payload) =>
     request('/api/compras/vuelos', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+  sendPurchaseConfirmation: (payload) =>
+    request('/api/compras/confirmacion-correo', {
       method: 'POST',
       body: JSON.stringify(payload)
     }),

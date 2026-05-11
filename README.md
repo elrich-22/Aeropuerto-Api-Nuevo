@@ -1,22 +1,25 @@
 # Aeropuerto Aurora
 
-Proyecto integrado de Bases de Datos II para la gestion de operaciones del Aeropuerto Aurora.
+Proyecto integrado de Bases de Datos II para gestionar operaciones, venta de boletos y consulta administrativa del Aeropuerto Aurora.
 
-Este repositorio incluye:
+El repositorio contiene tres clientes alrededor de la misma API:
 
-- `AeropuertoAurora.Api/`: API en ASP.NET Core conectada a Oracle.
-- `AeropuertoAurora.Web/`: frontend en React + Vite para consumir la API.
+- `AeropuertoAurora.Api/`: API ASP.NET Core conectada a Oracle.
+- `AeropuertoAurora.Web/`: frontend React + Vite para pasajeros y administradores.
+- `AeropuertoAurora.Android/`: app Android nativa en Java.
 - `AeropuertoAurora.Api/Database/`: scripts de estructura, seed y ajuste de identities.
 - `start-dev.ps1`: script para levantar backend y frontend juntos.
 
 ## Estructura
 
 ```text
-Proyecto2/
+Aeropuerto-Api-Nuevo/
 |-- AeropuertoAurora.Api/
 |-- AeropuertoAurora.Web/
+|-- AeropuertoAurora.Android/
 |-- start-dev.ps1
 |-- Proyecto2.sln
+|-- README.md
 ```
 
 ## Requisitos
@@ -24,6 +27,7 @@ Proyecto2/
 - .NET SDK 10
 - Node.js + npm
 - Oracle 21c local
+- Android Studio, solo si vas a correr la app Android
 
 ## Base de datos
 
@@ -43,7 +47,7 @@ Si despues del seed Oracle devuelve `ORA-00001` en inserts nuevos, vuelve a ejec
 @AeropuertoAurora.Api/Database/reset-identities.sql
 ```
 
-## Ejecutar todo
+## Ejecutar API y Web
 
 El flujo recomendado para desarrollo es levantar backend y frontend con un solo comando desde la raiz:
 
@@ -53,15 +57,18 @@ El flujo recomendado para desarrollo es levantar backend y frontend con un solo 
 
 El script hace lo siguiente:
 
+- Detiene procesos previos en los puertos `5185` y `5173`.
 - Levanta la API en `http://localhost:5185`.
 - Espera a que `http://localhost:5185/api/health` responda.
-- Levanta el frontend en `http://127.0.0.1:5173`.
 - Instala dependencias del frontend si falta `node_modules`.
+- Levanta el frontend en `http://127.0.0.1:5173`.
+- Escribe logs en `dev-api.log`, `dev-api-error.log`, `dev-web.log` y `dev-web-error.log`.
 
 URLs principales:
 
 - Frontend: `http://127.0.0.1:5173`
 - Swagger: `http://localhost:5185/swagger`
+- Health check: `http://localhost:5185/api/health`
 
 Para detener ambos procesos, presiona `Ctrl+C` en la terminal donde ejecutaste el script.
 
@@ -79,11 +86,13 @@ La API expone Swagger en:
 
 - `http://localhost:5185/swagger`
 
-Si `ApiSecurity:ApiKey` esta configurada, el cliente debe enviar:
+Si `ApiSecurity:ApiKey` esta configurada, los clientes deben enviar:
 
 ```http
 X-Api-Key: clave-local-segura
 ```
+
+Para probar correos de confirmacion de compra, configura `Email__Enabled`, `Email__Host`, `Email__User`, `Email__Password` y `Email__FromEmail` como variables de entorno. Las credenciales SMTP no deben subirse al repo.
 
 ## Frontend manual
 
@@ -104,14 +113,30 @@ cd AeropuertoAurora.Web
 npm run build
 ```
 
+## Android
+
+Abre `AeropuertoAurora.Android/` desde Android Studio y ejecuta la app en un emulador o telefono.
+
+URLs recomendadas para conectar con la API:
+
+- Emulador Android: `http://10.0.2.2:5185`
+- Telefono fisico: `http://IP_LOCAL_DE_TU_PC:5185`
+
+El telefono y la PC deben estar en la misma red. Si el firewall bloquea el puerto `5185`, permite la conexion entrante.
+
 ## Modulos destacados
 
-- Operaciones de vuelos, pasajeros, equipaje, mantenimiento y seguridad.
-- Consulta generica de tablas habilitadas desde la API.
-- Reporteria para ventas, destinos, incidentes, ocupacion de vuelos y metodos de pago.
-- Frontend con panel visual conectado a endpoints operativos y de reporteria.
+- Autenticacion y registro de pasajeros con `POST /api/auth/login` y `POST /api/auth/register`.
+- Busqueda de vuelos, seleccion de tarifa y flujo de compra.
+- Carrito compartido por pasajero y checkout con metodo de pago.
+- Confirmacion de compras con creacion de reserva, venta, detalle y transaccion de pago.
+- Rastreo de vuelos, destinos mas buscados y reportes de ocupacion.
+- Operaciones de equipaje, mantenimientos, controles e incidentes.
+- Panel administrativo con metadata y CRUD generico sobre tablas habilitadas.
+- Clientes Web y Android consumiendo la misma API.
 
 ## Documentacion por modulo
 
 - API: [AeropuertoAurora.Api/README.md](AeropuertoAurora.Api/README.md)
 - Frontend: [AeropuertoAurora.Web/README.md](AeropuertoAurora.Web/README.md)
+- Android: [AeropuertoAurora.Android/README.md](AeropuertoAurora.Android/README.md)

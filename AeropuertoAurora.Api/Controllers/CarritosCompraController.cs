@@ -50,7 +50,7 @@ public sealed class CarritosCompraController(IOracleCrudRepository repository, I
     [HttpPost("pasajero/{pasajeroId:int}/items")]
     public async Task<IActionResult> AddItemForPassenger(
         int pasajeroId,
-        AgregarItemCarritoUsuarioDto dto,
+        [FromBody] AgregarItemCarritoUsuarioDto dto,
         CancellationToken cancellationToken)
     {
         if (pasajeroId <= 0 || dto.VueloId <= 0)

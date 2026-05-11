@@ -35,7 +35,9 @@ public sealed record CompraVueloRequestDto(
     int EquipajeFacturado,
     decimal? PesoEquipaje,
     decimal TarifaPagada,
-    int MetodoPagoId);
+    int MetodoPagoId,
+    string? EmailConfirmacion,
+    bool? EnviarCorreoConfirmacion);
 
 public sealed record CompraVueloResponseDto(
     int ReservaId,
@@ -46,4 +48,23 @@ public sealed record CompraVueloResponseDto(
     decimal Total,
     int NumeroPasajeros,
     int PlazasOcupadas,
-    int PlazasDisponibles);
+    int PlazasDisponibles,
+    bool CorreoConfirmacionEnviado,
+    string? CorreoConfirmacionDestino);
+
+public sealed record CompraConfirmacionEmailRequestDto(
+    string EmailConfirmacion,
+    string? PasajeroNombre,
+    decimal Total,
+    IReadOnlyList<CompraConfirmacionReservaDto> Reservas);
+
+public sealed record CompraConfirmacionReservaDto(
+    string CodigoReserva,
+    string NumeroVenta,
+    string NumeroVuelo,
+    string Aerolinea,
+    string Origen,
+    string Destino,
+    DateTime FechaVuelo,
+    string Clase,
+    decimal Total);

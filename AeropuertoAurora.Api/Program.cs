@@ -9,12 +9,14 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.Configure<DatabaseOptions>(builder.Configuration.GetSection(DatabaseOptions.SectionName));
 builder.Services.Configure<ApiSecurityOptions>(builder.Configuration.GetSection(ApiSecurityOptions.SectionName));
+builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
 
 builder.Services.AddSingleton<IOracleConnectionFactory, OracleConnectionFactory>();
 builder.Services.AddScoped<IAeropuertoReadRepository, AeropuertoReadRepository>();
 builder.Services.AddScoped<ITableReadRepository, TableReadRepository>();
 builder.Services.AddScoped<IOracleCrudRepository, OracleCrudRepository>();
 builder.Services.AddScoped<IAeropuertoQueryService, AeropuertoQueryService>();
+builder.Services.AddScoped<IEmailService, SmtpEmailService>();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();

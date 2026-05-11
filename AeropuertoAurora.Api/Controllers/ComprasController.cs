@@ -7,8 +7,18 @@ namespace AeropuertoAurora.Api.Controllers;
 
 [ApiController]
 [Route("api/compras")]
-public sealed class ComprasController(IOracleCrudRepository repository, IAeropuertoQueryService service) : ControllerBase
+public sealed class ComprasController(
+    IOracleCrudRepository repository,
+    IAeropuertoQueryService service,
+    IEmailService emailService,
+    ILogger<ComprasController> logger) : ControllerBase
 {
+    private static readonly CrudTableDefinition PasajerosTable = new(
+        "AER_PASAJERO",
+        "PAS_ID_PASAJERO",
+        [],
+        []);
+
     private static readonly CrudTableDefinition ReservasTable = new(
         "AER_RESERVA",
         "RES_ID_RESERVA",
@@ -66,6 +76,12 @@ public sealed class ComprasController(IOracleCrudRepository repository, IAeropue
             return BadRequest(new { message = $"Solo quedan {flight.PlazasDisponibles} plazas disponibles para este vuelo." });
         }
 
+        var passenger = await repository.GetByIdAsync(PasajerosTable, dto.PasajeroId, cancellationToken);
+        if (passenger is null)
+        {
+            return BadRequest(new { message = "El pasajero seleccionado no existe." });
+        }
+
         var reservationId = await repository.CreateAsync(ReservasTable, new Dictionary<string, object?>
         {
             ["RES_ID_VUELO"] = dto.VueloId,
@@ -112,6 +128,38 @@ public sealed class ComprasController(IOracleCrudRepository repository, IAeropue
         }, cancellationToken);
 
         var updatedFlight = await service.GetFlightByIdAsync(dto.VueloId, cancellationToken);
+        var requestedConfirmationEmail = dto.EmailConfirmacion?.Trim();
+        var confirmationEmail = IsValidEmail(requestedConfirmationEmail)
+            ? requestedConfirmationEmail
+            : passenger.ToNullableString("PAS_EMAIL");
+        var confirmationEmailSent = false;
+
+        if (dto.EnviarCorreoConfirmacion != false && !string.IsNullOrWhiteSpace(confirmationEmail))
+        {
+            try
+            {
+                confirmationEmailSent = await emailService.SendReservationConfirmationAsync(
+                    confirmationEmail,
+                    BuildPassengerName(passenger),
+                    reservationCode,
+                    saleNumber,
+                    updatedFlight ?? flight,
+                    total,
+                    cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "No se pudo enviar el correo de confirmacion para la reserva {ReservationCode}.", reservationCode);
+            }
+        }
+        else if (dto.EnviarCorreoConfirmacion == false)
+        {
+            logger.LogInformation("Correo individual omitido para la reserva {ReservationCode} porque se enviara un resumen de compra.", reservationCode);
+        }
+        else
+        {
+            logger.LogInformation("Reserva {ReservationCode} creada sin correo de confirmacion porque el pasajero no tiene email.", reservationCode);
+        }
 
         return Created(string.Empty, new CompraVueloResponseDto(
             reservationId,
@@ -122,12 +170,67 @@ public sealed class ComprasController(IOracleCrudRepository repository, IAeropue
             total,
             seatsToBook,
             updatedFlight?.PlazasOcupadas ?? occupiedSeats,
-            updatedFlight?.PlazasDisponibles ?? availableSeats));
+            updatedFlight?.PlazasDisponibles ?? availableSeats,
+            confirmationEmailSent,
+            confirmationEmail));
+    }
+
+    [HttpPost("confirmacion-correo")]
+    public async Task<IActionResult> EnviarConfirmacionCorreo(CompraConfirmacionEmailRequestDto dto, CancellationToken cancellationToken)
+    {
+        if (!IsValidEmail(dto.EmailConfirmacion))
+        {
+            return BadRequest(new { message = "Ingresa un email valido para enviar la confirmacion." });
+        }
+
+        if (dto.Reservas.Count == 0)
+        {
+            return BadRequest(new { message = "Debe incluir al menos una reserva para enviar la confirmacion." });
+        }
+
+        var sent = false;
+        try
+        {
+            sent = await emailService.SendPurchaseSummaryAsync(
+                dto.EmailConfirmacion.Trim(),
+                dto.PasajeroNombre ?? string.Empty,
+                dto.Reservas,
+                dto.Total,
+                cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "No se pudo enviar el correo de resumen de compra a {Email}.", dto.EmailConfirmacion);
+        }
+
+        return Ok(new
+        {
+            correoConfirmacionEnviado = sent,
+            correoConfirmacionDestino = dto.EmailConfirmacion
+        });
     }
 
     private static string NormalizeClass(string? value)
     {
         var normalized = value?.Trim().ToLowerInvariant();
         return normalized is "ejecutiva" or "primera" ? normalized : "economica";
+    }
+
+    private static string BuildPassengerName(IReadOnlyDictionary<string, object?> passenger)
+    {
+        return string.Join(" ", new[]
+        {
+            passenger.ToNullableString("PAS_PRIMER_NOMBRE"),
+            passenger.ToNullableString("PAS_SEGUNDO_NOMBRE"),
+            passenger.ToNullableString("PAS_PRIMER_APELLIDO"),
+            passenger.ToNullableString("PAS_SEGUNDO_APELLIDO")
+        }.Where(value => !string.IsNullOrWhiteSpace(value)));
+    }
+
+    private static bool IsValidEmail(string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value) &&
+            value.Contains('@', StringComparison.Ordinal) &&
+            value.Contains('.', StringComparison.Ordinal);
     }
 }
