@@ -23,9 +23,15 @@ public sealed class ComprasController(IOracleCrudRepository repository, IAeropue
 
     private static readonly CrudTableDefinition DetallesTable = new(
         "AER_DETALLEVENTABOLETO",
-        "DEV_ID_DETALLE",
+        "DEV_ID_DETALLE_VENTA",
         ["DEV_ID_VENTA", "DEV_ID_RESERVA", "DEV_PRECIO_BASE", "DEV_CARGOS_ADICIONALES"],
         ["DEV_ID_VENTA", "DEV_ID_RESERVA", "DEV_PRECIO_BASE", "DEV_CARGOS_ADICIONALES"]);
+
+    private static readonly CrudTableDefinition VuelosDisponibilidadTable = new(
+        "AER_VUELO",
+        "VUE_ID_VUELO",
+        [],
+        ["VUE_PLAZAS_OCUPADAS", "VUE_PLAZAS_VACIAS"]);
 
     [HttpPost("vuelos")]
     public async Task<IActionResult> ComprarVuelo(CompraVueloRequestDto dto, CancellationToken cancellationToken)
@@ -36,12 +42,13 @@ public sealed class ComprasController(IOracleCrudRepository repository, IAeropue
         }
 
         var normalizedClass = NormalizeClass(dto.Clase);
+        var seatsToBook = Math.Max(1, dto.NumeroPasajeros);
         var fare = dto.TarifaPagada > 0 ? dto.TarifaPagada : 1250m;
         var taxes = Math.Round(fare * 0.12m, 2);
         var total = fare + taxes;
         var now = DateTime.UtcNow;
-        var reservationCode = $"RES-{now:yyMMddHHmmss}-{dto.PasajeroId}";
-        var saleNumber = $"WEB-{now:yyMMddHHmmss}-{dto.UsuarioId}";
+        var reservationCode = $"R{now:MMddHHmmssfff}{dto.PasajeroId % 100:D2}{dto.VueloId % 100:D2}";
+        var saleNumber = $"WEB-{now:yyMMddHHmmssfff}-{dto.UsuarioId}-{dto.VueloId}";
 
         var flight = await service.GetFlightByIdAsync(dto.VueloId, cancellationToken);
         if (flight is null)
@@ -52,6 +59,11 @@ public sealed class ComprasController(IOracleCrudRepository repository, IAeropue
         if (!string.Equals(flight.Estado, "PROGRAMADO", StringComparison.OrdinalIgnoreCase))
         {
             return BadRequest(new { message = "Solo se pueden comprar vuelos programados." });
+        }
+
+        if (flight.PlazasDisponibles < seatsToBook)
+        {
+            return BadRequest(new { message = $"Solo quedan {flight.PlazasDisponibles} plazas disponibles para este vuelo." });
         }
 
         var reservationId = await repository.CreateAsync(ReservasTable, new Dictionary<string, object?>
@@ -91,13 +103,26 @@ public sealed class ComprasController(IOracleCrudRepository repository, IAeropue
             ["DEV_CARGOS_ADICIONALES"] = taxes
         }, cancellationToken);
 
+        var occupiedSeats = flight.PlazasOcupadas + seatsToBook;
+        var availableSeats = Math.Max(0, flight.PlazasDisponibles - seatsToBook);
+        await repository.UpdateAsync(VuelosDisponibilidadTable, dto.VueloId, new Dictionary<string, object?>
+        {
+            ["VUE_PLAZAS_OCUPADAS"] = occupiedSeats,
+            ["VUE_PLAZAS_VACIAS"] = availableSeats
+        }, cancellationToken);
+
+        var updatedFlight = await service.GetFlightByIdAsync(dto.VueloId, cancellationToken);
+
         return Created(string.Empty, new CompraVueloResponseDto(
             reservationId,
             saleId,
             detailId,
             reservationCode,
             saleNumber,
-            total));
+            total,
+            seatsToBook,
+            updatedFlight?.PlazasOcupadas ?? occupiedSeats,
+            updatedFlight?.PlazasDisponibles ?? availableSeats));
     }
 
     private static string NormalizeClass(string? value)

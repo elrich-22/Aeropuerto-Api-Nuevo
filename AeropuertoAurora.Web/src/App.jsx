@@ -36,32 +36,38 @@ const services = [
 
 const formatDate = (value) => {
   if (!value) return 'Pendiente';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Pendiente';
 
   return new Intl.DateTimeFormat('es-GT', {
     day: '2-digit',
     month: 'short',
     hour: '2-digit',
     minute: '2-digit'
-  }).format(new Date(value));
+  }).format(date);
 };
 
 const formatTime = (value) => {
   if (!value) return '--:--';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '--:--';
 
   return new Intl.DateTimeFormat('es-GT', {
     hour: '2-digit',
     minute: '2-digit'
-  }).format(new Date(value));
+  }).format(date);
 };
 
 const formatShortDate = (value) => {
   if (!value) return '';
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return '';
 
   return new Intl.DateTimeFormat('es-GT', {
     weekday: 'short',
     day: '2-digit',
     month: 'short'
-  }).format(new Date(`${value}T00:00:00`));
+  }).format(date);
 };
 
 const formatCurrency = (value) =>
@@ -180,6 +186,11 @@ const PAYMENT_METHODS = [
   { id: 2, name: 'Tarjeta de debito', requiresCard: true },
   { id: 3, name: 'Transferencia', requiresCard: false }
 ];
+const CARD_MONTHS = Array.from({ length: 12 }, (_, index) => {
+  const value = String(index + 1).padStart(2, '0');
+  return { value, label: value };
+});
+const CARD_YEARS = Array.from({ length: 16 }, (_, index) => String(new Date().getFullYear() + index));
 const ANCILLARY_SERVICES = [
   { id: 'seat', title: 'Elige tu asiento', description: 'Selecciona ventana, pasillo o salida rapida.', price: 120, icon: 'AS' },
   { id: 'bag', title: 'Equipaje adicional', description: 'Agrega una maleta documentada al viaje.', price: 280, icon: 'EQ' },
@@ -195,6 +206,21 @@ const SEX_OPTIONS = [
 ];
 
 const canPurchaseFlight = (status = '') => normalize(status) === 'programado';
+
+const formatCardNumber = (value = '') =>
+  value
+    .replace(/\D/g, '')
+    .slice(0, 19)
+    .replace(/(.{4})/g, '$1 ')
+    .trim();
+
+const isExpiredCard = (month, year) => {
+  if (!month || !year) return false;
+
+  const today = new Date();
+  const expiration = new Date(Number(year), Number(month), 0, 23, 59, 59);
+  return expiration < today;
+};
 
 const passengerCountFromGroups = (groups = DEFAULT_PASSENGER_GROUPS) =>
   Math.max(1, PASSENGER_GROUPS.reduce((sum, group) => sum + Number(groups[group.key] || 0), 0));
@@ -359,6 +385,7 @@ const estimateDurationMinutes = (flight) => {
 
 const addMinutesToDate = (value, minutes) => {
   const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
   date.setMinutes(date.getMinutes() + minutes);
   return date;
 };
@@ -435,6 +462,22 @@ const stringifyValue = (value) => {
   return value.toString();
 };
 
+const UNSAFE_INPUT_PATTERN = /['"\\/;<>`{}[\]|]/;
+const PASSWORD_RULE_PATTERN = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*._?-]).{8,}$/;
+
+const sanitizeRegisterValue = (field, value = '') => {
+  const clean = value.toString().replace(new RegExp(UNSAFE_INPUT_PATTERN.source, 'g'), '');
+
+  if (field === 'contrasena') return clean;
+  if (field === 'email') return clean.replace(/[^A-Za-z0-9@._%+-]/g, '');
+  if (field === 'telefono') return clean.replace(/[^0-9+\s()-]/g, '');
+  if (field === 'numeroDocumento') return clean.replace(/[^A-Za-z0-9._ -]/g, '');
+  if (field === 'fechaNacimiento') return clean;
+  if (field === 'sexo') return clean.replace(/[^A-Za-z]/g, '');
+
+  return clean.replace(/[^\p{L}\p{N} ._-]/gu, '');
+};
+
 const isAdminUser = (currentUser) => {
   if (!currentUser) return false;
 
@@ -473,8 +516,14 @@ const validateRegisterForm = (form) => {
     errors.email = 'Usa un formato de email valido.';
   }
 
-  if (form.contrasena && form.contrasena.length < 4) {
-    errors.contrasena = 'Usa al menos 4 caracteres.';
+  Object.entries(form).forEach(([field, value]) => {
+    if (value && UNSAFE_INPUT_PATTERN.test(value.toString())) {
+      errors[field] = 'No uses comillas, apostrofes, slashes ni simbolos peligrosos.';
+    }
+  });
+
+  if (form.contrasena && !PASSWORD_RULE_PATTERN.test(form.contrasena)) {
+    errors.contrasena = 'Usa al menos 8 caracteres, una mayuscula, un numero y un simbolo seguro.';
   }
 
   return errors;
@@ -493,6 +542,13 @@ function NavBar({ user, adminView, isAdmin, activeView, cartCount, onAdminView, 
         <a className={activeView === 'explorar' ? 'active' : ''} href="#explorar" onClick={(event) => onNavigate(event, 'explorar')}>Explorar</a>
         <a className={activeView === 'rastreo' ? 'active' : ''} href="#rastreo" onClick={(event) => onNavigate(event, 'rastreo')}>Rastreo</a>
         <a className={activeView === 'ubicacion' ? 'active' : ''} href="#ubicacion" onClick={(event) => onNavigate(event, 'ubicacion')}>Ubicacion</a>
+        <button
+          className={activeView === 'carrito' ? 'nav-admin-link cart-nav-link active' : 'nav-admin-link cart-nav-link'}
+          type="button"
+          onClick={onCartClick}
+        >
+          Carrito ({cartCount})
+        </button>
         {isAdmin && (
           <>
             <button
@@ -521,11 +577,6 @@ function NavBar({ user, adminView, isAdmin, activeView, cartCount, onAdminView, 
               </div>
               <span className="nav-user-caret" aria-hidden="true">▾</span>
             </div>
-            {cartCount > 0 && (
-              <button className="nav-session-button cart-nav-button" type="button" onClick={onCartClick}>
-                Carrito ({cartCount})
-              </button>
-            )}
             <button className="nav-session-button" type="button" onClick={onLogout}>Salir</button>
           </>
         ) : (
@@ -708,7 +759,7 @@ function AuthModal({ open, onClose, onLogin, onRegister }) {
   };
 
   const updateRegister = (field, value) => {
-    setRegisterForm((current) => ({ ...current, [field]: value }));
+    setRegisterForm((current) => ({ ...current, [field]: sanitizeRegisterValue(field, value) }));
     setFieldErrors((current) => {
       const next = { ...current };
       delete next[field];
@@ -774,6 +825,7 @@ function AuthModal({ open, onClose, onLogin, onRegister }) {
               <label>
                 Contrasena
                 <input className={registerInputClass('contrasena')} type="password" value={registerForm.contrasena} onChange={(event) => updateRegister('contrasena', event.target.value)} />
+                <small>Minimo 8 caracteres, una mayuscula, un numero y un simbolo seguro.</small>
                 {fieldErrors.contrasena && <small className="field-error">{fieldErrors.contrasena}</small>}
               </label>
               <label>
@@ -935,10 +987,9 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
     titularTelefono: '',
     titularDocumento: '',
     pasajeros: [],
-    nombreTarjeta: '',
     numeroTarjeta: '',
-    vencimientoTarjeta: '',
-    cvvTarjeta: ''
+    mesTarjeta: '',
+    anioTarjeta: ''
   });
   const [formError, setFormError] = useState('');
   const [touched, setTouched] = useState({});
@@ -961,23 +1012,27 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
           documento: index === 0 ? user?.numeroDocumento || '' : '',
           edad: age
         })),
-        nombreTarjeta: '',
         numeroTarjeta: '',
-        vencimientoTarjeta: '',
-        cvvTarjeta: ''
+        mesTarjeta: '',
+        anioTarjeta: ''
       });
       setFormError('');
     }
-  }, [flight?.cartId, flight?.id, user]);
+  }, [flight?.cartId, flight?.id, flight?.checkoutId, user]);
 
   if (!flight) return null;
 
+  const checkoutFlights = Array.isArray(flight.flights) && flight.flights.length > 0 ? flight.flights : [flight];
+  const isMultiFlightCheckout = checkoutFlights.length > 1;
   const selectedPayment = PAYMENT_METHODS.find((method) => method.id === Number(form.metodoPagoId)) ?? PAYMENT_METHODS[0];
-  const className = flight.selectedClass || 'economica';
+  const className = checkoutFlights[0]?.selectedClass || flight.selectedClass || 'economica';
   const selectedTariff = tariffByClassName(className);
   const currency = flight.criteria?.currency || 'GTQ';
   const passengerCount = passengerCountFromCriteria(flight.criteria);
-  const fare = calculateFlightFare(className, passengerCount);
+  const fare = checkoutFlights.reduce(
+    (sum, item) => sum + calculateFlightFare(item.selectedClass || className, passengerCount),
+    0
+  );
   const servicesTotal = selectedServices.reduce((sum, serviceId) => {
     const service = ANCILLARY_SERVICES.find((item) => item.id === serviceId);
     return sum + (service?.price || 0) * passengerCount;
@@ -988,14 +1043,15 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
 
   const emailValid = !form.titularEmail || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.titularEmail);
   const phoneValid = !form.titularTelefono || form.titularTelefono.replace(/\D/g, '').length >= 8;
+  const cardNumberDigits = form.numeroTarjeta.replace(/\D/g, '');
+  const expiredCard = selectedPayment.requiresCard && isExpiredCard(form.mesTarjeta, form.anioTarjeta);
   const fieldErrors = {
     titularNombre: form.titularNombre.trim() ? '' : 'Nombre obligatorio.',
     titularEmail: !form.titularEmail.trim() ? 'Email obligatorio.' : emailValid ? '' : 'Formato de email invalido.',
     titularTelefono: !form.titularTelefono.trim() ? 'Telefono obligatorio.' : phoneValid ? '' : 'Usa al menos 8 digitos.',
-    nombreTarjeta: selectedPayment.requiresCard && !form.nombreTarjeta.trim() ? 'Nombre obligatorio.' : '',
-    numeroTarjeta: selectedPayment.requiresCard && form.numeroTarjeta.replace(/\s/g, '').length < 13 ? 'Numero de tarjeta incompleto.' : '',
-    vencimientoTarjeta: selectedPayment.requiresCard && !/^\d{2}\/\d{2}$/.test(form.vencimientoTarjeta) ? 'Usa formato MM/AA.' : '',
-    cvvTarjeta: selectedPayment.requiresCard && form.cvvTarjeta.length < 3 ? 'CVV incompleto.' : ''
+    numeroTarjeta: selectedPayment.requiresCard && cardNumberDigits.length < 13 ? 'Numero de tarjeta incompleto.' : '',
+    mesTarjeta: selectedPayment.requiresCard && !form.mesTarjeta ? 'Selecciona mes.' : '',
+    anioTarjeta: selectedPayment.requiresCard && !form.anioTarjeta ? 'Selecciona ano.' : expiredCard ? 'La tarjeta esta vencida.' : ''
   };
   const passengerErrors = form.pasajeros.map((passenger) => ({
     nombre: passenger.nombre.trim() ? '' : 'Nombre obligatorio.',
@@ -1023,10 +1079,9 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
     !fieldErrors.titularTelefono;
 
   const paymentStepValid = () =>
-    !fieldErrors.nombreTarjeta &&
     !fieldErrors.numeroTarjeta &&
-    !fieldErrors.vencimientoTarjeta &&
-    !fieldErrors.cvvTarjeta;
+    !fieldErrors.mesTarjeta &&
+    !fieldErrors.anioTarjeta;
 
   const continueToServices = () => {
     setTouched((current) => ({
@@ -1067,10 +1122,9 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
 
     setTouched((current) => ({
       ...current,
-      nombreTarjeta: true,
       numeroTarjeta: true,
-      vencimientoTarjeta: true,
-      cvvTarjeta: true
+      mesTarjeta: true,
+      anioTarjeta: true
     }));
 
     if (!paymentStepValid()) {
@@ -1084,7 +1138,12 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
       pesoEquipaje: null,
       tarifaPagada: subtotal,
       metodoPagoId: Number(form.metodoPagoId),
-      total
+      total,
+      legs: checkoutFlights.map((item) => ({
+        vueloId: item.id,
+        clase: item.selectedClass || className,
+        tarifaPagada: calculateFlightFare(item.selectedClass || className, passengerCount)
+      }))
     });
   };
 
@@ -1092,9 +1151,13 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
     <section className="checkout-view">
       <div className="checkout-shell">
         <button className="back-button" type="button" onClick={onBack}>Volver a vuelos</button>
-        <div className="section-label">Carrito de compras</div>
-        <h2 id="purchase-title">{flight.numeroVuelo}</h2>
-        <p>{flight.origen} a {flight.destino} - {formatDate(flight.fechaVuelo)} - {flight.aerolinea}</p>
+        <div className="section-label">Checkout</div>
+        <h2 id="purchase-title">{isMultiFlightCheckout ? 'Ida y vuelta' : flight.numeroVuelo}</h2>
+        <p>
+          {isMultiFlightCheckout
+            ? `${checkoutFlights[0].origen} a ${checkoutFlights[0].destino} y regreso`
+            : `${flight.origen} a ${flight.destino} - ${formatDate(flight.fechaVuelo)} - ${flight.aerolinea}`}
+        </p>
 
         <form onSubmit={submit}>
           <div className="checkout-steps">
@@ -1104,13 +1167,17 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
           </div>
 
           <div className="checkout-card">
-            <h3>Vuelo seleccionado</h3>
+            <h3>{isMultiFlightCheckout ? 'Vuelos seleccionados' : 'Vuelo seleccionado'}</h3>
             <div className="checkout-flight-summary">
-              <div><span>Salida</span><strong>{formatTime(flight.fechaVuelo)}</strong></div>
-              <div><span>Llegada</span><strong>{formatTime(addMinutesToDate(flight.fechaVuelo, estimateDurationMinutes(flight)))}</strong></div>
-              <div><span>Tarifa</span><strong>{selectedTariff.name}</strong></div>
+              {checkoutFlights.map((item, index) => (
+                <div key={`${item.id}-${index}`}>
+                  <span>{isMultiFlightCheckout ? (index === 0 ? 'Ida' : 'Vuelta') : 'Salida'}</span>
+                  <strong>{item.numeroVuelo} - {formatTime(item.fechaVuelo)}</strong>
+                  <small>{item.origen} - {item.destino} · {tariffByClassName(item.selectedClass || className).name}</small>
+                </div>
+              ))}
               <div><span>Viajan</span><strong>{passengerCount} pasajero(s)</strong></div>
-              <div><span>Parada</span><strong>{hasTechnicalStop(flight) ? 'Con parada' : 'Directo'}</strong></div>
+              <div><span>Tipo</span><strong>{isMultiFlightCheckout ? 'Ida y vuelta' : 'Solo ida'}</strong></div>
             </div>
           </div>
 
@@ -1208,7 +1275,7 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
 
           {step === 'services' && (
             <div className="checkout-card">
-              {selectedTariff.code === 'turista' && (
+              {checkoutFlights.some((item) => tariffByClassName(item.selectedClass || className).code === 'turista') && (
                 <div className="ancillary-warning">Tu tarifa Turista no incluye equipaje de bodega. Puedes agregar extras ahora o continuar sin cambios.</div>
               )}
               <h3>Servicios adicionales</h3>
@@ -1261,52 +1328,52 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
                     <h3>Datos de tarjeta</h3>
                     <div className="form-grid">
                       <label>
-                        Nombre en tarjeta
-                        <input
-                          className={touched.nombreTarjeta && fieldErrors.nombreTarjeta ? 'field-invalid' : ''}
-                          value={form.nombreTarjeta}
-                          onBlur={() => markTouched('nombreTarjeta')}
-                          onChange={(event) => setForm((current) => ({ ...current, nombreTarjeta: event.target.value }))}
-                          placeholder="Nombre completo"
-                        />
-                        {touched.nombreTarjeta && fieldErrors.nombreTarjeta && <small className="field-error">{fieldErrors.nombreTarjeta}</small>}
-                      </label>
-                      <label>
                         Numero de tarjeta
                         <input
                           className={touched.numeroTarjeta && fieldErrors.numeroTarjeta ? 'field-invalid' : ''}
                           value={form.numeroTarjeta}
                           onBlur={() => markTouched('numeroTarjeta')}
-                          onChange={(event) => setForm((current) => ({ ...current, numeroTarjeta: event.target.value }))}
+                          onChange={(event) => setForm((current) => ({ ...current, numeroTarjeta: formatCardNumber(event.target.value) }))}
                           placeholder="4111 1111 1111 1111"
+                          autoComplete="cc-number"
                           inputMode="numeric"
                         />
                         {touched.numeroTarjeta && fieldErrors.numeroTarjeta && <small className="field-error">{fieldErrors.numeroTarjeta}</small>}
                       </label>
-                      <label>
-                        Vencimiento
-                        <input
-                          className={touched.vencimientoTarjeta && fieldErrors.vencimientoTarjeta ? 'field-invalid' : ''}
-                          value={form.vencimientoTarjeta}
-                          onBlur={() => markTouched('vencimientoTarjeta')}
-                          onChange={(event) => setForm((current) => ({ ...current, vencimientoTarjeta: event.target.value }))}
-                          placeholder="MM/AA"
-                        />
-                        {touched.vencimientoTarjeta && fieldErrors.vencimientoTarjeta && <small className="field-error">{fieldErrors.vencimientoTarjeta}</small>}
-                      </label>
-                      <label>
-                        CVV
-                        <input
-                          className={touched.cvvTarjeta && fieldErrors.cvvTarjeta ? 'field-invalid' : ''}
-                          value={form.cvvTarjeta}
-                          onBlur={() => markTouched('cvvTarjeta')}
-                          onChange={(event) => setForm((current) => ({ ...current, cvvTarjeta: event.target.value }))}
-                          placeholder="123"
-                          inputMode="numeric"
-                          maxLength="4"
-                        />
-                        {touched.cvvTarjeta && fieldErrors.cvvTarjeta && <small className="field-error">{fieldErrors.cvvTarjeta}</small>}
-                      </label>
+                      <div className="expiration-grid">
+                        <label>
+                          Mes
+                          <select
+                            className={touched.mesTarjeta && fieldErrors.mesTarjeta ? 'field-invalid' : ''}
+                            value={form.mesTarjeta}
+                            onBlur={() => markTouched('mesTarjeta')}
+                            onChange={(event) => setForm((current) => ({ ...current, mesTarjeta: event.target.value }))}
+                            autoComplete="cc-exp-month"
+                          >
+                            <option value="">Mes</option>
+                            {CARD_MONTHS.map((month) => (
+                              <option value={month.value} key={month.value}>{month.label}</option>
+                            ))}
+                          </select>
+                          {touched.mesTarjeta && fieldErrors.mesTarjeta && <small className="field-error">{fieldErrors.mesTarjeta}</small>}
+                        </label>
+                        <label>
+                          Ano
+                          <select
+                            className={touched.anioTarjeta && fieldErrors.anioTarjeta ? 'field-invalid' : ''}
+                            value={form.anioTarjeta}
+                            onBlur={() => markTouched('anioTarjeta')}
+                            onChange={(event) => setForm((current) => ({ ...current, anioTarjeta: event.target.value }))}
+                            autoComplete="cc-exp-year"
+                          >
+                            <option value="">Ano</option>
+                            {CARD_YEARS.map((year) => (
+                              <option value={year} key={year}>{year}</option>
+                            ))}
+                          </select>
+                          {touched.anioTarjeta && fieldErrors.anioTarjeta && <small className="field-error">{fieldErrors.anioTarjeta}</small>}
+                        </label>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1323,10 +1390,14 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
 
               <aside className="purchase-summary sticky-summary">
                 <h3>Resumen de compra</h3>
-                <div><span>{flight.origen} - {flight.destino}</span><strong>{formatShortDate(flight.criteria?.departureDate) || formatDate(flight.fechaVuelo)}</strong></div>
-                {flight.criteria?.tripType === 'roundtrip' && <div><span>Regreso</span><strong>{formatShortDate(flight.criteria?.returnDate)}</strong></div>}
+                {checkoutFlights.map((item, index) => (
+                  <div key={`summary-${item.id}-${index}`}>
+                    <span>{isMultiFlightCheckout ? (index === 0 ? 'Ida' : 'Vuelta') : `${item.origen} - ${item.destino}`}</span>
+                    <strong>{item.numeroVuelo}</strong>
+                  </div>
+                ))}
                 <div><span>Moneda</span><strong>{currency}</strong></div>
-                <div><span>Tarifa {selectedTariff.name} x {passengerCount}</span><strong>{formatMoney(fare, currency)}</strong></div>
+                <div><span>{isMultiFlightCheckout ? 'Tarifas seleccionadas' : `Tarifa ${selectedTariff.name} x ${passengerCount}`}</span><strong>{formatMoney(fare, currency)}</strong></div>
                 <div><span>Servicios adicionales</span><strong>{formatMoney(servicesTotal, currency)}</strong></div>
                 <div><span>Impuestos</span><strong>{formatMoney(taxes, currency)}</strong></div>
                 <div className="total-row"><span>Total</span><strong>{formatMoney(total, currency)}</strong></div>
@@ -1336,6 +1407,57 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
         </form>
       </div>
     </section>
+  );
+}
+
+function PurchaseSuccessView({ summary, onGoHome, onExplore }) {
+  if (!summary) return null;
+
+  return (
+    <main className="purchase-success-page">
+      <section className="purchase-success-card">
+        <div className="success-mark">✓</div>
+        <div className="section-label">Pago exitoso</div>
+        <h1>Tu reserva esta confirmada</h1>
+        <p>Guarda el numero de reserva para check-in, rastreo y cualquier consulta del viaje.</p>
+
+        <div className="reservation-code-box">
+          <span>Numero de reserva</span>
+          <strong>{summary.reservationCodes.join(' / ') || '-'}</strong>
+        </div>
+
+        <div className="purchase-success-grid">
+          <div>
+            <span>Total pagado</span>
+            <strong>{formatMoney(summary.total, summary.currency)}</strong>
+          </div>
+          <div>
+            <span>Pasajeros</span>
+            <strong>{summary.passengerCount} pasajero(s)</strong>
+          </div>
+          <div>
+            <span>Estado</span>
+            <strong>Confirmada</strong>
+          </div>
+        </div>
+
+        <div className="success-flight-list">
+          {summary.flights.map((item, index) => (
+            <article key={`${item.numeroVuelo}-${index}`}>
+              <span>{item.label}</span>
+              <strong>{item.numeroVuelo}</strong>
+              <small>{item.route}</small>
+              <small>{item.className} · quedan {item.plazasDisponibles} plazas</small>
+            </article>
+          ))}
+        </div>
+
+        <div className="checkout-actions">
+          <button className="btn btn-outline" type="button" onClick={onGoHome}>Ir al inicio</button>
+          <button className="btn btn-primary" type="button" onClick={onExplore}>Buscar otro vuelo</button>
+        </div>
+      </section>
+    </main>
   );
 }
 
@@ -1928,10 +2050,11 @@ function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, on
 }
 
 function CartView({ items, user, onBack, onRequireLogin, onCheckoutItem, onRemoveItem }) {
-  const cartTotal = items.reduce((sum, item) => (
+  const visibleItems = items.filter(Boolean);
+  const cartTotal = visibleItems.reduce((sum, item) => (
     sum + calculateFlightFare(item.selectedClass || 'economica', passengerCountFromCriteria(item.criteria))
   ), 0);
-  const currency = items[0]?.criteria?.currency || 'GTQ';
+  const currency = visibleItems[0]?.criteria?.currency || 'GTQ';
 
   return (
     <main className="cart-page">
@@ -1939,30 +2062,32 @@ function CartView({ items, user, onBack, onRequireLogin, onCheckoutItem, onRemov
         <button className="back-button" type="button" onClick={onBack}>Volver</button>
         <div className="section-label">Carrito de compras</div>
         <h1>Vuelos seleccionados</h1>
-        {items.length === 0 && <div className="board-empty">Tu carrito esta vacio.</div>}
+        {visibleItems.length === 0 && <div className="board-empty">Tu carrito esta vacio.</div>}
 
         <div className="cart-list">
-          {items.map((item) => {
+          {visibleItems.map((item, index) => {
             const passengerCount = passengerCountFromCriteria(item.criteria);
             const selectedTariff = tariffByClassName(item.selectedClass || 'economica');
             const fare = calculateFlightFare(item.selectedClass || 'economica', passengerCount);
             const arrival = addMinutesToDate(item.fechaVuelo, estimateDurationMinutes(item));
+            const tripLabel = item.criteria?.tripType === 'roundtrip' ? 'Ida y vuelta' : 'Solo ida';
+            const routeLabel = item.origen && item.destino ? `${item.origen} - ${item.destino}` : 'Ruta pendiente';
+            const timeLabel = item.fechaVuelo ? `${formatTime(item.fechaVuelo)} - ${formatTime(arrival)}` : 'Horario pendiente';
 
             return (
-              <article className="cart-flight-card" key={item.cartId}>
+              <article className="cart-flight-card" key={item.cartId || `${item.id || item.vueloId || 'cart'}-${index}`}>
                 <div className="cart-flight-icon">✈</div>
                 <div className="cart-flight-main">
                   <div className="cart-flight-title">
-                    <strong>{item.numeroVuelo} - {item.aerolinea}</strong>
+                    <strong>{item.numeroVuelo || 'Vuelo seleccionado'} - {item.aerolinea || 'Aerolinea pendiente'}</strong>
                     <span>{formatMoney(fare, item.criteria?.currency || 'GTQ')}</span>
                   </div>
                   <div className="cart-flight-route">
-                    <span>{item.origen}</span>
-                    <b>{formatTime(item.fechaVuelo)} - {formatTime(arrival)}</b>
-                    <span>{item.destino}</span>
+                    <span>{routeLabel}</span>
+                    <b>{timeLabel}</b>
                   </div>
                   <div className="cart-flight-meta">
-                    <span><i>◷</i>{item.criteria?.tripType === 'roundtrip' ? 'Ida y vuelta' : 'Solo ida'}</span>
+                    <span><i>◷</i>{tripLabel}</span>
                     <span><i>☉</i>{passengerCount} pasajero(s)</span>
                     <span><i>▣</i>{selectedTariff.name}</span>
                     <span><i>$</i>{item.criteria?.currency || 'GTQ'}</span>
@@ -1977,7 +2102,7 @@ function CartView({ items, user, onBack, onRequireLogin, onCheckoutItem, onRemov
           })}
         </div>
 
-        {items.length > 0 && (
+        {visibleItems.length > 0 && (
           <aside className="cart-total-box">
             <span>Subtotal del carrito</span>
             <strong>{formatMoney(cartTotal, currency)}</strong>
@@ -2357,6 +2482,7 @@ function App() {
   const [pendingSection, setPendingSection] = useState('');
   const [purchaseError, setPurchaseError] = useState('');
   const [purchaseMessage, setPurchaseMessage] = useState('');
+  const [purchaseSuccess, setPurchaseSuccess] = useState(null);
   const [dashboard, setDashboard] = useState({
     health: null,
     flights: [],
@@ -2521,6 +2647,7 @@ function App() {
     setAdminView('');
     setSelectedFlight(null);
     setPurchaseMessage('');
+    setPurchaseSuccess(null);
   };
 
   const buildCartItem = (flight, selectedClass = 'economica', criteria = travelCriteria) => ({
@@ -2539,6 +2666,55 @@ function App() {
     }
   });
 
+  const buildCheckoutSelection = (items) => {
+    const flights = items.map((item) => buildCartItem(item.flight, item.selectedClass || 'economica', item.criteria || travelCriteria));
+
+    if (flights.length === 1) {
+      return flights[0];
+    }
+
+    const plazasDisponibles = Math.min(...flights.map((item) => Number(item.plazasDisponibles || 0)).filter((value) => value > 0));
+    const firstFlight = flights[0];
+    const lastFlight = flights[flights.length - 1];
+
+    return {
+      ...firstFlight,
+      id: `bundle-${Date.now()}`,
+      checkoutId: `checkout-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      cartId: `checkout-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      numeroVuelo: flights.map((item) => item.numeroVuelo).join(' / '),
+      aerolinea: flights.map((item) => item.aerolinea).filter(Boolean).join(' / '),
+      origen: firstFlight.origen,
+      destino: lastFlight.destino,
+      fechaVuelo: firstFlight.fechaVuelo,
+      plazasDisponibles: Number.isFinite(plazasDisponibles) ? plazasDisponibles : firstFlight.plazasDisponibles,
+      flights,
+      criteria: {
+        ...firstFlight.criteria,
+        tripType: flights.length > 1 ? 'roundtrip' : firstFlight.criteria?.tripType || 'oneway'
+      }
+    };
+  };
+
+  const saveCartItems = (items) => {
+    setCartItems(items);
+    window.localStorage.setItem(CART_KEY, JSON.stringify(items));
+  };
+
+  const addCheckoutToCart = (checkoutSelection) => {
+    const checkoutCartIds = new Set([
+      checkoutSelection.cartId,
+      ...(Array.isArray(checkoutSelection.flights) ? checkoutSelection.flights.map((item) => item.cartId) : [])
+    ].filter(Boolean));
+
+    const nextItems = [
+      ...cartItems.filter((item) => !checkoutCartIds.has(item.cartId)),
+      checkoutSelection
+    ];
+    saveCartItems(nextItems);
+    return checkoutSelection;
+  };
+
   const handleBuyFlight = async (flight, selectedClass = 'economica', criteria = travelCriteria) => {
     if (Array.isArray(flight)) {
       const selections = flight;
@@ -2549,49 +2725,13 @@ function App() {
         return;
       }
 
-      const nextLocalItems = selections.map((selection) => buildCartItem(selection.flight, selection.selectedClass || 'economica', criteria));
-
-      if (user?.pasajeroId) {
-        setBuyingFlightId('bundle');
-        setPurchaseError('');
-
-        try {
-          const serverItems = [];
-          for (const item of nextLocalItems) {
-            const serverItem = await api.addCartItem(user.pasajeroId, cartItemPayload(item));
-            serverItems.push({
-              ...serverCartItemToFlight(serverItem),
-              criteria: item.criteria
-            });
-          }
-
-          const nextCartItems = [...cartItems, ...serverItems];
-          setCartItems(nextCartItems);
-          window.localStorage.setItem(CART_KEY, JSON.stringify(nextCartItems));
-          setSelectedFlight(null);
-          setTravelCriteria(null);
-          setActiveView('carrito');
-          setCartOpen(true);
-          setPurchaseMessage('Agregamos la ida y la vuelta al carrito.');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        } catch (cartError) {
-          setPurchaseMessage(`No se pudo sincronizar el carrito: ${cartError.message}`);
-        } finally {
-          setBuyingFlightId(null);
-        }
-
-        return;
-      }
-
-      const nextCartItems = [...cartItems, ...nextLocalItems];
-      setCartItems(nextCartItems);
-      window.localStorage.setItem(CART_KEY, JSON.stringify(nextCartItems));
-      setSelectedFlight(null);
-      setTravelCriteria(null);
-      setActiveView('carrito');
-      setCartOpen(true);
+      const checkoutSelection = addCheckoutToCart(buildCheckoutSelection(selections.map((selection) => ({ ...selection, criteria }))));
+      setSelectedFlight(checkoutSelection);
+      setCartOpen(false);
+      setActiveView('explorar');
       setPurchaseError('');
-      setPurchaseMessage('Agregamos la ida y la vuelta al carrito.');
+      setPurchaseMessage('');
+      setPurchaseSuccess(null);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
@@ -2601,39 +2741,13 @@ function App() {
       return;
     }
 
-    const nextCartItem = buildCartItem(flight, selectedClass, criteria);
-
-    if (user?.pasajeroId) {
-      setBuyingFlightId(flight.id);
-      setPurchaseError('');
-
-      try {
-        const serverItem = await api.addCartItem(user.pasajeroId, cartItemPayload(nextCartItem));
-        const normalizedItem = {
-          ...serverCartItemToFlight(serverItem),
-          criteria: nextCartItem.criteria
-        };
-        const nextCartItems = [...cartItems, normalizedItem];
-        setCartItems(nextCartItems);
-        window.localStorage.setItem(CART_KEY, JSON.stringify(nextCartItems));
-        setSelectedFlight(normalizedItem);
-        setPurchaseMessage('');
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      } catch (cartError) {
-        setPurchaseMessage(`No se pudo sincronizar el carrito: ${cartError.message}`);
-      } finally {
-        setBuyingFlightId(null);
-      }
-
-      return;
-    }
-
-    const nextCartItems = [...cartItems, nextCartItem];
-    setCartItems(nextCartItems);
-    window.localStorage.setItem(CART_KEY, JSON.stringify(nextCartItems));
-    setSelectedFlight(nextCartItem);
+    const checkoutSelection = addCheckoutToCart(buildCheckoutSelection([{ flight, selectedClass, criteria }]));
+    setSelectedFlight(checkoutSelection);
+    setCartOpen(false);
+    setActiveView('explorar');
     setPurchaseError('');
     setPurchaseMessage('');
+    setPurchaseSuccess(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -2684,6 +2798,7 @@ function App() {
     setTravelCriteria(criteria);
     setSelectedFlight(null);
     setCartOpen(false);
+    setPurchaseSuccess(null);
     setActiveView('explorar');
     registerFlightSearch(criteria);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2692,29 +2807,64 @@ function App() {
   const handleConfirmPurchase = async (purchaseOptions) => {
     if (!selectedFlight) return;
 
-    setBuyingFlightId(selectedFlight.id);
+    const checkoutFlights = Array.isArray(selectedFlight.flights) && selectedFlight.flights.length > 0 ? selectedFlight.flights : [selectedFlight];
+    const passengerCount = passengerCountFromCriteria(selectedFlight.criteria);
+    const purchaseLegs = purchaseOptions.legs?.length ? purchaseOptions.legs : checkoutFlights.map((item) => ({
+      vueloId: item.id,
+      clase: item.selectedClass || purchaseOptions.clase,
+      tarifaPagada: calculateFlightFare(item.selectedClass || purchaseOptions.clase, passengerCount)
+    }));
+    const extraPerLeg = purchaseLegs.length > 0
+      ? Math.round(Math.max(0, Number(purchaseOptions.tarifaPagada || 0) - purchaseLegs.reduce((sum, leg) => sum + Number(leg.tarifaPagada || 0), 0)) / purchaseLegs.length * 100) / 100
+      : 0;
+
+    setBuyingFlightId(checkoutFlights.length > 1 ? 'bundle' : selectedFlight.id);
     setPurchaseError('');
 
     try {
-      const purchase = await api.buyFlight({
-        usuarioId: user.usuarioId,
-        pasajeroId: user.pasajeroId,
-        vueloId: selectedFlight.id,
-        clase: purchaseOptions.clase,
-        equipajeFacturado: purchaseOptions.equipajeFacturado,
-        pesoEquipaje: purchaseOptions.pesoEquipaje,
-        tarifaPagada: purchaseOptions.tarifaPagada,
-        metodoPagoId: purchaseOptions.metodoPagoId
-      });
+      const purchases = [];
+      for (const leg of purchaseLegs) {
+        purchases.push(await api.buyFlight({
+          usuarioId: user.usuarioId,
+          pasajeroId: user.pasajeroId,
+          vueloId: leg.vueloId,
+          clase: leg.clase,
+          numeroPasajeros: passengerCount,
+          equipajeFacturado: purchaseOptions.equipajeFacturado,
+          pesoEquipaje: purchaseOptions.pesoEquipaje,
+          tarifaPagada: Number(leg.tarifaPagada || 0) + extraPerLeg,
+          metodoPagoId: purchaseOptions.metodoPagoId
+        }));
+      }
 
-      setPurchaseMessage(`Compra confirmada para ${selectedFlight.numeroVuelo}. Reserva ${purchase.codigoReserva}. Total ${formatCurrency(purchase.total)}.`);
+      const reservationCodes = purchases.map((purchase) => purchase.codigoReserva).filter(Boolean);
+      const boughtFlights = checkoutFlights.map((item) => item.numeroVuelo).join(' / ');
+      const totalPaid = purchases.reduce((sum, purchase) => sum + Number(purchase.total || 0), 0);
+      const successCurrency = selectedFlight.criteria?.currency || currency;
+      setPurchaseSuccess({
+        reservationCodes,
+        total: totalPaid,
+        currency: successCurrency,
+        passengerCount,
+        flights: checkoutFlights.map((item, index) => ({
+          label: checkoutFlights.length > 1 ? (index === 0 ? 'Vuelo de ida' : 'Vuelo de vuelta') : 'Vuelo',
+          numeroVuelo: item.numeroVuelo,
+          route: `${item.origen} - ${item.destino}`,
+          className: tariffByClassName(item.selectedClass || purchaseOptions.clase).name,
+          plazasDisponibles: purchases[index]?.plazasDisponibles ?? Math.max(0, Number(item.plazasDisponibles || 0) - passengerCount)
+        }))
+      });
+      setPurchaseMessage(`Compra confirmada para ${boughtFlights}. Reserva${purchases.length > 1 ? 's' : ''} ${reservationCodes.join(', ')}.`);
       setSelectedFlight(null);
+      setTravelCriteria(null);
+      setCartOpen(false);
+      setActiveView('success');
       if (selectedFlight.itemCarritoId && user?.pasajeroId) {
         await api.deleteCartItem(user.pasajeroId, selectedFlight.itemCarritoId);
       }
-      const nextCartItems = cartItems.filter((item) => item.cartId !== selectedFlight.cartId);
-      setCartItems(nextCartItems);
-      window.localStorage.setItem(CART_KEY, JSON.stringify(nextCartItems));
+      const checkoutCartIds = new Set(checkoutFlights.map((item) => item.cartId));
+      const nextCartItems = cartItems.filter((item) => item.cartId !== selectedFlight.cartId && !checkoutCartIds.has(item.cartId));
+      saveCartItems(nextCartItems);
       await loadDashboard();
     } catch (purchaseError) {
       setPurchaseError(purchaseError.message);
@@ -2740,6 +2890,7 @@ function App() {
     setSelectedFlight(null);
     setTravelCriteria(null);
     setCartOpen(false);
+    setPurchaseSuccess(null);
     setActiveView(section);
     setPendingSection(section === 'inicio' ? 'inicio' : '');
   };
@@ -2750,6 +2901,7 @@ function App() {
     setSelectedFlight(null);
     setTravelCriteria(null);
     setCartOpen(false);
+    setPurchaseSuccess(null);
     setActiveView(view);
     setPendingSection(section || (view === 'inicio' ? 'inicio' : ''));
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2764,6 +2916,7 @@ function App() {
 
     setSelectedFlight(item);
     setCartOpen(false);
+    setPurchaseSuccess(null);
     setPurchaseError('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -2772,6 +2925,7 @@ function App() {
     setAdminView('');
     setSelectedFlight(null);
     setTravelCriteria(null);
+    setPurchaseSuccess(null);
     setActiveView('carrito');
     setCartOpen(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2790,8 +2944,7 @@ function App() {
     }
 
     const nextCartItems = cartItems.filter((item) => item.cartId !== cartId);
-    setCartItems(nextCartItems);
-    window.localStorage.setItem(CART_KEY, JSON.stringify(nextCartItems));
+    saveCartItems(nextCartItems);
   };
 
   const handleDestinationClick = async (destination) => {
@@ -2835,6 +2988,7 @@ function App() {
       returnDate: '',
       currency
     });
+    setPurchaseSuccess(null);
     setActiveView('explorar');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -2866,6 +3020,22 @@ function App() {
           onRequireLogin={() => setLoginOpen(true)}
           onCheckoutItem={continueCartItem}
           onRemoveItem={removeCartItem}
+        />
+      ) : activeView === 'success' && purchaseSuccess ? (
+        <PurchaseSuccessView
+          summary={purchaseSuccess}
+          onGoHome={() => {
+            setPurchaseSuccess(null);
+            setPurchaseMessage('');
+            setActiveView('inicio');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onExplore={() => {
+            setPurchaseSuccess(null);
+            setPurchaseMessage('');
+            setActiveView('explorar');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
         />
       ) : selectedFlight ? (
         <main>

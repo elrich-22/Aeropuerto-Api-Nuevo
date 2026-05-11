@@ -29,5 +29,17 @@ public sealed class OracleExceptionMiddleware(RequestDelegate next, ILogger<Orac
             context.Response.StatusCode = StatusCodes.Status409Conflict;
             await context.Response.WriteAsJsonAsync(new ErrorApiDto("No se puede eliminar porque existen registros relacionados."));
         }
+        catch (OracleException exception) when (exception.Number == 12899)
+        {
+            logger.LogWarning(exception, "Valor demasiado largo para una columna Oracle.");
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            await context.Response.WriteAsJsonAsync(new ErrorApiDto("Un valor excede el tamano permitido por la base de datos."));
+        }
+        catch (OracleException exception) when (exception.Number == 904)
+        {
+            logger.LogError(exception, "Columna o identificador invalido en Oracle.");
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+            await context.Response.WriteAsJsonAsync(new ErrorApiDto("Hay una columna mal configurada en el API para esta operacion."));
+        }
     }
 }

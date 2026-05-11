@@ -31,6 +31,7 @@ public sealed record CompraVueloRequestDto(
     int PasajeroId,
     int VueloId,
     string Clase,
+    int NumeroPasajeros,
     int EquipajeFacturado,
     decimal? PesoEquipaje,
     decimal TarifaPagada,
@@ -42,4 +43,7 @@ public sealed record CompraVueloResponseDto(
     int DetalleVentaId,
     string CodigoReserva,
     string NumeroVenta,
-    decimal Total);
+    decimal Total,
+    int NumeroPasajeros,
+    int PlazasOcupadas,
+    int PlazasDisponibles);
