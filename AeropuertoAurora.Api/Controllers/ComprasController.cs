@@ -149,7 +149,7 @@ public sealed class ComprasController(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "No se pudo enviar el correo de confirmacion para la reserva {ReservationCode}.", reservationCode);
+                logger.LogWarning("No se pudo enviar el correo de confirmacion para la reserva {ReservationCode}. La compra ya fue registrada. Detalle: {Error}", reservationCode, ex.Message);
             }
         }
         else if (dto.EnviarCorreoConfirmacion == false)
@@ -200,7 +200,7 @@ public sealed class ComprasController(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "No se pudo enviar el correo de resumen de compra a {Email}.", dto.EmailConfirmacion);
+            logger.LogWarning("No se pudo enviar el correo de resumen de compra a {Email}. La compra ya fue registrada. Detalle: {Error}", dto.EmailConfirmacion, ex.Message);
         }
 
         return Ok(new
