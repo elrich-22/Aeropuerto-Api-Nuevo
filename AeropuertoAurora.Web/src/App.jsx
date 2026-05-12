@@ -542,7 +542,7 @@ const validateRegisterForm = (form) => {
   return errors;
 };
 
-function NavBar({ user, adminView, isAdmin, activeView, cartCount, onAdminView, onNavigate, onCartClick, onLoginClick, onLogout }) {
+function NavBar({ user, adminView, isAdmin, activeView, onAdminView, onNavigate, onLoginClick, onLogout }) {
   const shortUserName = isAdmin ? 'Administrador' : (user?.nombreCompleto?.split(' ')[0] || user?.usuario || 'Usuario');
   const avatarLetter = (user?.nombreCompleto || user?.usuario || 'A').trim().charAt(0).toUpperCase();
 
@@ -555,13 +555,6 @@ function NavBar({ user, adminView, isAdmin, activeView, cartCount, onAdminView, 
         <a className={activeView === 'explorar' ? 'active' : ''} href="#explorar" onClick={(event) => onNavigate(event, 'explorar')}>Explorar</a>
         <a className={activeView === 'rastreo' ? 'active' : ''} href="#rastreo" onClick={(event) => onNavigate(event, 'rastreo')}>Rastreo</a>
         <a className={activeView === 'ubicacion' ? 'active' : ''} href="#ubicacion" onClick={(event) => onNavigate(event, 'ubicacion')}>Ubicacion</a>
-        <button
-          className={activeView === 'carrito' ? 'nav-admin-link cart-nav-link active' : 'nav-admin-link cart-nav-link'}
-          type="button"
-          onClick={onCartClick}
-        >
-          Carrito ({cartCount})
-        </button>
         {isAdmin && (
           <>
             <button
@@ -2743,7 +2736,7 @@ function App() {
         return;
       }
 
-      const checkoutSelection = addCheckoutToCart(buildCheckoutSelection(selections.map((selection) => ({ ...selection, criteria }))));
+      const checkoutSelection = buildCheckoutSelection(selections.map((selection) => ({ ...selection, criteria })));
       setSelectedFlight(checkoutSelection);
       setCartOpen(false);
       setActiveView('explorar');
@@ -2759,7 +2752,7 @@ function App() {
       return;
     }
 
-    const checkoutSelection = addCheckoutToCart(buildCheckoutSelection([{ flight, selectedClass, criteria }]));
+    const checkoutSelection = buildCheckoutSelection([{ flight, selectedClass, criteria }]);
     setSelectedFlight(checkoutSelection);
     setCartOpen(false);
     setActiveView('explorar');
@@ -3046,10 +3039,8 @@ function App() {
         adminView={adminView}
         isAdmin={isAdmin}
         activeView={activeView}
-        cartCount={cartItems.length}
         onAdminView={setAdminView}
         onNavigate={handleNavigate}
-        onCartClick={openCart}
         onLoginClick={() => setLoginOpen(true)}
         onLogout={handleLogout}
       />
@@ -3058,15 +3049,6 @@ function App() {
         <AdminSection tables={tables} selectedTable={selectedTable} onSelectTable={setSelectedTable} />
       ) : adminView === 'reporteria' && isAdmin ? (
         <ReporteriaSection />
-      ) : cartOpen ? (
-        <CartView
-          items={cartItems}
-          user={user}
-          onBack={() => setCartOpen(false)}
-          onRequireLogin={() => setLoginOpen(true)}
-          onCheckoutItem={continueCartItem}
-          onRemoveItem={removeCartItem}
-        />
       ) : activeView === 'success' && purchaseSuccess ? (
         <PurchaseSuccessView
           summary={purchaseSuccess}
