@@ -55,7 +55,10 @@ public sealed class AuthController(IOracleCrudRepository repository, IAeropuerto
             passengerId,
             user.ToStringValue("USL_USUARIO"),
             user.ToStringValue("USL_EMAIL"),
-            fullName));
+            fullName,
+            passenger?.NumeroDocumento,
+            passenger?.TipoDocumento,
+            passenger?.Telefono));
     }
 
     [HttpPost("register")]
@@ -133,7 +136,10 @@ public sealed class AuthController(IOracleCrudRepository repository, IAeropuerto
             passengerId,
             dto.Usuario,
             dto.Email,
-            fullName));
+            fullName,
+            dto.NumeroDocumento,
+            dto.TipoDocumento,
+            dto.Telefono));
     }
 
     private static bool PasswordMatches(string password, string storedHash, string salt)

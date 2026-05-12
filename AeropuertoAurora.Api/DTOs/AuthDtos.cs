@@ -24,7 +24,10 @@ public sealed record UsuarioSesionDto(
     int PasajeroId,
     string Usuario,
     string Email,
-    string NombreCompleto);
+    string NombreCompleto,
+    string? NumeroDocumento,
+    string? TipoDocumento,
+    string? Telefono);
 
 public sealed record CompraVueloRequestDto(
     int UsuarioId,

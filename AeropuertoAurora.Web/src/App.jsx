@@ -5,12 +5,12 @@ const services = [
   {
     code: 'DF',
     title: 'Tiendas y Duty Free',
-    text: 'Compras, recuerdos, tecnologia y productos de viaje antes de abordar.'
+    text: 'Compras, recuerdos, tecnología y productos de viaje antes de abordar.'
   },
   {
     code: 'RS',
     title: 'Restaurantes',
-    text: 'Opciones rapidas y espacios comodos para esperar el vuelo.'
+    text: 'Opciones rápidas y espacios cómodos para esperar el vuelo.'
   },
   {
     code: 'TR',
@@ -20,17 +20,17 @@ const services = [
   {
     code: 'VIP',
     title: 'Sala VIP',
-    text: 'Areas privadas para descanso, trabajo y espera prioritaria.'
+    text: 'Áreas privadas para descanso, trabajo y espera prioritaria.'
   },
   {
     code: 'WF',
     title: 'WiFi Gratuito',
-    text: 'Conexion disponible para pasajeros dentro de la terminal.'
+    text: 'Conexión disponible para pasajeros dentro de la terminal.'
   },
   {
     code: 'MD',
-    title: 'Servicio Medico',
-    text: 'Atencion de primeros auxilios y apoyo ante emergencias.'
+    title: 'Servicio Médico',
+    text: 'Atención de primeros auxilios y apoyo ante emergencias.'
   }
 ];
 
@@ -82,6 +82,23 @@ const formatMoney = (value, currency = 'GTQ') =>
     currency: CURRENCY_RATES[currency] ? currency : 'GTQ'
   }).format(Number(value || 0) * (CURRENCY_RATES[currency] || 1));
 
+const formatDateOnly = (value) => {
+  if (!value) return 'Pendiente';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Pendiente';
+
+  return new Intl.DateTimeFormat('es-GT', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  }).format(date);
+};
+
+const todayInputValue = () => new Date().toISOString().slice(0, 10);
+
+const boardingCode = (reservationId, passengerId) =>
+  `GUA-${String(reservationId || 0).padStart(5, '0')}-${String(passengerId || 0).padStart(4, '0')}`;
+
 const normalize = (value = '') => value.toString().trim().toLowerCase();
 
 const statusClassName = (status = '') => {
@@ -125,10 +142,10 @@ const TARIFF_FAMILIES = [
     code: 'turista',
     className: 'economica',
     name: 'Turista',
-    tagline: 'Para viajar basico',
+    tagline: 'Para viajar básico',
     multiplier: 1,
     benefits: [
-      ['check', 'Articulo personal'],
+      ['check', 'Artículo personal'],
       ['x', 'Equipaje de bodega'],
       ['x', 'Cambios sin penalidad']
     ]
@@ -137,10 +154,10 @@ const TARIFF_FAMILIES = [
     code: 'ejecutiva',
     className: 'ejecutiva',
     name: 'Ejecutiva',
-    tagline: 'Mas comodidad',
+    tagline: 'Más comodidad',
     multiplier: 1.32,
     benefits: [
-      ['check', 'Articulo personal'],
+      ['check', 'Artículo personal'],
       ['check', 'Equipaje de bodega'],
       ['x', 'Reembolso completo']
     ]
@@ -152,17 +169,17 @@ const TARIFF_FAMILIES = [
     tagline: 'Mayor tranquilidad',
     multiplier: 1.68,
     benefits: [
-      ['check', 'Articulo personal'],
+      ['check', 'Artículo personal'],
       ['check', 'Equipaje de bodega'],
       ['check', 'Cambios y reembolso']
     ]
   }
 ];
 const PASSENGER_GROUPS = [
-  { key: 'adults', label: 'Adultos', hint: 'Desde 15 anos', defaultValue: 1, age: 30 },
-  { key: 'youth', label: 'Jovenes', hint: 'De 12 a 14 anos', defaultValue: 0, age: 13 },
-  { key: 'children', label: 'Ninos', hint: 'De 2 a 11 anos', defaultValue: 0, age: 8 },
-  { key: 'babies', label: 'Bebes', hint: 'Menores de 2 anos', defaultValue: 0, age: 1 }
+  { key: 'adults', label: 'Adultos', hint: 'Pasajero adulto', defaultValue: 1 },
+  { key: 'youth', label: 'Jóvenes', hint: 'Pasajero joven', defaultValue: 0 },
+  { key: 'children', label: 'Niños', hint: 'Pasajero menor', defaultValue: 0 },
+  { key: 'babies', label: 'Bebés', hint: 'Bebé en brazos', defaultValue: 0 }
 ];
 const DEFAULT_PASSENGER_GROUPS = PASSENGER_GROUPS.reduce(
   (groups, group) => ({ ...groups, [group.key]: group.defaultValue }),
@@ -170,20 +187,20 @@ const DEFAULT_PASSENGER_GROUPS = PASSENGER_GROUPS.reduce(
 );
 const KNOWN_AIRPORTS = [
   { name: 'Aeropuerto Internacional La Aurora', country: 'Guatemala', city: 'Ciudad de Guatemala', aliases: ['guatemala', 'la aurora', 'gua'] },
-  { name: 'Aeropuerto Internacional El Dorado', country: 'Colombia', city: 'Bogota', aliases: ['colombia', 'bogota', 'el dorado'] },
+  { name: 'Aeropuerto Internacional El Dorado', country: 'Colombia', city: 'Bogotá', aliases: ['colombia', 'bogota', 'el dorado'] },
   { name: 'Miami International Airport', country: 'Estados Unidos', city: 'Miami', aliases: ['miami', 'mia'] },
   { name: 'John F. Kennedy International Airport', country: 'Estados Unidos', city: 'Nueva York', aliases: ['new york', 'jfk'] },
   { name: 'Los Angeles International Airport', country: 'Estados Unidos', city: 'Los Angeles', aliases: ['los angeles', 'lax'] },
-  { name: 'Aeropuerto Internacional Benito Juarez', country: 'Mexico', city: 'Ciudad de Mexico', aliases: ['mexico', 'ciudad de mexico'] },
-  { name: 'Aeropuerto Internacional de Cancun', country: 'Mexico', city: 'Cancun', aliases: ['cancun'] },
-  { name: 'Aeropuerto Internacional de Tocumen', country: 'Panama', city: 'Panama', aliases: ['panama', 'tocumen'] },
+  { name: 'Aeropuerto Internacional Benito Juárez', country: 'México', city: 'Ciudad de México', aliases: ['mexico', 'ciudad de mexico'] },
+  { name: 'Aeropuerto Internacional de Cancún', country: 'México', city: 'Cancún', aliases: ['cancun'] },
+  { name: 'Aeropuerto Internacional de Tocumen', country: 'Panamá', city: 'Panamá', aliases: ['panama', 'tocumen'] },
   { name: 'Aeropuerto Internacional Juan Santamaria', country: 'Costa Rica', city: 'San Jose', aliases: ['costa rica', 'san jose'] },
   { name: 'Aeropuerto Internacional de El Salvador San Oscar Arnulfo Romero', country: 'El Salvador', city: 'San Salvador', aliases: ['el salvador', 'san salvador'] },
-  { name: 'Aeropuerto Adolfo Suarez Madrid-Barajas', country: 'Espana', city: 'Madrid', aliases: ['madrid', 'espana'] }
+  { name: 'Aeropuerto Adolfo Suárez Madrid-Barajas', country: 'España', city: 'Madrid', aliases: ['madrid', 'españa', 'espana'] }
 ];
 const PAYMENT_METHODS = [
-  { id: 1, name: 'Tarjeta de credito', requiresCard: true },
-  { id: 2, name: 'Tarjeta de debito', requiresCard: true },
+  { id: 1, name: 'Tarjeta de crédito', requiresCard: true },
+  { id: 2, name: 'Tarjeta de débito', requiresCard: true },
   { id: 3, name: 'Transferencia', requiresCard: false }
 ];
 const CARD_MONTHS = Array.from({ length: 12 }, (_, index) => {
@@ -191,6 +208,10 @@ const CARD_MONTHS = Array.from({ length: 12 }, (_, index) => {
   return { value, label: value };
 });
 const CARD_YEARS = Array.from({ length: 16 }, (_, index) => String(new Date().getFullYear() + index));
+const TRANSFER_ACCOUNT = {
+  holder: 'Aeropuerto La Aurora',
+  number: '001-445889-7'
+};
 const ANCILLARY_SERVICES = [
   { id: 'seat', title: 'Elige tu asiento', description: 'Selecciona ventana, pasillo o salida rapida.', price: 120, icon: 'AS' },
   { id: 'bag', title: 'Equipaje adicional', description: 'Agrega una maleta documentada al viaje.', price: 280, icon: 'EQ' },
@@ -199,7 +220,7 @@ const ANCILLARY_SERVICES = [
 ];
 
 const DOCUMENT_TYPES = ['DPI', 'Pasaporte', 'Licencia'];
-const NATIONALITIES = ['Guatemala', 'El Salvador', 'Honduras', 'Nicaragua', 'Costa Rica', 'Panama', 'Mexico', 'Estados Unidos', 'Otra'];
+const NATIONALITIES = ['Guatemala', 'El Salvador', 'Honduras', 'Nicaragua', 'Costa Rica', 'Panamá', 'México', 'Estados Unidos', 'Otra'];
 const SEX_OPTIONS = [
   { value: 'M', label: 'Masculino' },
   { value: 'F', label: 'Femenino' }
@@ -228,20 +249,6 @@ const passengerCountFromGroups = (groups = DEFAULT_PASSENGER_GROUPS) =>
 const passengerCountFromCriteria = (criteria) =>
   criteria?.passengerGroups ? passengerCountFromGroups(criteria.passengerGroups) : Math.max(1, Number(criteria?.passengers || 1));
 
-const passengerAgesFromCriteria = (criteria) => {
-  const count = passengerCountFromCriteria(criteria);
-  const ages = Array.isArray(criteria?.passengerAges) ? criteria.passengerAges : [];
-  if (ages.length > 0) return Array.from({ length: count }, (_, index) => ages[index] ?? '');
-
-  if (criteria?.passengerGroups) {
-    return PASSENGER_GROUPS.flatMap((group) =>
-      Array.from({ length: Number(criteria.passengerGroups[group.key] || 0) }, () => group.age)
-    );
-  }
-
-  return Array.from({ length: count }, (_, index) => ages[index] ?? '');
-};
-
 const tariffByClassName = (className = 'economica') =>
   TARIFF_FAMILIES.find((family) => family.className === className) || TARIFF_FAMILIES[0];
 
@@ -262,7 +269,6 @@ const serverCartItemToFlight = (item = {}) => {
     selectedClass,
     criteria: {
       passengers,
-      passengerAges: Array.from({ length: passengers }, () => 30),
       origin: item.origen || '',
       destination: item.destino || '',
       departureDate: '',
@@ -462,6 +468,10 @@ const lowestRouteFareForDate = ({ date, flights = [], origin = '', destination =
 };
 
 const sameDateValue = (date, value) => toDateInputValue(date) === value;
+const isAfterDateValue = (later, earlier) => {
+  if (!later || !earlier) return false;
+  return later > earlier;
+};
 
 const prettifyName = (value = '') =>
   value
@@ -506,7 +516,7 @@ const validateRegisterForm = (form) => {
   const requiredFields = [
     ['usuario', 'Ingresa un usuario.'],
     ['email', 'Ingresa un email.'],
-    ['contrasena', 'Ingresa una contrasena.'],
+    ['contrasena', 'Ingresa una contraseña.'],
     ['numeroDocumento', 'Ingresa tu documento.'],
     ['tipoDocumento', 'Selecciona tipo de documento.'],
     ['primerNombre', 'Ingresa tu primer nombre.'],
@@ -516,7 +526,7 @@ const validateRegisterForm = (form) => {
     ['fechaNacimiento', 'Selecciona tu fecha de nacimiento.'],
     ['nacionalidad', 'Selecciona tu nacionalidad.'],
     ['sexo', 'Selecciona tu sexo.'],
-    ['telefono', 'Ingresa tu telefono.']
+    ['telefono', 'Ingresa tu teléfono.']
   ];
 
   requiredFields.forEach(([field, message]) => {
@@ -526,23 +536,24 @@ const validateRegisterForm = (form) => {
   });
 
   if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
-    errors.email = 'Usa un formato de email valido.';
+    errors.email = 'Usa un formato de email válido.';
   }
 
   Object.entries(form).forEach(([field, value]) => {
     if (value && UNSAFE_INPUT_PATTERN.test(value.toString())) {
-      errors[field] = 'No uses comillas, apostrofes, slashes ni simbolos peligrosos.';
+      errors[field] = 'No uses comillas, apóstrofes, slashes ni símbolos peligrosos.';
     }
   });
 
   if (form.contrasena && !PASSWORD_RULE_PATTERN.test(form.contrasena)) {
-    errors.contrasena = 'Usa al menos 8 caracteres, una mayuscula, un numero y un simbolo seguro.';
+    errors.contrasena = 'Usa al menos 8 caracteres, una mayúscula, un número y un símbolo seguro.';
   }
 
   return errors;
 };
 
 function NavBar({ user, adminView, isAdmin, activeView, onAdminView, onNavigate, onLoginClick, onLogout }) {
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const shortUserName = isAdmin ? 'Administrador' : (user?.nombreCompleto?.split(' ')[0] || user?.usuario || 'Usuario');
   const avatarLetter = (user?.nombreCompleto || user?.usuario || 'A').trim().charAt(0).toUpperCase();
 
@@ -554,7 +565,11 @@ function NavBar({ user, adminView, isAdmin, activeView, onAdminView, onNavigate,
       <div className="nav-links">
         <a className={activeView === 'explorar' ? 'active' : ''} href="#explorar" onClick={(event) => onNavigate(event, 'explorar')}>Explorar</a>
         <a className={activeView === 'rastreo' ? 'active' : ''} href="#rastreo" onClick={(event) => onNavigate(event, 'rastreo')}>Rastreo</a>
-        <a className={activeView === 'ubicacion' ? 'active' : ''} href="#ubicacion" onClick={(event) => onNavigate(event, 'ubicacion')}>Ubicacion</a>
+        <a className={activeView === 'mis-viajes' ? 'active' : ''} href="#mis-viajes" onClick={(event) => onNavigate(event, 'mis-viajes')}>Mis viajes</a>
+        <a className={activeView === 'checkin' ? 'active' : ''} href="#checkin" onClick={(event) => onNavigate(event, 'checkin')}>Check-in</a>
+        <a className={activeView === 'objetos' ? 'active' : ''} href="#objetos" onClick={(event) => onNavigate(event, 'objetos')}>Objetos</a>
+        <a className={activeView === 'promos' ? 'active' : ''} href="#promos" onClick={(event) => onNavigate(event, 'promos')}>Promos</a>
+        <a className={activeView === 'ubicacion' ? 'active' : ''} href="#ubicacion" onClick={(event) => onNavigate(event, 'ubicacion')}>Ubicación</a>
         {isAdmin && (
           <>
             <button
@@ -574,22 +589,86 @@ function NavBar({ user, adminView, isAdmin, activeView, onAdminView, onNavigate,
           </>
         )}
         {user ? (
-          <>
-            <div className="nav-user-menu">
+          <div className="nav-user-dropdown">
+            <button
+              className="nav-user-menu"
+              type="button"
+              onClick={() => setUserMenuOpen((current) => !current)}
+              aria-expanded={userMenuOpen}
+            >
               <div className="nav-avatar" aria-hidden="true">{avatarLetter}</div>
               <div className="nav-user-copy">
                 <span className="nav-user">{shortUserName}</span>
-                <small className="nav-user-role">{isAdmin ? 'Panel activo' : 'Sesion activa'}</small>
               </div>
               <span className="nav-user-caret" aria-hidden="true">▾</span>
-            </div>
-            <button className="nav-session-button" type="button" onClick={onLogout}>Salir</button>
-          </>
+            </button>
+            {userMenuOpen && (
+              <div className="nav-user-dropdown-menu">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    onLogout();
+                  }}
+                >
+                  Cerrar sesión
+                </button>
+              </div>
+            )}
+          </div>
         ) : (
-          <button className="nav-session-button" type="button" onClick={onLoginClick}>Iniciar sesion</button>
+          <button className="nav-session-button nav-login-button" type="button" onClick={onLoginClick}>
+            <AccountIcon />
+            <span>Iniciar sesión</span>
+          </button>
         )}
       </div>
     </nav>
+  );
+}
+
+function AccountIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 3a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 15.2a8.2 8.2 0 0 1-6-3.1c.1-2 4-3.2 6-3.2s5.9 1.2 6 3.2a8.2 8.2 0 0 1-6 3.1Z" />
+    </svg>
+  );
+}
+
+function EyeIcon({ hidden = false }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      {hidden ? (
+        <path d="M2.3 3 1 4.3l3 3A12.7 12.7 0 0 0 1 12c1.7 4.4 6 7.5 11 7.5 1.5 0 3-.3 4.3-.8l3.4 3.3 1.3-1.3L2.3 3ZM9 12c0-.2 0-.4.1-.6l3.5 3.5H12a3 3 0 0 1-3-3Zm3-7.5c5 0 9.3 3.1 11 7.5a12.5 12.5 0 0 1-3.8 4.9l-2.3-2.3A5 5 0 0 0 9.4 7.1L7.7 5.4c1.3-.6 2.8-.9 4.3-.9Z" />
+      ) : (
+        <path d="M12 4.5c-5 0-9.3 3.1-11 7.5 1.7 4.4 6 7.5 11 7.5s9.3-3.1 11-7.5c-1.7-4.4-6-7.5-11-7.5Zm0 12.5a5 5 0 1 1 0-10 5 5 0 0 1 0 10Zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z" />
+      )}
+    </svg>
+  );
+}
+
+function PasswordField({ value, onChange, className = '', placeholder = '', autoComplete = 'current-password', required = false }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="password-field">
+      <input
+        className={className}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        type={visible ? 'text' : 'password'}
+        autoComplete={autoComplete}
+        required={required}
+      />
+      <button
+        className="password-toggle"
+        type="button"
+        onClick={() => setVisible((current) => !current)}
+        aria-label={visible ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+      >
+        <EyeIcon hidden={visible} />
+      </button>
+    </div>
   );
 }
 
@@ -636,20 +715,20 @@ function Plane() {
   );
 }
 
-function Hero() {
+function Hero({ onExploreClick }) {
   return (
     <section className="hero" id="inicio">
       <Stars />
       <Plane />
       <div className="hero-content">
-        <div className="hero-badge">Guatemala City Â· GUA</div>
+        <div className="hero-badge">Guatemala City · GUA</div>
         <h1>
           Aeropuerto Internacional
           <span> La Aurora</span>
         </h1>
-        <p>Puerta de entrada al corazon de Centroamerica, conectada en tiempo real con la operacion aeroportuaria.</p>
+        <p>Puerta de entrada al corazón de Centroamérica, conectada en tiempo real con la operación aeroportuaria.</p>
         <div className="hero-ctas">
-          <a href="#explorar" className="btn btn-primary">Explorar vuelos</a>
+          <button className="btn btn-primary" type="button" onClick={onExploreClick}>Explorar vuelos</button>
         </div>
       </div>
     </section>
@@ -780,8 +859,8 @@ function AuthModal({ open, onClose, onLogin, onRegister }) {
       <div className="login-modal" role="dialog" aria-modal="true" aria-labelledby="login-title">
         <button className="modal-close" type="button" onClick={onClose} aria-label="Cerrar">x</button>
         <div className="section-label">Portal de compra</div>
-        <h2 id="login-title">{mode === 'login' ? 'Iniciar sesion' : 'Crear usuario'}</h2>
-        <p>{mode === 'login' ? 'Entra para comprar vuelos y mantener tu sesion activa.' : 'Crea tu pasajero y usuario para comprar boletos en linea.'}</p>
+        <h2 id="login-title">{mode === 'login' ? 'Iniciar sesión' : 'Crear usuario'}</h2>
+        <p>{mode === 'login' ? 'Entra para comprar vuelos y ver tus viajes.' : 'Crea tu pasajero y usuario para comprar boletos en línea.'}</p>
         <div className="auth-tabs">
           <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); setError(''); }}>Entrar</button>
           <button type="button" className={mode === 'register' ? 'active' : ''} onClick={() => { setMode('register'); setError(''); }}>Crear cuenta</button>
@@ -799,12 +878,11 @@ function AuthModal({ open, onClose, onLogin, onRegister }) {
               />
             </label>
             <label>
-              Contrasena
-              <input
+              Contraseña
+              <PasswordField
                 value={form.contrasena}
                 onChange={(event) => setForm((current) => ({ ...current, contrasena: event.target.value }))}
                 placeholder="1234"
-                type="password"
                 autoComplete="current-password"
                 required
               />
@@ -813,7 +891,6 @@ function AuthModal({ open, onClose, onLogin, onRegister }) {
             <button className="btn btn-primary" type="submit" disabled={submitting}>
               {submitting ? 'Entrando' : 'Entrar'}
             </button>
-            <small>Usuarios seed: viajero001, viajero002 o admin.aurora. Clave: 1234.</small>
           </form>
         ) : (
           <form onSubmit={submitRegister} noValidate>
@@ -829,9 +906,14 @@ function AuthModal({ open, onClose, onLogin, onRegister }) {
                 {fieldErrors.email && <small className="field-error">{fieldErrors.email}</small>}
               </label>
               <label>
-                Contrasena
-                <input className={registerInputClass('contrasena')} type="password" value={registerForm.contrasena} onChange={(event) => updateRegister('contrasena', event.target.value)} />
-                <small>Minimo 8 caracteres, una mayuscula, un numero y un simbolo seguro.</small>
+                Contraseña
+                <PasswordField
+                  className={registerInputClass('contrasena')}
+                  value={registerForm.contrasena}
+                  onChange={(event) => updateRegister('contrasena', event.target.value)}
+                  autoComplete="new-password"
+                />
+                <small>Mínimo 8 caracteres, una mayúscula, un número y un símbolo seguro.</small>
                 {fieldErrors.contrasena && <small className="field-error">{fieldErrors.contrasena}</small>}
               </label>
               <label>
@@ -874,7 +956,7 @@ function AuthModal({ open, onClose, onLogin, onRegister }) {
               <label>
                 Nacionalidad
                 <select className={registerInputClass('nacionalidad')} value={registerForm.nacionalidad} onChange={(event) => updateRegister('nacionalidad', event.target.value)}>
-                  <option value="">Selecciona una opcion</option>
+                  <option value="">Selecciona una opción</option>
                   {NATIONALITIES.map((nationality) => <option value={nationality} key={nationality}>{nationality}</option>)}
                 </select>
                 {fieldErrors.nacionalidad && <small className="field-error">{fieldErrors.nacionalidad}</small>}
@@ -882,13 +964,13 @@ function AuthModal({ open, onClose, onLogin, onRegister }) {
               <label>
                 Sexo
                 <select className={registerInputClass('sexo')} value={registerForm.sexo} onChange={(event) => updateRegister('sexo', event.target.value)}>
-                  <option value="">Selecciona una opcion</option>
+                  <option value="">Selecciona una opción</option>
                   {SEX_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
                 </select>
                 {fieldErrors.sexo && <small className="field-error">{fieldErrors.sexo}</small>}
               </label>
               <label>
-                Telefono
+                Teléfono
                 <input className={registerInputClass('telefono')} value={registerForm.telefono} onChange={(event) => updateRegister('telefono', event.target.value)} />
                 {fieldErrors.telefono && <small className="field-error">{fieldErrors.telefono}</small>}
               </label>
@@ -913,7 +995,7 @@ function FlightBoard({ flights, loading, user, onRequireLogin, onBuyFlight, buyi
         <input
           value={searchTerm}
           onChange={(event) => onSearchChange(event.target.value)}
-          placeholder="Buscar por vuelo, destino, origen o aerolinea"
+          placeholder="Buscar por vuelo, destino, origen o aerolínea"
         />
       </div>
 
@@ -922,7 +1004,7 @@ function FlightBoard({ flights, loading, user, onRequireLogin, onBuyFlight, buyi
           <span>Vuelo</span>
           <span>Destino</span>
           <span>Hora</span>
-          <span>Avion</span>
+          <span>Avión</span>
           <span>Estado</span>
           <span>Detalle</span>
         </div>
@@ -938,8 +1020,8 @@ function FlightBoard({ flights, loading, user, onRequireLogin, onBuyFlight, buyi
           <div className="board-empty board-empty-rich">
             <span className="board-empty-icon">✈</span>
             <div>
-              <strong>Comienza una busqueda</strong>
-              <p>Ingresa destino, vuelo, origen o aerolinea para rastrear vuelos en abordaje, vuelo o cancelados.</p>
+              <strong>Comienza una búsqueda</strong>
+              <p>Ingresa destino, vuelo, origen o aerolínea para rastrear vuelos en abordaje, vuelo o cancelados.</p>
             </div>
           </div>
         )}
@@ -949,7 +1031,7 @@ function FlightBoard({ flights, loading, user, onRequireLogin, onBuyFlight, buyi
             <span className="board-empty-icon">◌</span>
             <div>
               <strong>Sin resultados operativos</strong>
-              <p>No encontramos vuelos operativos con esa busqueda.</p>
+              <p>No encontramos vuelos operativos con esa búsqueda.</p>
             </div>
           </div>
         )}
@@ -959,7 +1041,7 @@ function FlightBoard({ flights, loading, user, onRequireLogin, onBuyFlight, buyi
             <span className="flight-num">{flight.numeroVuelo}</span>
             <span className="dest">
               {flight.destino}
-              <small>{flight.origen} Â· {flight.aerolinea}</small>
+              <small>{flight.origen} · {flight.aerolinea}</small>
             </span>
             <span className="time">{formatTime(flight.fechaVuelo)}</span>
             <span className="time">{flight.matriculaAvion || 'Sin asignar'}</span>
@@ -990,8 +1072,6 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
     metodoPagoId: 1,
     titularNombre: '',
     titularEmail: '',
-    titularTelefono: '',
-    titularDocumento: '',
     pasajeros: [],
     numeroTarjeta: '',
     mesTarjeta: '',
@@ -1003,7 +1083,7 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
 
   useEffect(() => {
     if (flight) {
-      const passengerAges = passengerAgesFromCriteria(flight.criteria);
+      const passengerCount = passengerCountFromCriteria(flight.criteria);
       setStep('passengers');
       setTouched({});
       setSelectedServices([]);
@@ -1011,12 +1091,9 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
         metodoPagoId: 1,
         titularNombre: user?.nombreCompleto || '',
         titularEmail: user?.email || '',
-        titularTelefono: user?.telefono || '',
-        titularDocumento: user?.numeroDocumento || '',
-        pasajeros: passengerAges.map((age, index) => ({
+        pasajeros: Array.from({ length: passengerCount }, (_, index) => ({
           nombre: index === 0 ? user?.nombreCompleto || '' : '',
-          documento: index === 0 ? user?.numeroDocumento || '' : '',
-          edad: age
+          documento: index === 0 ? user?.numeroDocumento || '' : ''
         })),
         numeroTarjeta: '',
         mesTarjeta: '',
@@ -1048,21 +1125,18 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
   const total = subtotal + taxes;
 
   const emailValid = !form.titularEmail || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.titularEmail);
-  const phoneValid = !form.titularTelefono || form.titularTelefono.replace(/\D/g, '').length >= 8;
   const cardNumberDigits = form.numeroTarjeta.replace(/\D/g, '');
   const expiredCard = selectedPayment.requiresCard && isExpiredCard(form.mesTarjeta, form.anioTarjeta);
   const fieldErrors = {
     titularNombre: form.titularNombre.trim() ? '' : 'Nombre obligatorio.',
-    titularEmail: !form.titularEmail.trim() ? 'Email obligatorio.' : emailValid ? '' : 'Formato de email invalido.',
-    titularTelefono: !form.titularTelefono.trim() ? 'Telefono obligatorio.' : phoneValid ? '' : 'Usa al menos 8 digitos.',
-    numeroTarjeta: selectedPayment.requiresCard && cardNumberDigits.length < 13 ? 'Numero de tarjeta incompleto.' : '',
+    titularEmail: !form.titularEmail.trim() ? 'Email obligatorio.' : emailValid ? '' : 'Formato de email inválido.',
+    numeroTarjeta: selectedPayment.requiresCard && cardNumberDigits.length < 13 ? 'Número de tarjeta incompleto.' : '',
     mesTarjeta: selectedPayment.requiresCard && !form.mesTarjeta ? 'Selecciona mes.' : '',
-    anioTarjeta: selectedPayment.requiresCard && !form.anioTarjeta ? 'Selecciona ano.' : expiredCard ? 'La tarjeta esta vencida.' : ''
+    anioTarjeta: selectedPayment.requiresCard && !form.anioTarjeta ? 'Selecciona año.' : expiredCard ? 'La tarjeta está vencida.' : ''
   };
-  const passengerErrors = form.pasajeros.map((passenger) => ({
-    nombre: passenger.nombre.trim() ? '' : 'Nombre obligatorio.',
-    documento: passenger.documento.trim() ? '' : 'Documento obligatorio.',
-    edad: passenger.edad !== '' && Number(passenger.edad) >= 0 ? '' : 'Edad obligatoria.'
+  const passengerErrors = form.pasajeros.map((passenger, index) => ({
+    nombre: index === 0 || passenger.nombre.trim() ? '' : 'Nombre obligatorio.',
+    documento: index === 0 || passenger.documento.trim() ? '' : 'Documento obligatorio.'
   }));
 
   const updatePassenger = (index, field, value) => {
@@ -1079,10 +1153,9 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
   };
 
   const passengerStepValid = () =>
-    passengerErrors.every((passenger) => !passenger.nombre && !passenger.documento && !passenger.edad) &&
+    passengerErrors.every((passenger) => !passenger.nombre && !passenger.documento) &&
     !fieldErrors.titularNombre &&
-    !fieldErrors.titularEmail &&
-    !fieldErrors.titularTelefono;
+    !fieldErrors.titularEmail;
 
   const paymentStepValid = () =>
     !fieldErrors.numeroTarjeta &&
@@ -1094,11 +1167,9 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
       ...current,
       titularNombre: true,
       titularEmail: true,
-      titularTelefono: true,
       ...Object.fromEntries(form.pasajeros.flatMap((_, index) => [
         [`pasajeros.${index}.nombre`, true],
-        [`pasajeros.${index}.documento`, true],
-        [`pasajeros.${index}.edad`, true]
+        [`pasajeros.${index}.documento`, true]
       ]))
     }));
 
@@ -1195,41 +1266,38 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
                 <div className="passenger-list">
                   {form.pasajeros.map((passenger, index) => (
                     <div className="passenger-form-row" key={`passenger-${index}`}>
-                      <label>
-                        Pasajero {index + 1}
-                        <input
-                          className={touched[`pasajeros.${index}.nombre`] && passengerErrors[index]?.nombre ? 'field-invalid' : ''}
-                          value={passenger.nombre}
-                          onBlur={() => markTouched(`pasajeros.${index}.nombre`)}
-                          onChange={(event) => updatePassenger(index, 'nombre', event.target.value)}
-                          placeholder="Nombre completo"
-                        />
-                        {touched[`pasajeros.${index}.nombre`] && passengerErrors[index]?.nombre && <small className="field-error">{passengerErrors[index].nombre}</small>}
-                      </label>
-                      <label>
-                        Documento
-                        <input
-                          className={touched[`pasajeros.${index}.documento`] && passengerErrors[index]?.documento ? 'field-invalid' : ''}
-                          value={passenger.documento}
-                          onBlur={() => markTouched(`pasajeros.${index}.documento`)}
-                          onChange={(event) => updatePassenger(index, 'documento', event.target.value)}
-                          placeholder="DPI o pasaporte"
-                        />
-                        {touched[`pasajeros.${index}.documento`] && passengerErrors[index]?.documento && <small className="field-error">{passengerErrors[index].documento}</small>}
-                      </label>
-                      <label>
-                        Edad
-                        <input
-                          className={touched[`pasajeros.${index}.edad`] && passengerErrors[index]?.edad ? 'field-invalid' : ''}
-                          type="number"
-                          min="0"
-                          max="120"
-                          value={passenger.edad}
-                          onBlur={() => markTouched(`pasajeros.${index}.edad`)}
-                          onChange={(event) => updatePassenger(index, 'edad', event.target.value)}
-                        />
-                        {touched[`pasajeros.${index}.edad`] && passengerErrors[index]?.edad && <small className="field-error">{passengerErrors[index].edad}</small>}
-                      </label>
+                      {index === 0 ? (
+                        <div className="passenger-account-summary">
+                          <strong>Pasajero principal</strong>
+                          <span>{user?.nombreCompleto || user?.usuario || 'Tu cuenta'}</span>
+                          <small>Usaremos los datos guardados en tu cuenta.</small>
+                        </div>
+                      ) : (
+                        <>
+                          <label>
+                            Pasajero {index + 1}
+                            <input
+                              className={touched[`pasajeros.${index}.nombre`] && passengerErrors[index]?.nombre ? 'field-invalid' : ''}
+                              value={passenger.nombre}
+                              onBlur={() => markTouched(`pasajeros.${index}.nombre`)}
+                              onChange={(event) => updatePassenger(index, 'nombre', event.target.value)}
+                              placeholder="Nombre completo"
+                            />
+                            {touched[`pasajeros.${index}.nombre`] && passengerErrors[index]?.nombre && <small className="field-error">{passengerErrors[index].nombre}</small>}
+                          </label>
+                          <label>
+                            Documento
+                            <input
+                              className={touched[`pasajeros.${index}.documento`] && passengerErrors[index]?.documento ? 'field-invalid' : ''}
+                              value={passenger.documento}
+                              onBlur={() => markTouched(`pasajeros.${index}.documento`)}
+                              onChange={(event) => updatePassenger(index, 'documento', event.target.value)}
+                              placeholder="DPI o pasaporte"
+                            />
+                            {touched[`pasajeros.${index}.documento`] && passengerErrors[index]?.documento && <small className="field-error">{passengerErrors[index].documento}</small>}
+                          </label>
+                        </>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1257,20 +1325,6 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
                       onChange={(event) => setForm((current) => ({ ...current, titularEmail: event.target.value }))}
                     />
                     {touched.titularEmail && fieldErrors.titularEmail && <small className="field-error">{fieldErrors.titularEmail}</small>}
-                  </label>
-                  <label>
-                    Telefono
-                    <input
-                      className={touched.titularTelefono && fieldErrors.titularTelefono ? 'field-invalid' : ''}
-                      value={form.titularTelefono}
-                      onBlur={() => markTouched('titularTelefono')}
-                      onChange={(event) => setForm((current) => ({ ...current, titularTelefono: event.target.value }))}
-                    />
-                    {touched.titularTelefono && fieldErrors.titularTelefono && <small className="field-error">{fieldErrors.titularTelefono}</small>}
-                  </label>
-                  <label>
-                    Documento
-                    <input value={form.titularDocumento} onChange={(event) => setForm((current) => ({ ...current, titularDocumento: event.target.value }))} />
                   </label>
                 </div>
               </div>
@@ -1317,7 +1371,7 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
                 <h3>Pago</h3>
                 <div className="form-grid">
                   <label>
-                    Metodo de pago
+                    Método de pago
                     <select value={form.metodoPagoId} onChange={(event) => setForm((current) => ({ ...current, metodoPagoId: event.target.value }))}>
                       {PAYMENT_METHODS.map((method) => (
                         <option value={method.id} key={method.id}>{method.name}</option>
@@ -1335,7 +1389,7 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
                     <h3>Datos de tarjeta</h3>
                     <div className="form-grid">
                       <label>
-                        Numero de tarjeta
+                        Número de tarjeta
                         <input
                           className={touched.numeroTarjeta && fieldErrors.numeroTarjeta ? 'field-invalid' : ''}
                           value={form.numeroTarjeta}
@@ -1365,7 +1419,7 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
                           {touched.mesTarjeta && fieldErrors.mesTarjeta && <small className="field-error">{fieldErrors.mesTarjeta}</small>}
                         </label>
                         <label>
-                          Ano
+                          Año
                           <select
                             className={touched.anioTarjeta && fieldErrors.anioTarjeta ? 'field-invalid' : ''}
                             value={form.anioTarjeta}
@@ -1373,7 +1427,7 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
                             onChange={(event) => setForm((current) => ({ ...current, anioTarjeta: event.target.value }))}
                             autoComplete="cc-exp-year"
                           >
-                            <option value="">Ano</option>
+                            <option value="">Año</option>
                             {CARD_YEARS.map((year) => (
                               <option value={year} key={year}>{year}</option>
                             ))}
@@ -1381,6 +1435,20 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
                           {touched.anioTarjeta && fieldErrors.anioTarjeta && <small className="field-error">{fieldErrors.anioTarjeta}</small>}
                         </label>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {!selectedPayment.requiresCard && (
+                  <div className="card-details transfer-details">
+                    <h3>Datos para transferencia</h3>
+                    <div className="transfer-detail-row">
+                      <span>Titular</span>
+                      <strong>{TRANSFER_ACCOUNT.holder}</strong>
+                    </div>
+                    <div className="transfer-detail-row">
+                      <span>Número de cuenta</span>
+                      <strong>{TRANSFER_ACCOUNT.number}</strong>
                     </div>
                   </div>
                 )}
@@ -1426,10 +1494,10 @@ function PurchaseSuccessView({ summary, onGoHome, onExplore }) {
         <div className="success-mark">✓</div>
         <div className="section-label">Pago exitoso</div>
         <h1>Tu reserva esta confirmada</h1>
-        <p>Guarda el numero de reserva para check-in, rastreo y cualquier consulta del viaje.</p>
+        <p>Guarda el número de reserva para check-in, rastreo y cualquier consulta del viaje.</p>
 
         <div className="reservation-code-box">
-          <span>Numero de reserva</span>
+          <span>Número de reserva</span>
           <strong>{summary.reservationCodes.join(' / ') || '-'}</strong>
         </div>
 
@@ -1533,17 +1601,14 @@ function DateFarePicker({ open, tripType, departureDate, returnDate, flights = [
 
     if (selecting === 'departure') {
       setDraftDeparture(value);
-      if (draftReturn && dateFromInputValue(draftReturn) < date) {
+      if (draftReturn && !isAfterDateValue(draftReturn, value)) {
         setDraftReturn('');
       }
       setSelecting('return');
       return;
     }
 
-    if (draftDeparture && date < dateFromInputValue(draftDeparture)) {
-      setDraftDeparture(value);
-      setDraftReturn('');
-      setSelecting('return');
+    if (draftDeparture && !isAfterDateValue(value, draftDeparture)) {
       return;
     }
 
@@ -1559,6 +1624,11 @@ function DateFarePicker({ open, tripType, departureDate, returnDate, flights = [
   };
 
   const apply = () => {
+    if (tripType === 'roundtrip' && (!draftDeparture || !isAfterDateValue(draftReturn, draftDeparture))) {
+      setDraftReturn('');
+      setSelecting('return');
+      return;
+    }
     onApply({ departureDate: draftDeparture, returnDate: tripType === 'roundtrip' ? draftReturn : '' });
     onClose();
   };
@@ -1591,7 +1661,7 @@ function DateFarePicker({ open, tripType, departureDate, returnDate, flights = [
           {days.map((date) => {
             const value = toDateInputValue(date);
             const isPastDate = date < todayStart;
-            const isBeforeDeparture = selecting === 'return' && draftDeparture && date < dateFromInputValue(draftDeparture);
+            const isBeforeDeparture = selecting === 'return' && draftDeparture && !isAfterDateValue(value, draftDeparture);
             const selected = sameDateValue(date, draftDeparture) || sameDateValue(date, draftReturn);
             const inRange = draftDeparture && draftReturn && date > dateFromInputValue(draftDeparture) && date < dateFromInputValue(draftReturn);
             const fareDirection = selecting === 'return' ? 'return' : 'departure';
@@ -1649,7 +1719,7 @@ function DateFarePicker({ open, tripType, departureDate, returnDate, flights = [
             <span>{selecting === 'return' ? 'Precios de vuelta' : 'Precios de ida'} para la ruta seleccionada</span>
             <span className="fare-legend-low">Los precios en verde son los mas bajos</span>
           </div>
-          <button className="fare-done" type="button" onClick={apply} disabled={!draftDeparture || (tripType === 'roundtrip' && !draftReturn)}>Hecho</button>
+          <button className="fare-done" type="button" onClick={apply} disabled={!draftDeparture || (tripType === 'roundtrip' && !isAfterDateValue(draftReturn, draftDeparture))}>Hecho</button>
         </div>
       </div>
     </div>
@@ -1696,16 +1766,20 @@ function PassengerPicker({ open, groups, onClose, onApply }) {
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
       <div className="passenger-picker" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
-        <h2>Quienes vuelan?</h2>
+        <h2>¿Quiénes vuelan?</h2>
         {PASSENGER_GROUPS.map((group) => (
           <div className="passenger-counter-row" key={group.key}>
             <div>
               <strong>{group.label}</strong>
               <small>{group.hint}</small>
             </div>
-            <button type="button" onClick={() => updateGroup(group.key, -1)} disabled={group.key === 'adults' && draftGroups[group.key] <= 1}>−</button>
+            <button type="button" onClick={() => updateGroup(group.key, -1)} disabled={group.key === 'adults' && draftGroups[group.key] <= 1}>
+              <span aria-hidden="true">−</span>
+            </button>
             <span>{draftGroups[group.key]}</span>
-            <button type="button" onClick={() => updateGroup(group.key, 1)}>+</button>
+            <button type="button" onClick={() => updateGroup(group.key, 1)}>
+              <span aria-hidden="true">+</span>
+            </button>
           </div>
         ))}
         <button className="passenger-confirm" type="button" onClick={() => { onApply(draftGroups); onClose(); }}>Confirmar</button>
@@ -1742,7 +1816,6 @@ function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
     tripType: 'roundtrip',
     passengers: 1,
     passengerGroups: DEFAULT_PASSENGER_GROUPS,
-    passengerAges: passengerAgesFromCriteria({ passengerGroups: DEFAULT_PASSENGER_GROUPS }),
     origin: '',
     destination: '',
     departureDate: '',
@@ -1757,6 +1830,18 @@ function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
         return { ...current, tripType: value, returnDate: '' };
       }
 
+      if (field === 'departureDate') {
+        return {
+          ...current,
+          departureDate: value,
+          returnDate: isAfterDateValue(current.returnDate, value) ? current.returnDate : ''
+        };
+      }
+
+      if (field === 'returnDate') {
+        return { ...current, returnDate: isAfterDateValue(value, current.departureDate) ? value : '' };
+      }
+
       return { ...current, [field]: value };
     });
   };
@@ -1765,8 +1850,7 @@ function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
     setCriteria((current) => ({
       ...current,
       passengerGroups: groups,
-      passengers: passengerCountFromGroups(groups),
-      passengerAges: passengerAgesFromCriteria({ passengerGroups: groups })
+      passengers: passengerCountFromGroups(groups)
     }));
   };
 
@@ -1854,7 +1938,7 @@ function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
           onClose={() => setDatePickerOpen(false)}
           onApply={({ departureDate, returnDate }) => {
             updateCriteria('departureDate', departureDate);
-            updateCriteria('returnDate', returnDate);
+            updateCriteria('returnDate', isAfterDateValue(returnDate, departureDate) ? returnDate : '');
           }}
         />
       </div>
@@ -1995,7 +2079,7 @@ function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, on
                         <ul>
                           {family.benefits.map(([state, benefit]) => (
                             <li className={state === 'check' ? 'included' : 'excluded'} key={benefit}>
-                              <span>{state === 'check' ? '✓' : '×'}</span>
+                              <span className="tariff-icon" aria-hidden="true">{state === 'check' ? '✓' : '×'}</span>
                               {benefit}
                             </li>
                           ))}
@@ -2086,7 +2170,7 @@ function CartView({ items, user, onBack, onRequireLogin, onCheckoutItem, onRemov
                 <div className="cart-flight-icon">✈</div>
                 <div className="cart-flight-main">
                   <div className="cart-flight-title">
-                    <strong>{item.numeroVuelo || 'Vuelo seleccionado'} - {item.aerolinea || 'Aerolinea pendiente'}</strong>
+                    <strong>{item.numeroVuelo || 'Vuelo seleccionado'} - {item.aerolinea || 'Aerolínea pendiente'}</strong>
                     <span>{formatMoney(fare, item.criteria?.currency || 'GTQ')}</span>
                   </div>
                   <div className="cart-flight-route">
@@ -2144,7 +2228,7 @@ function DestinationSection({ destinations, onDestinationClick }) {
             <strong>{destinationReportName(destination)}</strong>
             <div className="destination-metrics">
               <small>{Number(destination.totalBusquedas || 0) + Number(destination.totalClicks || 0)} puntos de interes</small>
-              <small>{destination.totalBusquedas} busquedas</small>
+              <small>{destination.totalBusquedas} búsquedas</small>
               <small>{destination.totalClicks} clicks</small>
             </div>
           </button>
@@ -2185,7 +2269,7 @@ function OperationsSection({ baggage, incidents }) {
             <div className="operation-row" key={item.id}>
               <div>
                 <strong>{item.codigoBarras}</strong>
-                <small>{item.pasajero} Â· {item.numeroVuelo}</small>
+                <small>{item.numeroVuelo} - {formatDate(item.fechaRegistro)}</small>
               </div>
               <span className={`status ${statusClassName(item.estado)}`}>{item.estado}</span>
             </div>
@@ -2199,7 +2283,7 @@ function OperationsSection({ baggage, incidents }) {
             <div className="operation-row" key={incident.id}>
               <div>
                 <strong>{incident.tipoIncidente}</strong>
-                <small>{incident.ubicacion} Â· {formatDate(incident.fechaIncidente)}</small>
+                <small>{incident.ubicacion} · {formatDate(incident.fechaIncidente)}</small>
               </div>
               <span className={`status ${statusClassName(incident.estado)}`}>{incident.severidad}</span>
             </div>
@@ -2216,7 +2300,7 @@ function LocationSection() {
       <div className="location-inner">
         <div>
           <div className="section-label">Como llegar</div>
-          <h2 className="section-title">Ubicacion</h2>
+          <h2 className="section-title">Ubicación</h2>
           <div className="location-detail">
             <span>⌖</span>
             <p>7a Avenida 11-03, Zona 13, Ciudad de Guatemala.</p>
@@ -2227,7 +2311,7 @@ function LocationSection() {
           </div>
           <div className="location-detail">
             <span>◔</span>
-            <p>Operacion aeroportuaria disponible todos los dias del aÃ±o.</p>
+            <p>Operación aeroportuaria disponible todos los días del año.</p>
           </div>
         </div>
         <div className="map-box">
@@ -2242,6 +2326,465 @@ function LocationSection() {
     </section>
   );
 }
+
+function MyTripsSection({ user, flights, onRequireLogin }) {
+  const [data, setData] = useState({ reservations: [], checkIns: [], passes: [] });
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    if (!user?.pasajeroId) return undefined;
+
+    let active = true;
+    setLoading(true);
+    setMessage('');
+
+    Promise.allSettled([
+      api.reservations(user.pasajeroId, 100),
+      api.checkIns(200),
+      api.boardingPasses(200)
+    ]).then((results) => {
+      if (!active) return;
+      setData({
+        reservations: results[0].status === 'fulfilled' ? results[0].value : [],
+        checkIns: results[1].status === 'fulfilled' ? results[1].value : [],
+        passes: results[2].status === 'fulfilled' ? results[2].value : []
+      });
+      if (results.some((result) => result.status === 'rejected')) {
+        setMessage('No se pudo cargar todo el historial, pero mostramos lo disponible.');
+      }
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [user?.pasajeroId]);
+
+  if (!user) {
+    return (
+      <main className="tab-page">
+        <section className="section passenger-tool">
+          <div className="section-label">Mis viajes</div>
+          <h1>Entra para ver tus reservas</h1>
+          <button className="btn btn-primary" type="button" onClick={onRequireLogin}>Iniciar sesión</button>
+        </section>
+      </main>
+    );
+  }
+
+  const flightMap = new Map(flights.map((flight) => [Number(flight.id), flight]));
+  const checkInByReservation = new Map(data.checkIns.map((checkIn) => [Number(checkIn.reservaId), checkIn]));
+  const passByCheckIn = new Map(data.passes.map((pass) => [Number(pass.checkInId), pass]));
+
+  return (
+    <main className="tab-page">
+      <section className="section passenger-tool">
+        <div className="section-label">Mis viajes</div>
+        <h1>Reservas y tarjetas</h1>
+        {message && <div className="connection-alert">{message}</div>}
+        {loading && <div className="board-empty"><span className="loader"></span>Cargando reservas</div>}
+        {!loading && data.reservations.length === 0 && <div className="board-empty">Aun no tienes reservas registradas.</div>}
+        <div className="passenger-card-grid">
+          {data.reservations.map((reservation) => {
+            const flight = flightMap.get(Number(reservation.vueloId));
+            const checkIn = checkInByReservation.get(Number(reservation.id));
+            const boardingPass = checkIn ? passByCheckIn.get(Number(checkIn.id)) : null;
+
+            return (
+              <article className="passenger-card" key={reservation.id}>
+                <div>
+                  <span className={`status ${statusClassName(reservation.estado)}`}>{reservation.estado}</span>
+                  <h2>{reservation.numeroVuelo}</h2>
+                  <p>{flight ? `${flight.origen} - ${flight.destino}` : 'Ruta pendiente'}</p>
+                </div>
+                <dl>
+                  <div><dt>Reserva</dt><dd>{reservation.codigo}</dd></div>
+                  <div><dt>Fecha</dt><dd>{formatDate(flight?.fechaVuelo || reservation.fechaReserva)}</dd></div>
+                  <div><dt>Clase</dt><dd>{reservation.clase}</dd></div>
+                  <div><dt>Check-in</dt><dd>{checkIn ? checkIn.estado : 'Pendiente'}</dd></div>
+                </dl>
+                {boardingPass && (
+                  <div className="boarding-pass-mini">
+                    <strong>{boardingPass.codigoQr}</strong>
+                    <span>Grupo {boardingPass.grupoAbordaje || 'A'} - Zona {boardingPass.zona || '1'}</span>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function CheckInSection({ user, flights, onRequireLogin }) {
+  const [reservations, setReservations] = useState([]);
+  const [checkIns, setCheckIns] = useState([]);
+  const [selectedReservationId, setSelectedReservationId] = useState('');
+  const [checkInQuery, setCheckInQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const loadData = useCallback(async () => {
+    if (!user?.pasajeroId) return;
+
+    setLoading(true);
+    setMessage('');
+    try {
+      const [reservationRows, checkInRows] = await Promise.all([
+        api.reservations(user.pasajeroId, 100),
+        api.checkIns(200)
+      ]);
+      setReservations(reservationRows);
+      setCheckIns(checkInRows);
+      setSelectedReservationId((current) => current || reservationRows[0]?.id?.toString() || '');
+    } catch (requestError) {
+      setMessage(`No se pudieron cargar tus reservas: ${requestError.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.pasajeroId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  if (!user) {
+    return (
+      <main className="tab-page">
+        <section className="section passenger-tool">
+          <div className="section-label">Check-in</div>
+          <h1>Confirma tu vuelo en línea</h1>
+          <button className="btn btn-primary" type="button" onClick={onRequireLogin}>Iniciar sesión</button>
+        </section>
+      </main>
+    );
+  }
+
+  const flightMap = new Map(flights.map((flight) => [Number(flight.id), flight]));
+  const normalizedCheckInQuery = normalize(checkInQuery);
+  const matchingReservations = reservations.filter((reservation) => {
+    if (!normalizedCheckInQuery) return true;
+
+    return [reservation.codigo, reservation.numeroVuelo]
+      .some((value) => normalize(value).includes(normalizedCheckInQuery));
+  });
+  const typedReservation = normalizedCheckInQuery
+    ? matchingReservations.find((reservation) =>
+      normalize(reservation.codigo) === normalizedCheckInQuery ||
+      normalize(reservation.numeroVuelo) === normalizedCheckInQuery) || matchingReservations[0]
+    : null;
+  const selectedReservation = typedReservation || reservations.find((reservation) => String(reservation.id) === String(selectedReservationId));
+  const existingCheckIn = selectedReservation
+    ? checkIns.find((checkIn) => Number(checkIn.reservaId) === Number(selectedReservation.id))
+    : null;
+  const selectedFlight = selectedReservation ? flightMap.get(Number(selectedReservation.vueloId)) : null;
+
+  const submitCheckIn = async () => {
+    if (!selectedReservation || existingCheckIn) return;
+
+    setSaving(true);
+    setMessage('');
+    try {
+      const checkIn = await api.createCheckIn({
+        reservaId: selectedReservation.id,
+        pasajeroId: user.pasajeroId,
+        vueloId: selectedReservation.vueloId,
+        fechaHora: new Date().toISOString(),
+        metodo: 'web',
+        estado: 'COMPLETADO'
+      });
+
+      await api.createBoardingPass({
+        checkInId: checkIn.id,
+        codigoQr: boardingCode(selectedReservation.id, user.pasajeroId),
+        grupoAbordaje: 'A',
+        zona: '1',
+        fechaEmision: new Date().toISOString()
+      });
+
+      setMessage('Check-in completado y tarjeta de embarque emitida.');
+      await loadData();
+    } catch (requestError) {
+      setMessage(`No se pudo completar el check-in: ${requestError.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <main className="tab-page">
+      <section className="section passenger-tool">
+        <div className="section-label">Check-in</div>
+          <h1>Check-in en línea</h1>
+        {message && <div className="connection-alert">{message}</div>}
+        <div className="tool-grid">
+          <div className="tool-panel">
+            <label className="field">
+              <span>Vuelo o reserva</span>
+              <input
+                value={checkInQuery}
+                onChange={(event) => setCheckInQuery(event.target.value)}
+                placeholder="Ej. AV2200X o R051..."
+                list="checkin-reservations"
+                disabled={loading || reservations.length === 0}
+              />
+              <datalist id="checkin-reservations">
+                {reservations.map((reservation) => (
+                  <option value={reservation.numeroVuelo} key={`flight-${reservation.id}`} />
+                ))}
+                {reservations.map((reservation) => (
+                  <option value={reservation.codigo} key={`reservation-${reservation.id}`} />
+                ))}
+              </datalist>
+            </label>
+            <label className="field">
+              <span>Coincidencias</span>
+              <select
+                value={selectedReservation?.id || selectedReservationId}
+                onChange={(event) => {
+                  setSelectedReservationId(event.target.value);
+                  setCheckInQuery('');
+                }}
+                disabled={loading || matchingReservations.length === 0}
+              >
+                {matchingReservations.length === 0 && <option value="">Sin coincidencias</option>}
+                {matchingReservations.slice(0, 25).map((reservation) => (
+                  <option value={reservation.id} key={reservation.id}>{reservation.numeroVuelo} - {reservation.codigo}</option>
+                ))}
+              </select>
+            </label>
+            <button className="btn btn-primary" type="button" onClick={submitCheckIn} disabled={!selectedReservation || Boolean(existingCheckIn) || saving}>
+              {saving ? 'Procesando' : existingCheckIn ? 'Check-in completado' : 'Completar check-in'}
+            </button>
+          </div>
+          <div className="tool-panel">
+            {!selectedReservation && <p className="muted-text">Selecciona una reserva para continuar.</p>}
+            {selectedReservation && (
+              <dl className="detail-list">
+                <div><dt>Ruta</dt><dd>{selectedFlight ? `${selectedFlight.origen} - ${selectedFlight.destino}` : 'Pendiente'}</dd></div>
+                <div><dt>Salida</dt><dd>{formatDate(selectedFlight?.fechaVuelo)}</dd></div>
+                <div><dt>Reserva</dt><dd>{selectedReservation.codigo}</dd></div>
+                <div><dt>Vuelo</dt><dd>{selectedReservation.numeroVuelo}</dd></div>
+                <div><dt>Estado</dt><dd>{existingCheckIn ? existingCheckIn.estado : 'Pendiente'}</dd></div>
+              </dl>
+            )}
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function BaggageTrackerSection() {
+  const [baggage, setBaggage] = useState([]);
+  const [movements, setMovements] = useState([]);
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.allSettled([
+      api.baggage(80),
+      api.baggageMovements(200)
+    ]).then((results) => {
+      setBaggage(results[0].status === 'fulfilled' ? results[0].value : []);
+      setMovements(results[1].status === 'fulfilled' ? results[1].value : []);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  const visible = baggage.filter((item) =>
+    [item.codigoBarras, item.numeroVuelo, item.estado]
+      .some((value) => normalize(value).includes(normalize(query)))
+  );
+  const selected = visible[0];
+  const selectedMovements = selected
+    ? movements.filter((movement) => Number(movement.equipajeId) === Number(selected.id))
+    : [];
+
+  return (
+    <main className="tab-page">
+      <section className="section passenger-tool">
+        <div className="section-label">Equipaje</div>
+        <h1>Rastreo de maletas</h1>
+        <div className="tool-grid">
+          <div className="tool-panel">
+            <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Codigo de maleta o vuelo" />
+            {loading && <div className="board-empty"><span className="loader"></span>Cargando equipaje</div>}
+            {!loading && visible.slice(0, 8).map((item) => (
+              <button className="tool-list-button" type="button" key={item.id} onClick={() => setQuery(item.codigoBarras)}>
+                <strong>{item.codigoBarras}</strong>
+                <span>{item.numeroVuelo} - {item.estado}</span>
+              </button>
+            ))}
+          </div>
+          <div className="tool-panel">
+            {!selected && <p className="muted-text">Busca una maleta para ver su recorrido.</p>}
+            {selected && (
+              <>
+                <h2>{selected.codigoBarras}</h2>
+                <p>{selected.numeroVuelo} - {formatDate(selected.fechaRegistro)}</p>
+                <span className={`status ${statusClassName(selected.estado)}`}>{selected.estado}</span>
+                <div className="timeline">
+                  {selectedMovements.length === 0 && <p className="muted-text">Sin movimientos registrados.</p>}
+                  {selectedMovements.map((movement) => (
+                    <div className="timeline-item" key={movement.id}>
+                      <strong>{movement.ubicacion}</strong>
+                      <span>{movement.estado} - {formatDate(movement.fechaHora)}</span>
+                      {movement.observacion && <small>{movement.observacion}</small>}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function LostObjectsSection({ airports }) {
+  const [items, setItems] = useState([]);
+  const [form, setForm] = useState({
+    descripcion: '',
+    reportanteNombre: '',
+    contactoReportante: ''
+  });
+  const [message, setMessage] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const loadItems = useCallback(async () => {
+    try {
+      setItems(await api.lostObjects(30));
+    } catch {
+      setItems([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadItems();
+  }, [loadItems]);
+
+  const updateForm = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    setMessage('');
+    const nameParts = form.reportanteNombre.trim().split(/\s+/).filter(Boolean);
+    const firstName = nameParts[0] || null;
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : null;
+
+    try {
+      await api.createLostObject({
+        vueloId: null,
+        aeropuertoId: airports[0]?.id || 1,
+        descripcion: form.descripcion,
+        fechaReporte: new Date().toISOString(),
+        ubicacionEncontrado: 'Pendiente de revisión',
+        estado: 'REPORTADO',
+        reportantePrimerNombre: firstName,
+        reportanteSegundoNombre: null,
+        reportantePrimerApellido: lastName,
+        reportanteSegundoApellido: null,
+        contactoReportante: form.contactoReportante,
+        fechaEntrega: null,
+        reclamantePrimerNombre: null,
+        reclamanteSegundoNombre: null,
+        reclamantePrimerApellido: null,
+        reclamanteSegundoApellido: null
+      });
+      setForm({ descripcion: '', reportanteNombre: '', contactoReportante: '' });
+      setMessage('Reporte recibido. El equipo de atencion lo revisara y usara el contacto solo para seguimiento interno.');
+      await loadItems();
+    } catch (requestError) {
+      setMessage(`No se pudo registrar: ${requestError.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <main className="tab-page">
+      <section className="section passenger-tool">
+        <div className="section-label">Objetos perdidos</div>
+        <h1>Objetos encontrados y reportes</h1>
+        {message && <div className="connection-alert">{message}</div>}
+        <p className="tool-intro">
+          Esta pantalla sirve para dos cosas: ver objetos encontrados recientemente y dejar un reporte si perdiste algo.
+          Los datos de contacto no se publican.
+        </p>
+        <div className="tool-grid lost-object-grid">
+          <form className="tool-panel lost-object-form" onSubmit={submit}>
+            <h2>Reportar pérdida</h2>
+            <label className="field"><span>¿Qué perdiste?</span><textarea value={form.descripcion} onChange={(event) => updateForm('descripcion', event.target.value)} placeholder="Ej. mochila negra con etiqueta roja" required /></label>
+            <label className="field"><span>Tu nombre</span><input value={form.reportanteNombre} onChange={(event) => updateForm('reportanteNombre', event.target.value)} placeholder="nombre y apellido" required /></label>
+            <label className="field"><span>Contacto privado</span><input value={form.contactoReportante} onChange={(event) => updateForm('contactoReportante', event.target.value)} placeholder="teléfono o email" required /></label>
+            <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Guardando' : 'Enviar reporte'}</button>
+          </form>
+          <div className="tool-panel">
+            <h2>Encontrados recientes</h2>
+            {items.slice(0, 8).map((item) => (
+              <div className="operation-row" key={item.id}>
+                <div>
+                  <strong>{item.descripcion}</strong>
+                  <small>{item.estado === 'REPORTADO' ? 'Reporte en revisión' : item.ubicacionEncontrado || 'Ubicación pendiente'} - {formatDateOnly(item.fechaReporte)}</small>
+                </div>
+                <span className={`status ${statusClassName(item.estado)}`}>{item.estado}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function PromotionsSection() {
+  const [promotions, setPromotions] = useState([]);
+
+  useEffect(() => {
+    api.promotions(50).then(setPromotions).catch(() => setPromotions([]));
+  }, []);
+
+  const activePromotions = promotions.filter((promotion) => normalize(promotion.estado).includes('activ'));
+
+  return (
+    <main className="tab-page">
+      <section className="section passenger-tool">
+        <div className="section-label">Promociones</div>
+        <h1>Beneficios disponibles</h1>
+        <div className="passenger-card-grid">
+          {activePromotions.length === 0 && <div className="board-empty">No hay promociones activas en este momento.</div>}
+          {activePromotions.map((promotion) => (
+            <article className="passenger-card promo-card" key={promotion.id}>
+              <span>{promotion.codigo}</span>
+              <h2>{promotion.tipoDescuento}</h2>
+              <strong>{promotion.valorDescuento}{normalize(promotion.tipoDescuento).includes('porcent') ? '%' : ' GTQ'} OFF</strong>
+              <p>{promotion.descripcion || 'Promoción disponible para compras seleccionadas.'}</p>
+              <small>Válida del {formatDateOnly(promotion.fechaInicio)} al {formatDateOnly(promotion.fechaFin)}</small>
+            </article>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+const ADMIN_MODULES = [
+  { title: 'Operaciones', tables: ['vuelo', 'asignacion_puerta', 'tripulacion', 'checkin', 'tarjeta_embarque'] },
+  { title: 'Equipaje y seguridad', tables: ['equipaje', 'movimiento_equipaje', 'control_seguridad', 'control_migratorio', 'arresto'] },
+  { title: 'Mantenimiento', tables: ['mantenimientoavion', 'hangar', 'asignacionhangar', 'repuesto', 'repuestoutilizado'] },
+  { title: 'Inventario', tables: ['categoriarepuesto', 'proveedor', 'ordencomprarepuesto', 'detalleordencompra', 'movimientorepuesto'] },
+  { title: 'RRHH', tables: ['empleado', 'departamento', 'puesto', 'licenciaempleado', 'asistencia', 'planilla'] },
+  { title: 'Ventas', tables: ['reserva', 'ventaboleto', 'detalleventaboleto', 'transaccionpago', 'usopromocion'] },
+  { title: 'Auditoria', tables: ['auditoria'] }
+];
 
 function AdminSection({ tables, selectedTable, onSelectTable }) {
   const [metadata, setMetadata] = useState(null);
@@ -2392,6 +2935,26 @@ function AdminSection({ tables, selectedTable, onSelectTable }) {
 
       {message && <div className="connection-alert">{message}</div>}
 
+      <section className="admin-module-grid">
+        {ADMIN_MODULES.map((module) => (
+          <article className="admin-module" key={module.title}>
+            <strong>{module.title}</strong>
+            <div>
+              {module.tables.map((alias) => (
+                <button
+                  type="button"
+                  key={`${module.title}-${alias}`}
+                  onClick={() => onSelectTable(alias)}
+                  className={selectedTable === alias ? 'active' : ''}
+                >
+                  {prettifyName(alias)}
+                </button>
+              ))}
+            </div>
+          </article>
+        ))}
+      </section>
+
       <section className="admin-workspace">
         <aside className="admin-form-panel">
           <h2>{editingRow ? 'Editar registro' : 'Crear registro'}</h2>
@@ -2449,6 +3012,55 @@ function AdminSection({ tables, selectedTable, onSelectTable }) {
 }
 
 function ReporteriaSection() {
+  const [reports, setReports] = useState({
+    sales: [],
+    occupancy: [],
+    payments: [],
+    severities: [],
+    maintenance: [],
+    security: [],
+    audit: []
+  });
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const loadReports = useCallback(async () => {
+    setLoading(true);
+    setMessage('');
+    const results = await Promise.allSettled([
+      api.salesByDate(),
+      api.occupancy(12),
+      api.paymentMethodsReport(),
+      api.incidentsBySeverity(),
+      api.maintenance(8),
+      api.securityControls(8),
+      api.audit(12)
+    ]);
+
+    setReports({
+      sales: results[0].status === 'fulfilled' ? results[0].value : [],
+      occupancy: results[1].status === 'fulfilled' ? results[1].value : [],
+      payments: results[2].status === 'fulfilled' ? results[2].value : [],
+      severities: results[3].status === 'fulfilled' ? results[3].value : [],
+      maintenance: results[4].status === 'fulfilled' ? results[4].value : [],
+      security: results[5].status === 'fulfilled' ? results[5].value : [],
+      audit: results[6].status === 'fulfilled' ? results[6].value : []
+    });
+
+    if (results.some((result) => result.status === 'rejected')) {
+      setMessage('Algunos reportes no respondieron; se muestra la información disponible.');
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    loadReports();
+  }, [loadReports]);
+
+  const salesTotal = reports.sales.reduce((sum, item) => sum + Number(item.montoTotal || 0), 0);
+  const occupiedSeats = reports.occupancy.reduce((sum, item) => sum + Number(item.plazasOcupadas || 0), 0);
+  const openIncidents = reports.severities.reduce((sum, item) => sum + Number(item.abiertos || 0), 0);
+
   return (
     <main className="admin-page">
       <section className="admin-header">
@@ -2456,6 +3068,81 @@ function ReporteriaSection() {
           <div className="section-label">Reporteria</div>
           <h1>Reporteria</h1>
         </div>
+        <button className="btn btn-outline" type="button" onClick={loadReports} disabled={loading}>
+          {loading ? 'Actualizando' : 'Actualizar'}
+        </button>
+      </section>
+      {message && <div className="connection-alert">{message}</div>}
+      <section className="report-summary-grid">
+        <article><span>Ventas</span><strong>{formatCurrency(salesTotal)}</strong></article>
+        <article><span>Plazas ocupadas</span><strong>{occupiedSeats}</strong></article>
+        <article><span>Incidentes abiertos</span><strong>{openIncidents}</strong></article>
+        <article><span>Auditorias recientes</span><strong>{reports.audit.length}</strong></article>
+      </section>
+      <section className="report-grid">
+        <article className="report-panel">
+          <h2>Ventas por fecha</h2>
+          {reports.sales.slice(0, 8).map((row) => (
+            <div className="report-row" key={row.fecha}>
+              <span>{formatDateOnly(row.fecha)}</span>
+              <strong>{formatCurrency(row.montoTotal)}</strong>
+            </div>
+          ))}
+        </article>
+        <article className="report-panel">
+          <h2>Ocupacion de vuelos</h2>
+          {reports.occupancy.slice(0, 8).map((row) => (
+            <div className="report-row" key={row.vueloId}>
+              <span>{row.numeroVuelo}</span>
+              <strong>{Number(row.porcentajeOcupacion || 0).toFixed(1)}%</strong>
+            </div>
+          ))}
+        </article>
+        <article className="report-panel">
+          <h2>Metodos de pago</h2>
+          {reports.payments.map((row) => (
+            <div className="report-row" key={row.metodoPagoId}>
+              <span>{row.metodoPago}</span>
+              <strong>{formatCurrency(row.montoTotal)}</strong>
+            </div>
+          ))}
+        </article>
+        <article className="report-panel">
+          <h2>Incidentes</h2>
+          {reports.severities.map((row) => (
+            <div className="report-row" key={row.severidad}>
+              <span>{row.severidad}</span>
+              <strong>{row.totalIncidentes}</strong>
+            </div>
+          ))}
+        </article>
+        <article className="report-panel">
+          <h2>Mantenimientos</h2>
+          {reports.maintenance.map((row) => (
+            <div className="report-row" key={row.id}>
+              <span>{row.matriculaAvion || row.avion || `Mantenimiento ${row.id}`}</span>
+              <strong>{row.estado}</strong>
+            </div>
+          ))}
+        </article>
+        <article className="report-panel">
+          <h2>Controles de seguridad</h2>
+          {reports.security.map((row) => (
+            <div className="report-row" key={row.id}>
+              <span>{row.pasajero || `Control ${row.id}`}</span>
+              <strong>{row.resultado || row.estado}</strong>
+            </div>
+          ))}
+        </article>
+        <article className="report-panel report-panel-wide">
+          <h2>Auditoria reciente</h2>
+          {reports.audit.map((row) => (
+            <div className="report-row" key={row.id}>
+              <span>{row.tablaAfectada} - {row.operacion}</span>
+              <strong>{row.usuario}</strong>
+            </div>
+          ))}
+        </article>
       </section>
     </main>
   );
@@ -2668,7 +3355,6 @@ function App() {
     criteria: {
       tripType: criteria?.tripType || 'oneway',
       passengers: passengerCountFromCriteria(criteria),
-      passengerAges: passengerAgesFromCriteria(criteria),
       origin: criteria?.origin || flight.origen || '',
       destination: criteria?.destination || flight.destino || '',
       departureDate: criteria?.departureDate || '',
@@ -3020,7 +3706,6 @@ function App() {
       tripType: 'roundtrip',
       passengers: 1,
       passengerGroups: DEFAULT_PASSENGER_GROUPS,
-      passengerAges: passengerAgesFromCriteria({ passengerGroups: DEFAULT_PASSENGER_GROUPS }),
       origin: '',
       destination: destinationName,
       departureDate: '',
@@ -3076,6 +3761,14 @@ function App() {
             error={purchaseError}
           />
         </main>
+      ) : activeView === 'mis-viajes' ? (
+        <MyTripsSection user={user} flights={dashboard.flights} onRequireLogin={() => setLoginOpen(true)} />
+      ) : activeView === 'checkin' ? (
+        <CheckInSection user={user} flights={dashboard.flights} onRequireLogin={() => setLoginOpen(true)} />
+      ) : activeView === 'objetos' ? (
+        <LostObjectsSection airports={dashboard.airports} />
+      ) : activeView === 'promos' ? (
+        <PromotionsSection />
       ) : activeView === 'explorar' && travelCriteria ? (
         <main>
           <TravelResultsView
@@ -3116,7 +3809,18 @@ function App() {
         </main>
       ) : (
         <main>
-          <Hero />
+          <Hero
+            onExploreClick={() => {
+              setAdminView('');
+              setSelectedFlight(null);
+              setTravelCriteria(null);
+              setCartOpen(false);
+              setPurchaseSuccess(null);
+              setActiveView('explorar');
+              setPendingSection('');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
           {purchaseMessage && <div className="connection-alert success-alert">{purchaseMessage}</div>}
           <DestinationSection destinations={dashboard.destinations} onDestinationClick={handleDestinationClick} />
         </main>
@@ -3133,7 +3837,7 @@ function App() {
               <a href="#inicio" onClick={(event) => handleFooterNavigate(event, 'inicio', 'inicio')}>Inicio</a>
               <a href="#explorar" onClick={(event) => handleFooterNavigate(event, 'explorar')}>Explorar vuelos</a>
               <a href="#rastreo" onClick={(event) => handleFooterNavigate(event, 'rastreo')}>Rastreo</a>
-              <a href="#ubicacion" onClick={(event) => handleFooterNavigate(event, 'ubicacion')}>Ubicacion</a>
+              <a href="#ubicacion" onClick={(event) => handleFooterNavigate(event, 'ubicacion')}>Ubicación</a>
             </div>
             <div className="footer-column">
               <h3>Aeropuerto</h3>

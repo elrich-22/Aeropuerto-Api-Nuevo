@@ -17,6 +17,7 @@ builder.Services.AddScoped<ITableReadRepository, TableReadRepository>();
 builder.Services.AddScoped<IOracleCrudRepository, OracleCrudRepository>();
 builder.Services.AddScoped<IAeropuertoQueryService, AeropuertoQueryService>();
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();

@@ -1,10 +1,14 @@
 ﻿using AeropuertoAurora.Api.Data;
 using AeropuertoAurora.Api.DTOs;
+using Microsoft.AspNetCore.Http;
 using Oracle.ManagedDataAccess.Client;
+using System.Text.Json;
 
 namespace AeropuertoAurora.Api.Repositories;
 
-public sealed class TableReadRepository(IOracleConnectionFactory connectionFactory) : ITableReadRepository
+public sealed class TableReadRepository(
+    IOracleConnectionFactory connectionFactory,
+    IHttpContextAccessor httpContextAccessor) : ITableReadRepository
 {
     public async Task<FilasTablaDto> GetRowsAsync(string tableName, int limit, CancellationToken cancellationToken)
     {
@@ -121,7 +125,9 @@ public sealed class TableReadRepository(IOracleConnectionFactory connectionFacto
         }
 
         await command.ExecuteNonQueryAsync(cancellationToken);
-        return await GetLastRowAsync(connection, tableName, metadata, cancellationToken);
+        var row = await GetLastRowAsync(connection, tableName, metadata, cancellationToken);
+        await WriteAuditAsync(connection, tableName, "INSERT", null, row ?? safeValues, cancellationToken);
+        return row;
     }
 
     public async Task<bool> UpdateRowAsync(
@@ -139,6 +145,7 @@ public sealed class TableReadRepository(IOracleConnectionFactory connectionFacto
             return false;
         }
 
+        var previous = await GetRowByKeyAsync(tableName, keyColumn, keyValue, cancellationToken);
         var assignments = string.Join(", ", safeValues.Keys.Select(column => $"{column} = :{column}"));
         var sql = $"UPDATE {tableName} SET {assignments} WHERE {keyColumn.Nombre} = :keyValue";
 
@@ -153,13 +160,20 @@ public sealed class TableReadRepository(IOracleConnectionFactory connectionFacto
         }
 
         command.Parameters.Add(new OracleParameter("keyValue", ConvertValue(keyColumn, keyValue)));
-        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+        var updated = await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+        if (updated)
+        {
+            await WriteAuditAsync(connection, tableName, "UPDATE", previous, WithKey(keyColumn.Nombre, keyValue, safeValues), cancellationToken);
+        }
+
+        return updated;
     }
 
     public async Task<bool> DeleteRowAsync(string tableName, string keyValue, CancellationToken cancellationToken)
     {
         var metadata = await GetMetadataAsync(tableName, cancellationToken);
         var keyColumn = RequirePrimaryKey(metadata);
+        var previous = await GetRowByKeyAsync(tableName, keyColumn, keyValue, cancellationToken);
         var sql = $"DELETE FROM {tableName} WHERE {keyColumn.Nombre} = :keyValue";
 
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
@@ -168,7 +182,13 @@ public sealed class TableReadRepository(IOracleConnectionFactory connectionFacto
         command.CommandText = sql;
         command.Parameters.Add(new OracleParameter("keyValue", ConvertValue(keyColumn, keyValue)));
 
-        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+        var deleted = await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+        if (deleted)
+        {
+            await WriteAuditAsync(connection, tableName, "DELETE", previous, null, cancellationToken);
+        }
+
+        return deleted;
     }
 
     private static ColumnaTablaDto RequirePrimaryKey(MetadataTablaDto metadata)
@@ -257,6 +277,132 @@ public sealed class TableReadRepository(IOracleConnectionFactory connectionFacto
 
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken) ? ReadRow(reader) : null;
+    }
+
+    private async Task<IReadOnlyDictionary<string, object?>?> GetRowByKeyAsync(
+        string tableName,
+        ColumnaTablaDto keyColumn,
+        string keyValue,
+        CancellationToken cancellationToken)
+    {
+        var sql = $"SELECT * FROM {tableName} WHERE {keyColumn.Nombre} = :keyValue";
+
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.BindByName = true;
+        command.CommandText = sql;
+        command.Parameters.Add(new OracleParameter("keyValue", ConvertValue(keyColumn, keyValue)));
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadRow(reader) : null;
+    }
+
+    private async Task WriteAuditAsync(
+        OracleConnection connection,
+        string tableName,
+        string operation,
+        IReadOnlyDictionary<string, object?>? previous,
+        IReadOnlyDictionary<string, object?>? next,
+        CancellationToken cancellationToken)
+    {
+        if (tableName.Equals("AER_AUDITORIA", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        const string sql = """
+            INSERT INTO AER_AUDITORIA (
+                AUD_TABLA_AFECTADA,
+                AUD_OPERACION,
+                AUD_USUARIO,
+                AUD_FECHA_HORA,
+                AUD_IP_ADDRESS,
+                AUD_DATOS_ANTERIORES,
+                AUD_DATOS_NUEVOS
+            )
+            VALUES (
+                :tableName,
+                :operation,
+                :userName,
+                SYSTIMESTAMP,
+                :ipAddress,
+                :previousData,
+                :nextData
+            )
+            """;
+
+        await using var command = connection.CreateCommand();
+        command.BindByName = true;
+        command.CommandText = sql;
+        command.Parameters.Add(new OracleParameter("tableName", tableName));
+        command.Parameters.Add(new OracleParameter("operation", operation));
+        command.Parameters.Add(new OracleParameter("userName", CurrentUser()));
+        command.Parameters.Add(new OracleParameter("ipAddress", CurrentIpAddress()));
+        command.Parameters.Add(new OracleParameter("previousData", SerializeAuditData(previous)));
+        command.Parameters.Add(new OracleParameter("nextData", SerializeAuditData(next)));
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static IReadOnlyDictionary<string, object?> WithKey(
+        string keyColumn,
+        string keyValue,
+        IReadOnlyDictionary<string, object?> values)
+    {
+        var result = new Dictionary<string, object?>(values, StringComparer.OrdinalIgnoreCase)
+        {
+            [keyColumn] = keyValue
+        };
+
+        return result;
+    }
+
+    private string CurrentUser()
+    {
+        var request = httpContextAccessor.HttpContext?.Request;
+        var value =
+            request?.Headers["X-User"].FirstOrDefault() ??
+            request?.Headers["X-Usuario"].FirstOrDefault() ??
+            request?.Headers["X-User-Email"].FirstOrDefault();
+
+        return string.IsNullOrWhiteSpace(value) ? "sistema" : value[..Math.Min(value.Length, 50)];
+    }
+
+    private string? CurrentIpAddress()
+    {
+        var context = httpContextAccessor.HttpContext;
+        var forwarded = context?.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        var value = string.IsNullOrWhiteSpace(forwarded)
+            ? context?.Connection.RemoteIpAddress?.ToString()
+            : forwarded.Split(',')[0].Trim();
+
+        return string.IsNullOrWhiteSpace(value) ? null : value[..Math.Min(value.Length, 50)];
+    }
+
+    private static string? SerializeAuditData(IReadOnlyDictionary<string, object?>? values)
+    {
+        if (values is null)
+        {
+            return null;
+        }
+
+        var masked = values.ToDictionary(
+            pair => pair.Key,
+            pair => IsSensitiveColumn(pair.Key) ? "***" : pair.Value,
+            StringComparer.OrdinalIgnoreCase);
+
+        return JsonSerializer.Serialize(masked);
+    }
+
+    private static bool IsSensitiveColumn(string column)
+    {
+        return column.Contains("CONTRASENA", StringComparison.OrdinalIgnoreCase) ||
+            column.Contains("PASSWORD", StringComparison.OrdinalIgnoreCase) ||
+            column.Contains("HASH", StringComparison.OrdinalIgnoreCase) ||
+            column.Equals("USL_SAL", StringComparison.OrdinalIgnoreCase) ||
+            column.Contains("SALT", StringComparison.OrdinalIgnoreCase) ||
+            column.Contains("TOKEN", StringComparison.OrdinalIgnoreCase) ||
+            column.Contains("TARJETA", StringComparison.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyDictionary<string, object?> ReadRow(OracleDataReader reader)
