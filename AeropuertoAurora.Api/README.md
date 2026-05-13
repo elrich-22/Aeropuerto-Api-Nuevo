@@ -51,21 +51,21 @@ Si `Email:Enabled` esta en `false` o falta algun dato SMTP, la compra se confirm
 Los scripts de Oracle estan en [Database](./Database):
 
 - `Database/aeropuerto_aurora_v2.sql`: crea la estructura completa de la base de datos.
-- `Database/aeropuerto_aurora_seed.sql`: carga data de prueba con IDs fijos.
-- `Database/reset-identities.sql`: resincroniza columnas identity despues del seed.
+- `Database/aeropuerto_aurora_seed_maestra.sql`: seed principal de demo/preproduccion con expansion global y datos masivos.
+
+Credenciales demo utiles del seed maestra:
+
+- `admin.aurora` / `AdminAurora1!`
+- `soporte.operaciones` / `SoporteAurora1!`
+- `auditoria.seguridad` / `SoporteAurora1!`
+- Usuarios demo activos genericos / `AuroraDemo1!`
+- Usuarios demo inactivos o bloqueados / `DemoInactivo1!`
 
 Orden recomendado de ejecucion:
 
 ```sql
 @Database/aeropuerto_aurora_v2.sql
-@Database/aeropuerto_aurora_seed.sql
-@Database/reset-identities.sql
-```
-
-El seed inserta IDs fijos. Si luego haces `POST` desde Swagger y Oracle devuelve `ORA-00001` sobre una PK, ejecuta:
-
-```sql
-@Database/reset-identities.sql
+@Database/aeropuerto_aurora_seed_maestra.sql
 ```
 
 ## Ejecutar

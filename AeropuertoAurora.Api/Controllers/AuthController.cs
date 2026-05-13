@@ -110,14 +110,14 @@ public sealed class AuthController(IOracleCrudRepository repository, IAeropuerto
             ["PAS_FECHA_REGISTRO"] = DateTime.UtcNow
         }, cancellationToken);
 
-        var salt = Guid.NewGuid().ToString("N")[..12];
+        var passwordData = PasswordHasher.HashPassword(dto.Contrasena);
         var userId = await repository.CreateAsync(UsersTable, new Dictionary<string, object?>
         {
             ["USL_ID_PASAJERO"] = passengerId,
             ["USL_USUARIO"] = dto.Usuario,
             ["USL_EMAIL"] = dto.Email,
-            ["USL_CONTRASENA_HASH"] = $"{dto.Contrasena}:{salt}",
-            ["USL_SAL"] = salt,
+            ["USL_CONTRASENA_HASH"] = passwordData.Hash,
+            ["USL_SAL"] = passwordData.Salt,
             ["USL_ESTADO"] = "ACTIVO",
             ["USL_EMAIL_VERIFICADO"] = "S",
             ["USL_TOKEN_VERIFICACION"] = null,
@@ -142,19 +142,6 @@ public sealed class AuthController(IOracleCrudRepository repository, IAeropuerto
             dto.Telefono));
     }
 
-    private static bool PasswordMatches(string password, string storedHash, string salt)
-    {
-        if (string.Equals(password, storedHash, StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        if (storedHash.StartsWith("$2a$10$demoHash", StringComparison.Ordinal) &&
-            string.Equals(password, "demo", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return string.Equals($"{password}:{salt}", storedHash, StringComparison.Ordinal);
-    }
+    private static bool PasswordMatches(string password, string storedHash, string salt) =>
+        PasswordHasher.VerifyPassword(password, storedHash, salt);
 }

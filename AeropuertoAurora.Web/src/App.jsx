@@ -861,6 +861,11 @@ function AuthModal({ open, onClose, onLogin, onRegister }) {
         <div className="section-label">Portal de compra</div>
         <h2 id="login-title">{mode === 'login' ? 'Iniciar sesión' : 'Crear usuario'}</h2>
         <p>{mode === 'login' ? 'Entra para comprar vuelos y ver tus viajes.' : 'Crea tu pasajero y usuario para comprar boletos en línea.'}</p>
+        {mode === 'login' && (
+          <small>
+            Demo: <strong>admin.aurora</strong> / <strong>AdminAurora1!</strong>
+          </small>
+        )}
         <div className="auth-tabs">
           <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); setError(''); }}>Entrar</button>
           <button type="button" className={mode === 'register' ? 'active' : ''} onClick={() => { setMode('register'); setError(''); }}>Crear cuenta</button>
