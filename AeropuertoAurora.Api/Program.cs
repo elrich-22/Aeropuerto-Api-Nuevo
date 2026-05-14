@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using AeropuertoAurora.Api.Configuration;
 using AeropuertoAurora.Api.Data;
 using AeropuertoAurora.Api.Middleware;
@@ -49,6 +50,27 @@ else
 }
 
 builder.Services.AddAuthorization();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("login", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0
+            }));
+
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        await context.HttpContext.Response.WriteAsJsonAsync(
+            new { message = "Demasiadas solicitudes. Intenta de nuevo en un momento." }, token);
+    };
+});
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
@@ -126,6 +148,7 @@ app.UseCors("Frontend");
 app.UseApiKeyProtection();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 app.MapControllers();
 
