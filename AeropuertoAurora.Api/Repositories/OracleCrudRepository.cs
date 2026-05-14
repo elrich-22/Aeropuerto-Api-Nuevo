@@ -184,6 +184,69 @@ public sealed class OracleCrudRepository(
         return rows;
     }
 
+    public async Task<IReadOnlyDictionary<string, object?>?> GetByLoginIdentifierAsync(
+        CrudTableDefinition table,
+        string usernameColumn,
+        string emailColumn,
+        string identifier,
+        CancellationToken cancellationToken)
+    {
+        var sql = $"""
+            SELECT * FROM {table.TableName}
+            WHERE UPPER({usernameColumn}) = UPPER(:value)
+               OR UPPER({emailColumn}) = UPPER(:value)
+            FETCH FIRST 1 ROWS ONLY
+            """;
+
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.BindByName = true;
+        command.CommandText = sql;
+        command.Parameters.Add(new OracleParameter("value", identifier));
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadRow(reader) : null;
+    }
+
+    public async Task<bool> UpdatePartialAsync(
+        CrudTableDefinition table,
+        int id,
+        IReadOnlyDictionary<string, object?> partialValues,
+        CancellationToken cancellationToken)
+    {
+        var safeValues = table.UpdateColumns
+            .Where(partialValues.ContainsKey)
+            .ToDictionary(col => col, col => partialValues[col], StringComparer.OrdinalIgnoreCase);
+
+        if (safeValues.Count == 0)
+        {
+            return false;
+        }
+
+        var previous = await GetByIdAsync(table, id, cancellationToken);
+        var assignments = string.Join(", ", safeValues.Keys.Select(col => $"{col} = :{col}"));
+        var sql = $"UPDATE {table.TableName} SET {assignments} WHERE {table.IdColumn} = :id";
+
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.BindByName = true;
+        command.CommandText = sql;
+
+        foreach (var kv in safeValues)
+        {
+            command.Parameters.Add(new OracleParameter(kv.Key, kv.Value ?? DBNull.Value));
+        }
+
+        command.Parameters.Add(new OracleParameter("id", id));
+        var updated = await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+        if (updated)
+        {
+            await WriteAuditAsync(connection, table.TableName, "UPDATE", previous, WithKey(table, id, safeValues), cancellationToken);
+        }
+
+        return updated;
+    }
+
     private async Task WriteAuditAsync(
         OracleConnection connection,
         string tableName,
@@ -246,13 +309,25 @@ public sealed class OracleCrudRepository(
 
     private string CurrentUser()
     {
-        var request = httpContextAccessor.HttpContext?.Request;
-        var value =
+        var context = httpContextAccessor.HttpContext;
+
+        var claimValue =
+            context?.User.FindFirst("usuario")?.Value ??
+            context?.User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ??
+            context?.User.FindFirst("email")?.Value;
+
+        if (!string.IsNullOrWhiteSpace(claimValue))
+        {
+            return claimValue[..Math.Min(claimValue.Length, 50)];
+        }
+
+        var request = context?.Request;
+        var headerValue =
             request?.Headers["X-User"].FirstOrDefault() ??
             request?.Headers["X-Usuario"].FirstOrDefault() ??
             request?.Headers["X-User-Email"].FirstOrDefault();
 
-        return string.IsNullOrWhiteSpace(value) ? "sistema" : value[..Math.Min(value.Length, 50)];
+        return string.IsNullOrWhiteSpace(headerValue) ? "sistema" : headerValue[..Math.Min(headerValue.Length, 50)];
     }
 
     private string? CurrentIpAddress()

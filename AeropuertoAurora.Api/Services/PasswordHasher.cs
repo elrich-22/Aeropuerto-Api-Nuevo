@@ -29,19 +29,7 @@ public static class PasswordHasher
             return false;
         }
 
-        if (TryVerifyPbkdf2(password, storedHash))
-        {
-            return true;
-        }
-
-        if (storedHash.StartsWith("$2a$10$demoHash", StringComparison.Ordinal) &&
-            string.Equals(password, "demo", StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        return string.Equals($"{password}:{legacySalt}", storedHash, StringComparison.Ordinal) ||
-               string.Equals(password, storedHash, StringComparison.Ordinal);
+        return TryVerifyPbkdf2(password, storedHash);
     }
 
     private static bool TryVerifyPbkdf2(string password, string storedHash)

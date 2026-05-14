@@ -1,14 +1,22 @@
+using System.Security.Claims;
 using AeropuertoAurora.Api.DTOs;
 using AeropuertoAurora.Api.Repositories;
 using AeropuertoAurora.Api.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AeropuertoAurora.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public sealed class AuthController(IOracleCrudRepository repository, IAeropuertoQueryService service) : ControllerBase
+public sealed class AuthController(
+    IOracleCrudRepository repository,
+    IAeropuertoQueryService service,
+    IJwtService jwtService) : ControllerBase
 {
+    private const int MaxFailedAttempts = 5;
+    private const int LockoutMinutes = 30;
+
     private static readonly CrudTableDefinition PassengersTable = new(
         "AER_PASAJERO",
         "PAS_ID_PASAJERO",
@@ -29,36 +37,61 @@ public sealed class AuthController(IOracleCrudRepository repository, IAeropuerto
             return BadRequest(new { message = "Usuario y contrasena son obligatorios." });
         }
 
-        var users = await repository.GetAllAsync(UsersTable, 500, cancellationToken);
-        var user = users.FirstOrDefault(row =>
-            string.Equals(row.ToStringValue("USL_USUARIO"), dto.UsuarioOEmail, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(row.ToStringValue("USL_EMAIL"), dto.UsuarioOEmail, StringComparison.OrdinalIgnoreCase));
+        var user = await repository.GetByLoginIdentifierAsync(
+            UsersTable, "USL_USUARIO", "USL_EMAIL", dto.UsuarioOEmail, cancellationToken);
 
-        if (user is null || !string.Equals(user.ToStringValue("USL_ESTADO"), "ACTIVO", StringComparison.OrdinalIgnoreCase))
+        if (user is null)
         {
             return Unauthorized(new { message = "Usuario o contrasena incorrectos." });
+        }
+
+        var userId = user.ToInt("USL_ID_USUARIO");
+        var estado = user.ToStringValue("USL_ESTADO");
+
+        if (string.Equals(estado, "INACTIVO", StringComparison.OrdinalIgnoreCase))
+        {
+            return Unauthorized(new { message = "La cuenta esta inactiva. Contacta al administrador." });
+        }
+
+        var bloqueadoHasta = user.ToNullableDateTime("USL_BLOQUEADO_HASTA");
+        if (bloqueadoHasta.HasValue && bloqueadoHasta.Value > DateTime.Now)
+        {
+            var minutosRestantes = (int)Math.Ceiling((bloqueadoHasta.Value - DateTime.Now).TotalMinutes);
+            return StatusCode(StatusCodes.Status423Locked, new
+            {
+                message = $"Cuenta bloqueada temporalmente. Intenta de nuevo en {minutosRestantes} minuto(s)."
+            });
         }
 
         if (!PasswordMatches(dto.Contrasena, user.ToStringValue("USL_CONTRASENA_HASH"), user.ToStringValue("USL_SAL")))
         {
+            await RegisterFailedAttemptAsync(userId, user, cancellationToken);
             return Unauthorized(new { message = "Usuario o contrasena incorrectos." });
         }
 
+        await RegisterSuccessfulLoginAsync(userId, cancellationToken);
+
         var passengerId = user.ToInt("USL_ID_PASAJERO");
-        var passenger = (await service.GetPassengersAsync(500, cancellationToken)).FirstOrDefault(item => item.Id == passengerId);
+        var passenger = (await service.GetPassengersAsync(500, cancellationToken)).FirstOrDefault(p => p.Id == passengerId);
         var fullName = passenger is null
             ? user.ToStringValue("USL_USUARIO")
-            : string.Join(" ", new[] { passenger.PrimerNombre, passenger.SegundoNombre, passenger.PrimerApellido, passenger.SegundoApellido }.Where(part => !string.IsNullOrWhiteSpace(part)));
+            : string.Join(" ", new[] { passenger.PrimerNombre, passenger.SegundoNombre, passenger.PrimerApellido, passenger.SegundoApellido }
+                .Where(part => !string.IsNullOrWhiteSpace(part)));
+
+        var usuarioStr = user.ToStringValue("USL_USUARIO");
+        var emailStr = user.ToStringValue("USL_EMAIL");
+        var token = jwtService.GenerateToken(userId, passengerId, usuarioStr, emailStr);
 
         return Ok(new UsuarioSesionDto(
-            user.ToInt("USL_ID_USUARIO"),
+            userId,
             passengerId,
-            user.ToStringValue("USL_USUARIO"),
-            user.ToStringValue("USL_EMAIL"),
+            usuarioStr,
+            emailStr,
             fullName,
             passenger?.NumeroDocumento,
             passenger?.TipoDocumento,
-            passenger?.Telefono));
+            passenger?.Telefono,
+            token));
     }
 
     [HttpPost("register")]
@@ -70,15 +103,10 @@ public sealed class AuthController(IOracleCrudRepository repository, IAeropuerto
             string.IsNullOrWhiteSpace(dto.NumeroDocumento) ||
             string.IsNullOrWhiteSpace(dto.TipoDocumento) ||
             string.IsNullOrWhiteSpace(dto.PrimerNombre) ||
-            string.IsNullOrWhiteSpace(dto.SegundoNombre) ||
             string.IsNullOrWhiteSpace(dto.PrimerApellido) ||
-            string.IsNullOrWhiteSpace(dto.SegundoApellido) ||
-            dto.FechaNacimiento is null ||
-            string.IsNullOrWhiteSpace(dto.Nacionalidad) ||
-            string.IsNullOrWhiteSpace(dto.Sexo) ||
-            string.IsNullOrWhiteSpace(dto.Telefono))
+            dto.FechaNacimiento is null)
         {
-            return BadRequest(new { message = "Completa todos los campos del registro." });
+            return BadRequest(new { message = "Completa todos los campos obligatorios del registro." });
         }
 
         if (!dto.Email.Contains('@', StringComparison.Ordinal) || !dto.Email.Contains('.', StringComparison.Ordinal))
@@ -86,12 +114,18 @@ public sealed class AuthController(IOracleCrudRepository repository, IAeropuerto
             return BadRequest(new { message = "Ingresa un email valido." });
         }
 
-        var users = await repository.GetAllAsync(UsersTable, 1000, cancellationToken);
-        if (users.Any(row =>
-            string.Equals(row.ToStringValue("USL_USUARIO"), dto.Usuario, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(row.ToStringValue("USL_EMAIL"), dto.Email, StringComparison.OrdinalIgnoreCase)))
+        var existing = await repository.GetByLoginIdentifierAsync(
+            UsersTable, "USL_USUARIO", "USL_EMAIL", dto.Usuario, cancellationToken);
+        if (existing is not null)
         {
-            return Conflict(new { message = "Ya existe un usuario con ese nombre o email." });
+            return Conflict(new { message = "Ya existe un usuario con ese nombre." });
+        }
+
+        var existingEmail = await repository.GetByLoginIdentifierAsync(
+            UsersTable, "USL_USUARIO", "USL_EMAIL", dto.Email, cancellationToken);
+        if (existingEmail is not null)
+        {
+            return Conflict(new { message = "Ya existe un usuario con ese email." });
         }
 
         var passengerId = await repository.CreateAsync(PassengersTable, new Dictionary<string, object?>
@@ -129,7 +163,9 @@ public sealed class AuthController(IOracleCrudRepository repository, IAeropuerto
             ["USL_VENCIMIENTO_TOKEN"] = null
         }, cancellationToken);
 
-        var fullName = string.Join(" ", new[] { dto.PrimerNombre, dto.SegundoNombre, dto.PrimerApellido, dto.SegundoApellido }.Where(part => !string.IsNullOrWhiteSpace(part)));
+        var fullName = string.Join(" ", new[] { dto.PrimerNombre, dto.SegundoNombre, dto.PrimerApellido, dto.SegundoApellido }
+            .Where(part => !string.IsNullOrWhiteSpace(part)));
+        var token = jwtService.GenerateToken(userId, passengerId, dto.Usuario, dto.Email);
 
         return CreatedAtAction(nameof(Login), new UsuarioSesionDto(
             userId,
@@ -139,7 +175,47 @@ public sealed class AuthController(IOracleCrudRepository repository, IAeropuerto
             fullName,
             dto.NumeroDocumento,
             dto.TipoDocumento,
-            dto.Telefono));
+            dto.Telefono,
+            token));
+    }
+
+    [Authorize]
+    [HttpGet("perfil")]
+    public IActionResult Perfil()
+    {
+        var userId = int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub"), out var id) ? id : 0;
+        var pasajeroId = int.TryParse(User.FindFirstValue("pasajeroId"), out var pid) ? pid : 0;
+        var usuario = User.FindFirstValue("usuario") ?? string.Empty;
+        var email = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue("email") ?? string.Empty;
+
+        return Ok(new PerfilUsuarioDto(userId, pasajeroId, usuario, email));
+    }
+
+    private async Task RegisterFailedAttemptAsync(
+        int userId,
+        IReadOnlyDictionary<string, object?> user,
+        CancellationToken cancellationToken)
+    {
+        var intentos = (user.ToNullableInt("USL_INTENTOS_FALLIDOS") ?? 0) + 1;
+        DateTime? bloqueadoHasta = intentos >= MaxFailedAttempts
+            ? DateTime.Now.AddMinutes(LockoutMinutes)
+            : null;
+
+        await repository.UpdatePartialAsync(UsersTable, userId, new Dictionary<string, object?>
+        {
+            ["USL_INTENTOS_FALLIDOS"] = intentos,
+            ["USL_BLOQUEADO_HASTA"] = (object?)bloqueadoHasta ?? DBNull.Value
+        }, cancellationToken);
+    }
+
+    private async Task RegisterSuccessfulLoginAsync(int userId, CancellationToken cancellationToken)
+    {
+        await repository.UpdatePartialAsync(UsersTable, userId, new Dictionary<string, object?>
+        {
+            ["USL_INTENTOS_FALLIDOS"] = 0,
+            ["USL_BLOQUEADO_HASTA"] = DBNull.Value,
+            ["USL_ULTIMO_ACCESO"] = DateTime.Now
+        }, cancellationToken);
     }
 
     private static bool PasswordMatches(string password, string storedHash, string salt) =>

@@ -1,8 +1,11 @@
+using System.Text;
 using AeropuertoAurora.Api.Configuration;
 using AeropuertoAurora.Api.Data;
 using AeropuertoAurora.Api.Middleware;
 using AeropuertoAurora.Api.Repositories;
 using AeropuertoAurora.Api.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,6 +13,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<DatabaseOptions>(builder.Configuration.GetSection(DatabaseOptions.SectionName));
 builder.Services.Configure<ApiSecurityOptions>(builder.Configuration.GetSection(ApiSecurityOptions.SectionName));
 builder.Services.Configure<EmailOptions>(builder.Configuration.GetSection(EmailOptions.SectionName));
+builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 
 builder.Services.AddSingleton<IOracleConnectionFactory, OracleConnectionFactory>();
 builder.Services.AddScoped<IAeropuertoReadRepository, AeropuertoReadRepository>();
@@ -17,7 +21,34 @@ builder.Services.AddScoped<ITableReadRepository, TableReadRepository>();
 builder.Services.AddScoped<IOracleCrudRepository, OracleCrudRepository>();
 builder.Services.AddScoped<IAeropuertoQueryService, AeropuertoQueryService>();
 builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddHttpContextAccessor();
+
+var jwtSecret = builder.Configuration["Jwt:Secret"];
+if (!string.IsNullOrWhiteSpace(jwtSecret))
+{
+    builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+        .AddJwtBearer(options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuer = builder.Configuration["Jwt:Issuer"] ?? "AeropuertoAurora",
+                ValidateAudience = true,
+                ValidAudience = builder.Configuration["Jwt:Audience"] ?? "AeropuertoAuroraApp",
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecret)),
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero
+            };
+        });
+}
+else
+{
+    builder.Services.AddAuthentication();
+}
+
+builder.Services.AddAuthorization();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
@@ -87,6 +118,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("Frontend");
 app.UseApiKeyProtection();
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

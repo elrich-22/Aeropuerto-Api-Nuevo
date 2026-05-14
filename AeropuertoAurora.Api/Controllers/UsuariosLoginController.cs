@@ -55,17 +55,12 @@ public sealed class UsuariosLoginController(IOracleCrudRepository repository) : 
             row.ToInt("USL_ID_PASAJERO"),
             row.ToStringValue("USL_USUARIO"),
             row.ToStringValue("USL_EMAIL"),
-            row.ToStringValue("USL_CONTRASENA_HASH"),
-            row.ToStringValue("USL_SAL"),
             row.ToStringValue("USL_ESTADO"),
             row.ToStringValue("USL_EMAIL_VERIFICADO"),
-            row.ToNullableString("USL_TOKEN_VERIFICACION"),
             row.ToNullableDateTime("USL_FECHA_REGISTRO"),
             row.ToNullableDateTime("USL_ULTIMO_ACCESO"),
             row.ToNullableInt("USL_INTENTOS_FALLIDOS") ?? 0,
-            row.ToNullableDateTime("USL_BLOQUEADO_HASTA"),
-            row.ToNullableString("USL_TOKEN_RECUPERACION"),
-            row.ToNullableDateTime("USL_VENCIMIENTO_TOKEN"));
+            row.ToNullableDateTime("USL_BLOQUEADO_HASTA"));
     }
 
     private static IReadOnlyDictionary<string, object?> ToValues(CrearUsuarioLoginDto dto) => new Dictionary<string, object?>
