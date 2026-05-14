@@ -587,6 +587,13 @@ function NavBar({ user, adminView, isAdmin, activeView, onAdminView, onNavigate,
               Arrestos
             </button>
             <button
+              className={adminView === 'vuelos' ? 'nav-admin-link active' : 'nav-admin-link'}
+              type="button"
+              onClick={() => onAdminView('vuelos')}
+            >
+              Vuelos
+            </button>
+            <button
               className={adminView === 'admin' ? 'nav-admin-link active' : 'nav-admin-link'}
               type="button"
               onClick={() => onAdminView('admin')}
@@ -3107,6 +3114,176 @@ function ArrestosSection({ airports, flights }) {
   );
 }
 
+function VuelosAdminSection() {
+  const [flights, setFlights] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState(null);
+  const [action, setAction] = useState('');
+  const [newDate, setNewDate] = useState('');
+  const [newTime, setNewTime] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    api.flights(200).then(setFlights).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const selectedFlight = flights.find((f) => f.id === selectedId) ?? null;
+
+  const reload = () => {
+    setLoading(true);
+    api.flights(200).then(setFlights).catch(() => {}).finally(() => setLoading(false));
+  };
+
+  const handleCancel = async () => {
+    if (!selectedFlight) return;
+    setSaving(true);
+    setMessage('');
+    try {
+      await api.updateFlight(selectedFlight.id, { estado: 'CANCELADO' });
+      setMessage('Vuelo cancelado correctamente.');
+      setSelectedId(null);
+      setAction('');
+      reload();
+    } catch (e) {
+      setMessage(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReschedule = async () => {
+    if (!selectedFlight || !newDate) return;
+    setSaving(true);
+    setMessage('');
+    try {
+      const fechaVuelo = newTime
+        ? new Date(`${newDate}T${newTime}:00`)
+        : new Date(`${newDate}T00:00:00`);
+      await api.updateFlight(selectedFlight.id, { estado: 'REPROGRAMADO', fechaVuelo: fechaVuelo.toISOString() });
+      setMessage('Vuelo reprogramado correctamente.');
+      setSelectedId(null);
+      setAction('');
+      setNewDate('');
+      setNewTime('');
+      reload();
+    } catch (e) {
+      setMessage(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectFlight = (id) => {
+    setSelectedId(selectedId === id ? null : id);
+    setAction('');
+    setMessage('');
+  };
+
+  return (
+    <main className="tab-page">
+      <section className="section passenger-tool">
+        <div className="section-label">Admin</div>
+        <h1>Gestión de vuelos</h1>
+        <p className="section-sub">Selecciona un vuelo para cancelarlo o reprogramarlo.</p>
+        {message && <div className="connection-alert">{message}</div>}
+        {selectedFlight && (
+          <div className="card" style={{ marginBottom: '1.25rem', padding: '1.25rem' }}>
+            <h3 style={{ margin: '0 0 .25rem' }}>{selectedFlight.numeroVuelo}</h3>
+            <p style={{ margin: '0 0 .75rem', color: '#64748b', fontSize: '.9rem' }}>
+              {selectedFlight.origen} {'→'} {selectedFlight.destino} &middot; {formatDate(selectedFlight.fechaVuelo)} &middot; <strong>{selectedFlight.estado}</strong>
+            </p>
+            {selectedFlight.estado === 'CANCELADO' ? (
+              <p style={{ color: '#c0392b' }}>Este vuelo ya está cancelado.</p>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className={action === 'cancel' ? 'btn btn-danger' : 'btn btn-outline'}
+                    onClick={() => setAction(action === 'cancel' ? '' : 'cancel')}
+                  >
+                    Cancelar vuelo
+                  </button>
+                  <button
+                    type="button"
+                    className={action === 'reschedule' ? 'btn' : 'btn btn-outline'}
+                    onClick={() => setAction(action === 'reschedule' ? '' : 'reschedule')}
+                  >
+                    Reprogramar
+                  </button>
+                </div>
+                {action === 'cancel' && (
+                  <div style={{ background: '#fff5f5', border: '1px solid #fca5a5', borderRadius: '8px', padding: '1rem', marginBottom: '.75rem' }}>
+                    <p style={{ color: '#c0392b', marginBottom: '.75rem', fontWeight: 600 }}>
+                      ¿Confirmas cancelar este vuelo? Esta acción no se puede deshacer.
+                    </p>
+                    <button type="button" className="btn btn-danger" disabled={saving} onClick={handleCancel}>
+                      {saving ? 'Cancelando...' : 'Confirmar cancelación'}
+                    </button>
+                  </div>
+                )}
+                {action === 'reschedule' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                    <label className="field">
+                      <span>Nueva fecha</span>
+                      <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required />
+                    </label>
+                    <label className="field">
+                      <span>Nueva hora <small>(opcional)</small></span>
+                      <input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
+                    </label>
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={saving || !newDate}
+                      onClick={handleReschedule}
+                    >
+                      {saving ? 'Reprogramando...' : 'Confirmar reprogramación'}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ marginTop: '.75rem' }}
+              onClick={() => { setSelectedId(null); setAction(''); }}
+            >
+              Cerrar
+            </button>
+          </div>
+        )}
+        {loading ? (
+          <p>Cargando vuelos...</p>
+        ) : (
+          <div className="operations-list" style={{ marginTop: '1rem' }}>
+            {flights.length === 0 && <p>No hay vuelos disponibles.</p>}
+            {flights.map((f) => (
+              <div
+                key={f.id}
+                className="operation-row"
+                style={{ cursor: 'pointer', outline: selectedId === f.id ? '2px solid #0077b6' : 'none', borderRadius: '6px' }}
+                onClick={() => selectFlight(f.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && selectFlight(f.id)}
+              >
+                <div>
+                  <strong>{f.numeroVuelo} — {f.origen} {'→'} {f.destino}</strong>
+                  <small>{f.aerolinea} &middot; {formatDate(f.fechaVuelo)}</small>
+                </div>
+                <span className={`status ${statusClassName(f.estado)}`}>{f.estado}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
 const ADMIN_MODULES = [
   { title: 'Operaciones', tables: ['vuelo', 'asignacion_puerta', 'tripulacion', 'checkin', 'tarjeta_embarque'] },
   { title: 'Equipaje y seguridad', tables: ['equipaje', 'movimiento_equipaje', 'control_seguridad', 'control_migratorio', 'arresto'] },
@@ -4068,6 +4245,8 @@ function App() {
         <ReporteriaSection />
       ) : adminView === 'arrestos' && isAdmin ? (
         <ArrestosSection airports={dashboard.airports} flights={dashboard.flights} />
+      ) : adminView === 'vuelos' && isAdmin ? (
+        <VuelosAdminSection />
       ) : activeView === 'success' && purchaseSuccess ? (
         <PurchaseSuccessView
           summary={purchaseSuccess}

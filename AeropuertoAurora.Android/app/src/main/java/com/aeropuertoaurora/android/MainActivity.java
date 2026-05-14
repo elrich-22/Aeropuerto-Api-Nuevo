@@ -102,6 +102,9 @@ public final class MainActivity extends Activity {
     private JSONArray arrestsList = new JSONArray();
     private JSONArray passengersList = new JSONArray();
     private JSONObject arrestFoundPassenger = null;
+    private JSONArray adminFlightsList = new JSONArray();
+    private int actionFlightId = 0;
+    private String actionFlightAction = "";
     private JSONArray myReservations = new JSONArray();
     private JSONArray myCheckIns = new JSONArray();
     private JSONArray myBoardingPasses = new JSONArray();
@@ -279,6 +282,8 @@ public final class MainActivity extends Activity {
             renderLostObjects();
         } else if ("arrestos".equals(activeView)) {
             renderArrestos();
+        } else if ("vuelos_admin".equals(activeView)) {
+            renderVuelosAdmin();
         } else if ("operaciones".equals(activeView)) {
             renderOperations();
         } else if ("reportes".equals(activeView)) {
@@ -379,6 +384,9 @@ public final class MainActivity extends Activity {
         trip.addView(menuOption("\u25C9", "Ubicación", "Ver donde está el aeropuerto", "ubicacion"));
         if (isAdmin()) {
             trip.addView(menuOption("⚠", "Arrestos", "Registro de pasajeros arrestados", "arrestos"));
+        }
+        if (isAdmin()) {
+            trip.addView(menuOption("✈", "Vuelos", "Cancelar o reprogramar vuelos", "vuelos_admin"));
         }
         contentLayout.addView(trip);
     }
@@ -2147,6 +2155,155 @@ public final class MainActivity extends Activity {
         return sb.toString();
     }
 
+    private void renderVuelosAdmin() {
+        if (!isAdmin()) {
+            addAlert("Solo administradores pueden acceder a esta seccion.", true);
+            return;
+        }
+        contentLayout.addView(screenHeader("Gestion de vuelos", "Cancela o reprograma vuelos programados.", "menu_more", "Actualizar", v -> loadAdminFlights()));
+
+        // Action panel for selected flight
+        if (actionFlightId > 0) {
+            JSONObject selectedFlight = null;
+            for (int i = 0; i < adminFlightsList.length(); i++) {
+                JSONObject f = adminFlightsList.optJSONObject(i);
+                if (f != null && f.optInt("id", 0) == actionFlightId) {
+                    selectedFlight = f;
+                    break;
+                }
+            }
+            if (selectedFlight != null) {
+                final JSONObject flight = selectedFlight;
+                LinearLayout actionCard = compactCard();
+                String numVuelo = value(flight, "numeroVuelo", "#" + actionFlightId);
+                String origen = value(flight, "origen", "?");
+                String destino = value(flight, "destino", "?");
+                String estado = value(flight, "estado", "?");
+
+                actionCard.addView(text(numVuelo + "  " + origen + " > " + destino, 15, TEAL, Typeface.BOLD));
+                actionCard.addView(text("Estado: " + estado, 13, MUTED, Typeface.NORMAL));
+
+                if (!"CANCELADO".equalsIgnoreCase(estado)) {
+                    LinearLayout btns = new LinearLayout(this);
+                    btns.setOrientation(LinearLayout.HORIZONTAL);
+                    btns.setLayoutParams(matchWrap());
+                    btns.addView(outlineButton("Cancelar vuelo", v -> {
+                        actionFlightAction = "cancel".equals(actionFlightAction) ? "" : "cancel";
+                        render();
+                    }));
+                    btns.addView(outlineButton("Reprogramar", v -> {
+                        actionFlightAction = "reschedule".equals(actionFlightAction) ? "" : "reschedule";
+                        render();
+                    }));
+                    actionCard.addView(btns);
+
+                    if ("cancel".equals(actionFlightAction)) {
+                        actionCard.addView(text("Confirmas cancelar este vuelo? No se puede deshacer.", 13, RED, Typeface.BOLD));
+                        actionCard.addView(primaryButton("Confirmar cancelacion", v -> cancelFlight(flight.optInt("id", 0))));
+                    } else if ("reschedule".equals(actionFlightAction)) {
+                        EditText dateInput = input("Nueva fecha (YYYY-MM-DD)", "", false);
+                        EditText timeInput = input("Nueva hora HH:MM (opcional)", "", false);
+                        actionCard.addView(dateInput);
+                        actionCard.addView(timeInput);
+                        actionCard.addView(primaryButton("Confirmar reprogramacion", v -> {
+                            String d = dateInput.getText().toString().trim();
+                            String t = timeInput.getText().toString().trim();
+                            if (d.isEmpty()) {
+                                lastMessage = "Ingresa la nueva fecha (YYYY-MM-DD).";
+                                render();
+                                return;
+                            }
+                            rescheduleFlight(flight.optInt("id", 0), d, t);
+                        }));
+                    }
+                } else {
+                    actionCard.addView(text("Este vuelo ya esta cancelado.", 13, RED, Typeface.ITALIC));
+                }
+
+                actionCard.addView(outlineButton("Cerrar panel", v -> {
+                    actionFlightId = 0;
+                    actionFlightAction = "";
+                    render();
+                }));
+                contentLayout.addView(actionCard);
+            }
+        }
+
+        LinearLayout flightListCard = card();
+        flightListCard.addView(sectionTitle("Vuelos (" + adminFlightsList.length() + ") — toca uno para seleccionarlo"));
+        boolean hasFlights = false;
+        for (int i = 0; i < Math.min(200, adminFlightsList.length()); i++) {
+            JSONObject item = adminFlightsList.optJSONObject(i);
+            if (item == null) continue;
+            hasFlights = true;
+            final int fId = item.optInt("id", 0);
+            String numVuelo = value(item, "numeroVuelo", "-");
+            String origen = value(item, "origen", "?");
+            String destino = value(item, "destino", "?");
+            String estado = value(item, "estado", "-");
+            String fecha = value(item, "fechaVuelo", "");
+            String fechaShort = fecha.length() >= 10 ? fecha.substring(0, 10) : fecha;
+            LinearLayout itemCard = compactCard();
+            if (fId == actionFlightId) {
+                itemCard.setBackgroundColor(Color.rgb(224, 242, 254));
+            }
+            itemCard.addView(text(numVuelo + "  " + origen + " > " + destino, 15, TEXT, Typeface.BOLD));
+            itemCard.addView(text(estado + (fechaShort.isEmpty() ? "" : "  .  " + fechaShort), 13, MUTED, Typeface.NORMAL));
+            itemCard.setOnClickListener(v -> {
+                actionFlightId = (actionFlightId == fId) ? 0 : fId;
+                actionFlightAction = "";
+                render();
+            });
+            flightListCard.addView(itemCard);
+        }
+        if (!hasFlights) {
+            flightListCard.addView(text("Sin vuelos cargados.", 13, MUTED, Typeface.NORMAL));
+        }
+        contentLayout.addView(flightListCard);
+
+        if (lastMessage != null && !lastMessage.isEmpty()) {
+            LinearLayout msgCard = compactCard();
+            msgCard.addView(text(lastMessage, 13, TEAL, Typeface.NORMAL));
+            contentLayout.addView(msgCard);
+            lastMessage = "";
+        }
+    }
+
+    private void loadAdminFlights() {
+        runTask("Cargando vuelos...", () -> apiClient.get("/api/vuelos?limit=200"), json -> {
+            adminFlightsList = new JSONArray(json);
+            render();
+        });
+    }
+
+    private void cancelFlight(int id) {
+        runTask("Cancelando vuelo...", () -> {
+            org.json.JSONObject body = new org.json.JSONObject();
+            body.put("estado", "CANCELADO");
+            return apiClient.put("/api/vuelos/" + id, body.toString());
+        }, json -> {
+            lastMessage = "Vuelo cancelado correctamente.";
+            actionFlightId = 0;
+            actionFlightAction = "";
+            loadAdminFlights();
+        });
+    }
+
+    private void rescheduleFlight(int id, String date, String time) {
+        runTask("Reprogramando vuelo...", () -> {
+            String fechaVuelo = time.isEmpty() ? date + "T00:00:00" : date + "T" + time + ":00";
+            org.json.JSONObject body = new org.json.JSONObject();
+            body.put("estado", "REPROGRAMADO");
+            body.put("fechaVuelo", fechaVuelo);
+            return apiClient.put("/api/vuelos/" + id, body.toString());
+        }, json -> {
+            lastMessage = "Vuelo reprogramado correctamente.";
+            actionFlightId = 0;
+            actionFlightAction = "";
+            loadAdminFlights();
+        });
+    }
+
     private void loadArrestosData() {
         runTask("Cargando arrestos...", () -> {
             String arrestsJson = apiClient.get("/api/arrestos?limit=100");
@@ -3181,6 +3338,9 @@ public final class MainActivity extends Activity {
         }
         if ("arrestos".equals(view) && isAdmin() && arrestsList.length() == 0) {
             loadArrestosData();
+        }
+        if ("vuelos_admin".equals(view) && isAdmin() && adminFlightsList.length() == 0) {
+            loadAdminFlights();
         }
         render();
     }

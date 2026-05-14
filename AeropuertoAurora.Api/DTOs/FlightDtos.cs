@@ -111,3 +111,7 @@ public sealed record ActualizarAsignacionAsientoDto(
     int AsientoId,
     DateTime? FechaAsignacion,
     string Estado);
+
+public sealed record ActualizarVueloEstadoDto(
+    string Estado,
+    DateTime? FechaVuelo);
