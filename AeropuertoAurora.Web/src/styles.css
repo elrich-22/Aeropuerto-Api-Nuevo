@@ -1852,6 +1852,21 @@ footer p {
   gap: 0.85rem;
 }
 
+.passenger-additional {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.passenger-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--primary-dark);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
 .passenger-account-summary {
   grid-column: 1 / -1;
   display: grid;

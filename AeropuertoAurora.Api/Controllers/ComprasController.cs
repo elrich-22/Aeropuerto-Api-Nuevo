@@ -16,7 +16,7 @@ public sealed class ComprasController(
     private static readonly CrudTableDefinition PasajerosTable = new(
         "AER_PASAJERO",
         "PAS_ID_PASAJERO",
-        [],
+        ["PAS_NUMERO_DOCUMENTO", "PAS_TIPO_DOCUMENTO", "PAS_PRIMER_NOMBRE", "PAS_SEGUNDO_NOMBRE", "PAS_PRIMER_APELLIDO", "PAS_SEGUNDO_APELLIDO", "PAS_FECHA_NACIMIENTO", "PAS_NACIONALIDAD", "PAS_SEXO", "PAS_TELEFONO", "PAS_EMAIL", "PAS_FECHA_REGISTRO"],
         []);
 
     private static readonly CrudTableDefinition ReservasTable = new(
@@ -52,11 +52,12 @@ public sealed class ComprasController(
         }
 
         var normalizedClass = NormalizeClass(dto.Clase);
-        var seatsToBook = Math.Max(1, dto.NumeroPasajeros);
+        var additionalCount = dto.PasajerosAdicionales?.Count ?? 0;
+        var seatsToBook = additionalCount > 0 ? 1 + additionalCount : Math.Max(1, dto.NumeroPasajeros);
         var fare = dto.TarifaPagada > 0 ? dto.TarifaPagada : 1250m;
         var taxes = Math.Round(fare * 0.12m, 2);
         var total = fare + taxes;
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
         var reservationCode = $"R{now:MMddHHmmssfff}{dto.PasajeroId % 100:D2}{dto.VueloId % 100:D2}";
         var saleNumber = $"WEB-{now:yyMMddHHmmssfff}-{dto.UsuarioId}-{dto.VueloId}";
 
@@ -119,6 +120,39 @@ public sealed class ComprasController(
             ["DEV_CARGOS_ADICIONALES"] = taxes
         }, cancellationToken);
 
+        var additionalReservations = new List<ReservaAdicionalInfo>();
+
+        if (dto.PasajerosAdicionales is { Count: > 0 })
+        {
+            foreach (var extra in dto.PasajerosAdicionales)
+            {
+                var extraPassengerId = await EnsurePassengerExistsAsync(extra, now, cancellationToken);
+                var extraCode = $"R{now:MMddHHmmssfff}{extraPassengerId % 100:D2}{dto.VueloId % 100:D2}";
+                var extraReservationId = await repository.CreateAsync(ReservasTable, new Dictionary<string, object?>
+                {
+                    ["RES_ID_VUELO"] = dto.VueloId,
+                    ["RES_ID_PASAJERO"] = extraPassengerId,
+                    ["RES_CLASE"] = normalizedClass,
+                    ["RES_FECHA_RESERVA"] = now,
+                    ["RES_ESTADO"] = "CONFIRMADA",
+                    ["RES_EQUIPAJE_FACTURADO"] = dto.EquipajeFacturado,
+                    ["RES_PESO_EQUIPAJE"] = dto.PesoEquipaje,
+                    ["RES_TARIFA_PAGADA"] = fare,
+                    ["RES_CODIGO_RESERVA"] = extraCode
+                }, cancellationToken);
+
+                await repository.CreateAsync(DetallesTable, new Dictionary<string, object?>
+                {
+                    ["DEV_ID_VENTA"] = saleId,
+                    ["DEV_ID_RESERVA"] = extraReservationId,
+                    ["DEV_PRECIO_BASE"] = fare,
+                    ["DEV_CARGOS_ADICIONALES"] = taxes
+                }, cancellationToken);
+
+                additionalReservations.Add(new ReservaAdicionalInfo(extraPassengerId, extraReservationId, extraCode));
+            }
+        }
+
         var occupiedSeats = flight.PlazasOcupadas + seatsToBook;
         var availableSeats = Math.Max(0, flight.PlazasDisponibles - seatsToBook);
         await repository.UpdateAsync(VuelosDisponibilidadTable, dto.VueloId, new Dictionary<string, object?>
@@ -172,7 +206,8 @@ public sealed class ComprasController(
             updatedFlight?.PlazasOcupadas ?? occupiedSeats,
             updatedFlight?.PlazasDisponibles ?? availableSeats,
             confirmationEmailSent,
-            confirmationEmail));
+            confirmationEmail,
+            additionalReservations));
     }
 
     [HttpPost("confirmacion-correo")]
@@ -208,6 +243,31 @@ public sealed class ComprasController(
             correoConfirmacionEnviado = sent,
             correoConfirmacionDestino = dto.EmailConfirmacion
         });
+    }
+
+    private async Task<int> EnsurePassengerExistsAsync(PasajeroAdicionalDto dto, DateTime registeredAt, CancellationToken cancellationToken)
+    {
+        var existing = await repository.GetByColumnAsync(PasajerosTable, "PAS_NUMERO_DOCUMENTO", dto.NumeroDocumento, cancellationToken);
+        if (existing.Count > 0)
+        {
+            return existing[0].ToInt("PAS_ID_PASAJERO");
+        }
+
+        return await repository.CreateAsync(PasajerosTable, new Dictionary<string, object?>
+        {
+            ["PAS_NUMERO_DOCUMENTO"] = dto.NumeroDocumento,
+            ["PAS_TIPO_DOCUMENTO"] = dto.TipoDocumento,
+            ["PAS_PRIMER_NOMBRE"] = dto.PrimerNombre,
+            ["PAS_SEGUNDO_NOMBRE"] = dto.SegundoNombre,
+            ["PAS_PRIMER_APELLIDO"] = dto.PrimerApellido,
+            ["PAS_SEGUNDO_APELLIDO"] = dto.SegundoApellido,
+            ["PAS_FECHA_NACIMIENTO"] = dto.FechaNacimiento,
+            ["PAS_NACIONALIDAD"] = dto.Nacionalidad,
+            ["PAS_SEXO"] = dto.Sexo,
+            ["PAS_TELEFONO"] = dto.Telefono,
+            ["PAS_EMAIL"] = dto.Email,
+            ["PAS_FECHA_REGISTRO"] = registeredAt
+        }, cancellationToken);
     }
 
     private static string NormalizeClass(string? value)

@@ -1092,8 +1092,12 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
         titularNombre: user?.nombreCompleto || '',
         titularEmail: user?.email || '',
         pasajeros: Array.from({ length: passengerCount }, (_, index) => ({
-          nombre: index === 0 ? user?.nombreCompleto || '' : '',
-          documento: index === 0 ? user?.numeroDocumento || '' : ''
+          primerNombre: '',
+          segundoNombre: '',
+          primerApellido: '',
+          segundoApellido: '',
+          tipoDocumento: 'DPI',
+          numeroDocumento: index === 0 ? user?.numeroDocumento || '' : ''
         })),
         numeroTarjeta: '',
         mesTarjeta: '',
@@ -1135,8 +1139,9 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
     anioTarjeta: selectedPayment.requiresCard && !form.anioTarjeta ? 'Selecciona año.' : expiredCard ? 'La tarjeta está vencida.' : ''
   };
   const passengerErrors = form.pasajeros.map((passenger, index) => ({
-    nombre: index === 0 || passenger.nombre.trim() ? '' : 'Nombre obligatorio.',
-    documento: index === 0 || passenger.documento.trim() ? '' : 'Documento obligatorio.'
+    primerNombre: index === 0 || passenger.primerNombre.trim() ? '' : 'Nombre obligatorio.',
+    primerApellido: index === 0 || passenger.primerApellido.trim() ? '' : 'Apellido obligatorio.',
+    numeroDocumento: index === 0 || passenger.numeroDocumento.trim() ? '' : 'Documento obligatorio.'
   }));
 
   const updatePassenger = (index, field, value) => {
@@ -1153,7 +1158,7 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
   };
 
   const passengerStepValid = () =>
-    passengerErrors.every((passenger) => !passenger.nombre && !passenger.documento) &&
+    passengerErrors.every((passenger) => !passenger.primerNombre && !passenger.primerApellido && !passenger.numeroDocumento) &&
     !fieldErrors.titularNombre &&
     !fieldErrors.titularEmail;
 
@@ -1168,8 +1173,9 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
       titularNombre: true,
       titularEmail: true,
       ...Object.fromEntries(form.pasajeros.flatMap((_, index) => [
-        [`pasajeros.${index}.nombre`, true],
-        [`pasajeros.${index}.documento`, true]
+        [`pasajeros.${index}.primerNombre`, true],
+        [`pasajeros.${index}.primerApellido`, true],
+        [`pasajeros.${index}.numeroDocumento`, true]
       ]))
     }));
 
@@ -1221,7 +1227,22 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
         vueloId: item.id,
         clase: item.selectedClass || className,
         tarifaPagada: calculateFlightFare(item.selectedClass || className, passengerCount)
-      }))
+      })),
+      pasajerosAdicionales: passengerCount > 1
+        ? form.pasajeros.slice(1).map((p) => ({
+            primerNombre: p.primerNombre.trim(),
+            segundoNombre: p.segundoNombre.trim() || null,
+            primerApellido: p.primerApellido.trim(),
+            segundoApellido: p.segundoApellido.trim() || null,
+            tipoDocumento: p.tipoDocumento || 'DPI',
+            numeroDocumento: p.numeroDocumento.trim(),
+            fechaNacimiento: null,
+            nacionalidad: null,
+            sexo: null,
+            telefono: null,
+            email: null
+          }))
+        : undefined
     });
   };
 
@@ -1273,30 +1294,70 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
                           <small>Usaremos los datos guardados en tu cuenta.</small>
                         </div>
                       ) : (
-                        <>
-                          <label>
-                            Pasajero {index + 1}
-                            <input
-                              className={touched[`pasajeros.${index}.nombre`] && passengerErrors[index]?.nombre ? 'field-invalid' : ''}
-                              value={passenger.nombre}
-                              onBlur={() => markTouched(`pasajeros.${index}.nombre`)}
-                              onChange={(event) => updatePassenger(index, 'nombre', event.target.value)}
-                              placeholder="Nombre completo"
-                            />
-                            {touched[`pasajeros.${index}.nombre`] && passengerErrors[index]?.nombre && <small className="field-error">{passengerErrors[index].nombre}</small>}
-                          </label>
-                          <label>
-                            Documento
-                            <input
-                              className={touched[`pasajeros.${index}.documento`] && passengerErrors[index]?.documento ? 'field-invalid' : ''}
-                              value={passenger.documento}
-                              onBlur={() => markTouched(`pasajeros.${index}.documento`)}
-                              onChange={(event) => updatePassenger(index, 'documento', event.target.value)}
-                              placeholder="DPI o pasaporte"
-                            />
-                            {touched[`pasajeros.${index}.documento`] && passengerErrors[index]?.documento && <small className="field-error">{passengerErrors[index].documento}</small>}
-                          </label>
-                        </>
+                        <div className="passenger-additional">
+                          <p className="passenger-label">Pasajero {index + 1}</p>
+                          <div className="form-grid">
+                            <label>
+                              Primer nombre
+                              <input
+                                className={touched[`pasajeros.${index}.primerNombre`] && passengerErrors[index]?.primerNombre ? 'field-invalid' : ''}
+                                value={passenger.primerNombre}
+                                onBlur={() => markTouched(`pasajeros.${index}.primerNombre`)}
+                                onChange={(event) => updatePassenger(index, 'primerNombre', event.target.value)}
+                                placeholder="Primer nombre"
+                              />
+                              {touched[`pasajeros.${index}.primerNombre`] && passengerErrors[index]?.primerNombre && <small className="field-error">{passengerErrors[index].primerNombre}</small>}
+                            </label>
+                            <label>
+                              Segundo nombre <small>(opcional)</small>
+                              <input
+                                value={passenger.segundoNombre}
+                                onChange={(event) => updatePassenger(index, 'segundoNombre', event.target.value)}
+                                placeholder="Segundo nombre"
+                              />
+                            </label>
+                            <label>
+                              Primer apellido
+                              <input
+                                className={touched[`pasajeros.${index}.primerApellido`] && passengerErrors[index]?.primerApellido ? 'field-invalid' : ''}
+                                value={passenger.primerApellido}
+                                onBlur={() => markTouched(`pasajeros.${index}.primerApellido`)}
+                                onChange={(event) => updatePassenger(index, 'primerApellido', event.target.value)}
+                                placeholder="Primer apellido"
+                              />
+                              {touched[`pasajeros.${index}.primerApellido`] && passengerErrors[index]?.primerApellido && <small className="field-error">{passengerErrors[index].primerApellido}</small>}
+                            </label>
+                            <label>
+                              Segundo apellido <small>(opcional)</small>
+                              <input
+                                value={passenger.segundoApellido}
+                                onChange={(event) => updatePassenger(index, 'segundoApellido', event.target.value)}
+                                placeholder="Segundo apellido"
+                              />
+                            </label>
+                            <label>
+                              Tipo de documento
+                              <select
+                                value={passenger.tipoDocumento}
+                                onChange={(event) => updatePassenger(index, 'tipoDocumento', event.target.value)}
+                              >
+                                <option value="DPI">DPI</option>
+                                <option value="PASAPORTE">Pasaporte</option>
+                              </select>
+                            </label>
+                            <label>
+                              Número de documento
+                              <input
+                                className={touched[`pasajeros.${index}.numeroDocumento`] && passengerErrors[index]?.numeroDocumento ? 'field-invalid' : ''}
+                                value={passenger.numeroDocumento}
+                                onBlur={() => markTouched(`pasajeros.${index}.numeroDocumento`)}
+                                onChange={(event) => updatePassenger(index, 'numeroDocumento', event.target.value)}
+                                placeholder="Número de documento"
+                              />
+                              {touched[`pasajeros.${index}.numeroDocumento`] && passengerErrors[index]?.numeroDocumento && <small className="field-error">{passengerErrors[index].numeroDocumento}</small>}
+                            </label>
+                          </div>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -3533,7 +3594,8 @@ function App() {
           tarifaPagada: Number(leg.tarifaPagada || 0) + extraPerLeg,
           metodoPagoId: purchaseOptions.metodoPagoId,
           emailConfirmacion: shouldSendIndividualEmail ? purchaseOptions.emailConfirmacion : null,
-          enviarCorreoConfirmacion: shouldSendIndividualEmail
+          enviarCorreoConfirmacion: shouldSendIndividualEmail,
+          pasajerosAdicionales: purchaseOptions.pasajerosAdicionales
         }));
       }
 

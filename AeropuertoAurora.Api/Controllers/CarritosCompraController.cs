@@ -162,7 +162,7 @@ public sealed class CarritosCompraController(IOracleCrudRepository repository, I
             return null;
         }
 
-        var now = DateTime.UtcNow;
+        var now = DateTime.Now;
         var id = await repository.CreateAsync(Table, new Dictionary<string, object?>
         {
             ["CAR_ID_PASAJERO"] = pasajeroId,
