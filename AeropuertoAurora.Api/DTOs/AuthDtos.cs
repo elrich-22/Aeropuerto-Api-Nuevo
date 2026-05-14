@@ -30,13 +30,15 @@ public sealed record UsuarioSesionDto(
     string? NumeroDocumento,
     string? TipoDocumento,
     string? Telefono,
+    string Rol,
     string? Token = null);
 
 public sealed record PerfilUsuarioDto(
     int UsuarioId,
     int PasajeroId,
     string Usuario,
-    string Email);
+    string Email,
+    string Rol);
 
 public sealed record PasajeroAdicionalDto(
     string NumeroDocumento,

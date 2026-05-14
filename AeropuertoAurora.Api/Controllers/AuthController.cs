@@ -27,7 +27,7 @@ public sealed class AuthController(
     private static readonly CrudTableDefinition UsersTable = new(
         "AER_USUARIO_LOGIN",
         "USL_ID_USUARIO",
-        ["USL_ID_PASAJERO", "USL_USUARIO", "USL_EMAIL", "USL_CONTRASENA_HASH", "USL_SAL", "USL_ESTADO", "USL_EMAIL_VERIFICADO", "USL_TOKEN_VERIFICACION", "USL_FECHA_REGISTRO", "USL_ULTIMO_ACCESO", "USL_INTENTOS_FALLIDOS", "USL_BLOQUEADO_HASTA", "USL_TOKEN_RECUPERACION", "USL_VENCIMIENTO_TOKEN"],
+        ["USL_ID_PASAJERO", "USL_USUARIO", "USL_EMAIL", "USL_CONTRASENA_HASH", "USL_SAL", "USL_ESTADO", "USL_EMAIL_VERIFICADO", "USL_TOKEN_VERIFICACION", "USL_FECHA_REGISTRO", "USL_ULTIMO_ACCESO", "USL_INTENTOS_FALLIDOS", "USL_BLOQUEADO_HASTA", "USL_TOKEN_RECUPERACION", "USL_VENCIMIENTO_TOKEN", "USL_ROL"],
         ["USL_ID_PASAJERO", "USL_USUARIO", "USL_EMAIL", "USL_CONTRASENA_HASH", "USL_SAL", "USL_ESTADO", "USL_EMAIL_VERIFICADO", "USL_TOKEN_VERIFICACION", "USL_FECHA_REGISTRO", "USL_ULTIMO_ACCESO", "USL_INTENTOS_FALLIDOS", "USL_BLOQUEADO_HASTA", "USL_TOKEN_RECUPERACION", "USL_VENCIMIENTO_TOKEN"]);
 
     [HttpPost("login")]
@@ -82,7 +82,8 @@ public sealed class AuthController(
 
         var usuarioStr = user.ToStringValue("USL_USUARIO");
         var emailStr = user.ToStringValue("USL_EMAIL");
-        var token = jwtService.GenerateToken(userId, passengerId, usuarioStr, emailStr);
+        var rol = user.ToStringValue("USL_ROL") ?? "PASAJERO";
+        var token = jwtService.GenerateToken(userId, passengerId, usuarioStr, emailStr, rol);
 
         return Ok(new UsuarioSesionDto(
             userId,
@@ -93,6 +94,7 @@ public sealed class AuthController(
             passenger?.NumeroDocumento,
             passenger?.TipoDocumento,
             passenger?.Telefono,
+            rol,
             token));
     }
 
@@ -160,12 +162,14 @@ public sealed class AuthController(
             ["USL_INTENTOS_FALLIDOS"] = 0,
             ["USL_BLOQUEADO_HASTA"] = null,
             ["USL_TOKEN_RECUPERACION"] = null,
-            ["USL_VENCIMIENTO_TOKEN"] = null
+            ["USL_VENCIMIENTO_TOKEN"] = null,
+            ["USL_ROL"] = "PASAJERO"
         }, cancellationToken);
 
+        const string nuevaRol = "PASAJERO";
         var fullName = string.Join(" ", new[] { dto.PrimerNombre, dto.SegundoNombre, dto.PrimerApellido, dto.SegundoApellido }
             .Where(part => !string.IsNullOrWhiteSpace(part)));
-        var token = jwtService.GenerateToken(userId, passengerId, dto.Usuario, dto.Email);
+        var token = jwtService.GenerateToken(userId, passengerId, dto.Usuario, dto.Email, nuevaRol);
 
         return CreatedAtAction(nameof(Login), new UsuarioSesionDto(
             userId,
@@ -176,6 +180,7 @@ public sealed class AuthController(
             dto.NumeroDocumento,
             dto.TipoDocumento,
             dto.Telefono,
+            nuevaRol,
             token));
     }
 
@@ -187,8 +192,9 @@ public sealed class AuthController(
         var pasajeroId = int.TryParse(User.FindFirstValue("pasajeroId"), out var pid) ? pid : 0;
         var usuario = User.FindFirstValue("usuario") ?? string.Empty;
         var email = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue("email") ?? string.Empty;
+        var rol = User.FindFirstValue(ClaimTypes.Role) ?? "PASAJERO";
 
-        return Ok(new PerfilUsuarioDto(userId, pasajeroId, usuario, email));
+        return Ok(new PerfilUsuarioDto(userId, pasajeroId, usuario, email, rol));
     }
 
     private async Task RegisterFailedAttemptAsync(

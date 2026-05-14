@@ -1,11 +1,13 @@
 using AeropuertoAurora.Api.Configuration;
 using AeropuertoAurora.Api.DTOs;
 using AeropuertoAurora.Api.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
 
 namespace AeropuertoAurora.Api.Controllers;
 
+[Authorize(Roles = "ADMIN")]
 [ApiController]
 [Route("api/tablas")]
 public sealed class TablasController(ITableReadRepository repository) : ControllerBase

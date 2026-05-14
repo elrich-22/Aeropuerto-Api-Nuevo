@@ -9,14 +9,14 @@ namespace AeropuertoAurora.Api.Services;
 
 public interface IJwtService
 {
-    string GenerateToken(int userId, int pasajeroId, string usuario, string email);
+    string GenerateToken(int userId, int pasajeroId, string usuario, string email, string rol = "PASAJERO");
 }
 
 public sealed class JwtService(IOptions<JwtOptions> options) : IJwtService
 {
     private readonly JwtOptions _options = options.Value;
 
-    public string GenerateToken(int userId, int pasajeroId, string usuario, string email)
+    public string GenerateToken(int userId, int pasajeroId, string usuario, string email, string rol = "PASAJERO")
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.Secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
@@ -27,6 +27,7 @@ public sealed class JwtService(IOptions<JwtOptions> options) : IJwtService
             new Claim(JwtRegisteredClaimNames.Email, email),
             new Claim("usuario", usuario),
             new Claim("pasajeroId", pasajeroId.ToString()),
+            new Claim(ClaimTypes.Role, rol),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 

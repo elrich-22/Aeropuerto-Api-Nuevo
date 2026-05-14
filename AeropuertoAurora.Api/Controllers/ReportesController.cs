@@ -1,8 +1,10 @@
 using AeropuertoAurora.Api.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AeropuertoAurora.Api.Controllers;
 
+[Authorize(Roles = "ADMIN")]
 [ApiController]
 [Route("api/reportes")]
 public sealed class ReportesController(IAeropuertoQueryService service) : ControllerBase

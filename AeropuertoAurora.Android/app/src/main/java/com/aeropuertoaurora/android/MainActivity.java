@@ -3887,6 +3887,11 @@ public final class MainActivity extends Activity {
         if (sessionUser == null) {
             return false;
         }
+        String rol = value(sessionUser, "rol", "").toUpperCase(Locale.ROOT);
+        if (!rol.isEmpty()) {
+            return "ADMIN".equals(rol);
+        }
+        // Fallback para sesiones antiguas sin campo rol
         String combined = (value(sessionUser, "usuario", "") + " " + value(sessionUser, "email", "") + " " + value(sessionUser, "nombreCompleto", "")).toLowerCase(Locale.ROOT);
         return combined.contains("admin.aurora") || combined.contains("administrador");
     }

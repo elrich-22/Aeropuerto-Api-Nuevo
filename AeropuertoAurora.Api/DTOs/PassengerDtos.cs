@@ -24,7 +24,8 @@ public sealed record UsuarioLoginDto(
     DateTime? FechaRegistro,
     DateTime? UltimoAcceso,
     int IntentosFallidos,
-    DateTime? BloqueadoHasta);
+    DateTime? BloqueadoHasta,
+    string Rol);
 
 public sealed record CrearUsuarioLoginDto(
     int PasajeroId,

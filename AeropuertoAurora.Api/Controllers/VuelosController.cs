@@ -1,6 +1,7 @@
 using AeropuertoAurora.Api.DTOs;
 using AeropuertoAurora.Api.Repositories;
 using AeropuertoAurora.Api.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AeropuertoAurora.Api.Controllers;
@@ -34,6 +35,7 @@ public sealed class VuelosController(IAeropuertoQueryService service, IOracleCru
         return Ok(await service.GetFlightProgramsAsync(limit, cancellationToken));
     }
 
+    [Authorize(Roles = "ADMIN")]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> ActualizarVuelo(int id, ActualizarVueloEstadoDto dto, CancellationToken cancellationToken)
     {

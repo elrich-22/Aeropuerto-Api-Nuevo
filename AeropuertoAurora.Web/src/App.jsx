@@ -503,8 +503,11 @@ const sanitizeRegisterValue = (field, value = '') => {
 
 const isAdminUser = (currentUser) => {
   if (!currentUser) return false;
-
-  return [currentUser.usuario, currentUser.email, currentUser.nombreCompleto, currentUser.rol, currentUser.role]
+  if (currentUser.rol) {
+    return currentUser.rol.toUpperCase() === 'ADMIN';
+  }
+  // Fallback para sesiones anteriores sin campo rol
+  return [currentUser.usuario, currentUser.email, currentUser.nombreCompleto, currentUser.role]
     .filter(Boolean)
     .some((value) => {
       const normalized = normalize(value);
