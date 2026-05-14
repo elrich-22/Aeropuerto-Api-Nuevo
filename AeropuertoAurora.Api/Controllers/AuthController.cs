@@ -109,10 +109,8 @@ public sealed class AuthController(
             return BadRequest(new { message = "Completa todos los campos obligatorios del registro." });
         }
 
-        if (!dto.Email.Contains('@', StringComparison.Ordinal) || !dto.Email.Contains('.', StringComparison.Ordinal))
-        {
-            return BadRequest(new { message = "Ingresa un email valido." });
-        }
+        try { _ = new System.Net.Mail.MailAddress(dto.Email); }
+        catch { return BadRequest(new { message = "Ingresa un email valido." }); }
 
         var existing = await repository.GetByLoginIdentifierAsync(
             UsersTable, "USL_USUARIO", "USL_EMAIL", dto.Usuario, cancellationToken);

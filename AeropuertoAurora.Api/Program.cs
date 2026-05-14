@@ -117,7 +117,10 @@ if (app.Environment.IsDevelopment())
 }
 
 if (!app.Environment.IsDevelopment())
+{
     app.UseHttpsRedirection();
+    app.UseHsts();
+}
 
 app.UseCors("Frontend");
 app.UseApiKeyProtection();
