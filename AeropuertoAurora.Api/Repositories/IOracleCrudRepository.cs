@@ -27,4 +27,10 @@ public interface IOracleCrudRepository
         CrudTableDefinition table,
         int id,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GetByColumnAsync(
+        CrudTableDefinition table,
+        string column,
+        object value,
+        CancellationToken cancellationToken);
 }

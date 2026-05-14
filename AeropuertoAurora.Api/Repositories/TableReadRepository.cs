@@ -144,7 +144,7 @@ public sealed class TableReadRepository(
         else
         {
             await command.ExecuteNonQueryAsync(cancellationToken);
-            row = await GetLastRowAsync(connection, tableName, metadata, cancellationToken);
+            row = null;
         }
 
         await WriteAuditAsync(connection, tableName, "INSERT", null, row ?? safeValues, cancellationToken);
@@ -272,32 +272,6 @@ public sealed class TableReadRepository(
         }
 
         return value;
-    }
-
-    private static async Task<IReadOnlyDictionary<string, object?>?> GetLastRowAsync(
-        OracleConnection connection,
-        string tableName,
-        MetadataTablaDto metadata,
-        CancellationToken cancellationToken)
-    {
-        var keyColumn = metadata.LlavePrimaria;
-        var orderColumn = keyColumn ?? metadata.Columnas.First().Nombre;
-        var sql = $"""
-            SELECT *
-            FROM (
-                SELECT *
-                FROM {tableName}
-                ORDER BY {orderColumn} DESC
-            )
-            WHERE ROWNUM = 1
-            """;
-
-        await using var command = connection.CreateCommand();
-        command.BindByName = true;
-        command.CommandText = sql;
-
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken) ? ReadRow(reader) : null;
     }
 
     private async Task<IReadOnlyDictionary<string, object?>?> GetRowByKeyAsync(

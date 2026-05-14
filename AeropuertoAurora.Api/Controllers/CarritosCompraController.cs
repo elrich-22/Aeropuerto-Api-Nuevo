@@ -146,10 +146,9 @@ public sealed class CarritosCompraController(IOracleCrudRepository repository, I
 
     private async Task<(int Id, int PasajeroId)?> GetActiveCartAsync(int pasajeroId, bool createIfMissing, CancellationToken cancellationToken)
     {
-        var carts = await repository.GetAllAsync(Table, 1000, cancellationToken);
+        var carts = await repository.GetByColumnAsync(Table, "CAR_ID_PASAJERO", pasajeroId, cancellationToken);
         var active = carts
-            .Where(row => row.ToInt("CAR_ID_PASAJERO") == pasajeroId &&
-                          string.Equals(row.ToStringValue("CAR_ESTADO"), "ACTIVO", StringComparison.OrdinalIgnoreCase))
+            .Where(row => string.Equals(row.ToStringValue("CAR_ESTADO"), "ACTIVO", StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(row => row.ToInt("CAR_ID_CARRITO"))
             .FirstOrDefault();
 
@@ -178,9 +177,7 @@ public sealed class CarritosCompraController(IOracleCrudRepository repository, I
 
     private async Task<IReadOnlyList<ItemCarritoUsuarioDto>> GetCartItemsAsync(int cartId, CancellationToken cancellationToken)
     {
-        var rows = await repository.GetAllAsync(ItemsTable, 1000, cancellationToken);
-        var items = rows
-            .Where(row => row.ToInt("ITE_ID_CARRITO") == cartId)
+        var items = (await repository.GetByColumnAsync(ItemsTable, "ITE_ID_CARRITO", cartId, cancellationToken))
             .OrderBy(row => row.ToInt("ITE_ID_ITEM_CARRITO"))
             .ToList();
         var result = new List<ItemCarritoUsuarioDto>();
