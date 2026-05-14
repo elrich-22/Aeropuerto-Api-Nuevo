@@ -9,7 +9,7 @@ final class SettingsStore {
     private static final String KEY_API_KEY = "api_key";
     private static final String KEY_SESSION = "session_json";
     private static final String KEY_CART = "cart_json";
-    private static final String DEFAULT_BASE_URL = "http://10.0.2.2:5185";
+    private static final String DEFAULT_BASE_URL = "http://192.168.0.3:5185";
 
     private final SharedPreferences preferences;
 
