@@ -112,7 +112,11 @@ public sealed class TableReadRepository(
 
         var columns = string.Join(", ", safeValues.Keys);
         var parameters = string.Join(", ", safeValues.Keys.Select(column => $":{column}"));
-        var sql = $"INSERT INTO {tableName} ({columns}) VALUES ({parameters})";
+        var keyColumnDto = metadata.Columnas.FirstOrDefault(c => c.EsLlavePrimaria);
+
+        var sql = keyColumnDto is not null
+            ? $"INSERT INTO {tableName} ({columns}) VALUES ({parameters}) RETURNING {keyColumnDto.Nombre} INTO :newId"
+            : $"INSERT INTO {tableName} ({columns}) VALUES ({parameters})";
 
         await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
         await using var command = connection.CreateCommand();
@@ -124,8 +128,25 @@ public sealed class TableReadRepository(
             command.Parameters.Add(new OracleParameter(value.Key, value.Value ?? DBNull.Value));
         }
 
-        await command.ExecuteNonQueryAsync(cancellationToken);
-        var row = await GetLastRowAsync(connection, tableName, metadata, cancellationToken);
+        IReadOnlyDictionary<string, object?>? row;
+
+        if (keyColumnDto is not null)
+        {
+            var idParameter = new OracleParameter("newId", OracleDbType.Int32)
+            {
+                Direction = System.Data.ParameterDirection.Output
+            };
+            command.Parameters.Add(idParameter);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            var newId = idParameter.Value.ToString()!;
+            row = await GetRowByKeyAsync(tableName, keyColumnDto, newId, cancellationToken);
+        }
+        else
+        {
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            row = null;
+        }
+
         await WriteAuditAsync(connection, tableName, "INSERT", null, row ?? safeValues, cancellationToken);
         return row;
     }
@@ -251,32 +272,6 @@ public sealed class TableReadRepository(
         }
 
         return value;
-    }
-
-    private static async Task<IReadOnlyDictionary<string, object?>?> GetLastRowAsync(
-        OracleConnection connection,
-        string tableName,
-        MetadataTablaDto metadata,
-        CancellationToken cancellationToken)
-    {
-        var keyColumn = metadata.LlavePrimaria;
-        var orderColumn = keyColumn ?? metadata.Columnas.First().Nombre;
-        var sql = $"""
-            SELECT *
-            FROM (
-                SELECT *
-                FROM {tableName}
-                ORDER BY {orderColumn} DESC
-            )
-            WHERE ROWNUM = 1
-            """;
-
-        await using var command = connection.CreateCommand();
-        command.BindByName = true;
-        command.CommandText = sql;
-
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken) ? ReadRow(reader) : null;
     }
 
     private async Task<IReadOnlyDictionary<string, object?>?> GetRowByKeyAsync(

@@ -159,6 +159,31 @@ public sealed class OracleCrudRepository(
         return deleted;
     }
 
+    public async Task<IReadOnlyList<IReadOnlyDictionary<string, object?>>> GetByColumnAsync(
+        CrudTableDefinition table,
+        string column,
+        object value,
+        CancellationToken cancellationToken)
+    {
+        var sql = $"SELECT * FROM {table.TableName} WHERE {column} = :value ORDER BY {table.IdColumn}";
+
+        await using var connection = await connectionFactory.CreateOpenConnectionAsync(cancellationToken);
+        await using var command = connection.CreateCommand();
+        command.BindByName = true;
+        command.CommandText = sql;
+        command.Parameters.Add(new OracleParameter("value", value));
+
+        var rows = new List<IReadOnlyDictionary<string, object?>>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(ReadRow(reader));
+        }
+
+        return rows;
+    }
+
     private async Task WriteAuditAsync(
         OracleConnection connection,
         string tableName,

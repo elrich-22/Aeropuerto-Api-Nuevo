@@ -115,6 +115,16 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(payload)
   }),
+  passengers: (limit = 500) => request(`/api/pasajeros?limit=${limit}`),
+  arrests: (limit = 100) => request(`/api/arrestos?limit=${limit}`),
+  createArrest: (payload) => request('/api/arrestos', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }),
+  updateFlight: (id, payload) => request(`/api/vuelos/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  }),
   audit: (limit = 50) => request(`/api/auditoria?limit=${limit}`),
   cartItems: (passengerId) => request(`/api/carritos-compra/pasajero/${passengerId}/items`),
   addCartItem: (passengerId, payload) => request(`/api/carritos-compra/pasajero/${passengerId}/items`, {

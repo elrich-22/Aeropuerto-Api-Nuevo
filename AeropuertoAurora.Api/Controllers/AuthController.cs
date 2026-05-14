@@ -107,7 +107,7 @@ public sealed class AuthController(IOracleCrudRepository repository, IAeropuerto
             ["PAS_SEXO"] = string.IsNullOrWhiteSpace(dto.Sexo) ? null : dto.Sexo.ToUpperInvariant()[..1],
             ["PAS_TELEFONO"] = dto.Telefono,
             ["PAS_EMAIL"] = dto.Email,
-            ["PAS_FECHA_REGISTRO"] = DateTime.UtcNow
+            ["PAS_FECHA_REGISTRO"] = DateTime.Now
         }, cancellationToken);
 
         var passwordData = PasswordHasher.HashPassword(dto.Contrasena);
@@ -121,8 +121,8 @@ public sealed class AuthController(IOracleCrudRepository repository, IAeropuerto
             ["USL_ESTADO"] = "ACTIVO",
             ["USL_EMAIL_VERIFICADO"] = "S",
             ["USL_TOKEN_VERIFICACION"] = null,
-            ["USL_FECHA_REGISTRO"] = DateTime.UtcNow,
-            ["USL_ULTIMO_ACCESO"] = DateTime.UtcNow,
+            ["USL_FECHA_REGISTRO"] = DateTime.Now,
+            ["USL_ULTIMO_ACCESO"] = DateTime.Now,
             ["USL_INTENTOS_FALLIDOS"] = 0,
             ["USL_BLOQUEADO_HASTA"] = null,
             ["USL_TOKEN_RECUPERACION"] = null,

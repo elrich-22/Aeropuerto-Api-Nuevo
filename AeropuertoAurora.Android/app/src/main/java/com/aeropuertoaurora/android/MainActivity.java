@@ -99,6 +99,12 @@ public final class MainActivity extends Activity {
     private JSONArray maintenance = new JSONArray();
     private JSONArray occupancy = new JSONArray();
     private JSONArray lostObjects = new JSONArray();
+    private JSONArray arrestsList = new JSONArray();
+    private JSONArray passengersList = new JSONArray();
+    private JSONObject arrestFoundPassenger = null;
+    private JSONArray adminFlightsList = new JSONArray();
+    private int actionFlightId = 0;
+    private String actionFlightAction = "";
     private JSONArray myReservations = new JSONArray();
     private JSONArray myCheckIns = new JSONArray();
     private JSONArray myBoardingPasses = new JSONArray();
@@ -114,7 +120,11 @@ public final class MainActivity extends Activity {
     private String fareSelectionLeg = "ida";
     private JSONObject selectedOutboundFlight;
     private JSONObject selectedReturnFlight;
-    private String[] savedPassengerNames = new String[0];
+    private String[] savedPassengerFirstNames = new String[0];
+    private String[] savedPassengerSecondNames = new String[0];
+    private String[] savedPassengerFirstLastNames = new String[0];
+    private String[] savedPassengerSecondLastNames = new String[0];
+    private String[] savedPassengerDocTypes = new String[0];
     private String[] savedPassengerDocs = new String[0];
     private String savedHolderName = "";
     private String savedHolderEmail = "";
@@ -270,6 +280,10 @@ public final class MainActivity extends Activity {
             renderCheckIn();
         } else if ("objetos".equals(activeView)) {
             renderLostObjects();
+        } else if ("arrestos".equals(activeView)) {
+            renderArrestos();
+        } else if ("vuelos_admin".equals(activeView)) {
+            renderVuelosAdmin();
         } else if ("operaciones".equals(activeView)) {
             renderOperations();
         } else if ("reportes".equals(activeView)) {
@@ -368,6 +382,12 @@ public final class MainActivity extends Activity {
             trip.addView(menuOption("\u2713", "Check-in", "Confirma tu reserva por vuelo o código", "checkin"));
         trip.addView(menuOption("?", "Objetos perdidos", "Reporta una perdida o revisa encontrados", "objetos"));
         trip.addView(menuOption("\u25C9", "Ubicación", "Ver donde está el aeropuerto", "ubicacion"));
+        if (isAdmin()) {
+            trip.addView(menuOption("⚠", "Arrestos", "Registro de pasajeros arrestados", "arrestos"));
+        }
+        if (isAdmin()) {
+            trip.addView(menuOption("✈", "Vuelos", "Cancelar o reprogramar vuelos", "vuelos_admin"));
+        }
         contentLayout.addView(trip);
     }
 
@@ -1277,42 +1297,58 @@ public final class MainActivity extends Activity {
         }), matchWrap());
         card.addView(sectionTitle("Información de pasajeros"));
 
-        EditText[] names = new EditText[passengerCount];
+        EditText[] primerNombres = new EditText[passengerCount];
+        EditText[] segundoNombres = new EditText[passengerCount];
+        EditText[] primerApellidos = new EditText[passengerCount];
+        EditText[] segundoApellidos = new EditText[passengerCount];
+        Spinner[] docTypes = new Spinner[passengerCount];
         EditText[] docs = new EditText[passengerCount];
         for (int i = 0; i < passengerCount; i++) {
             LinearLayout passengerCard = compactCard();
             passengerCard.addView(text(i == 0 ? "Pasajero principal" : "Pasajero " + (i + 1), 24, TEXT, Typeface.NORMAL));
-            names[i] = input("Nombre *", defaultSaved(savedPassengerNames, i, i == 0 ? value(sessionUser, "nombreCompleto", "") : ""), false);
-            docs[i] = input("Documento *", defaultSaved(savedPassengerDocs, i, i == 0 ? value(sessionUser, "numeroDocumento", "") : ""), false);
             if (i == 0) {
                 passengerCard.addView(text("Usaremos los datos de tu cuenta para el titular del viaje.", 14, MUTED, Typeface.NORMAL));
                 passengerCard.addView(text(value(sessionUser, "nombreCompleto", value(sessionUser, "usuario", "Usuario")), 16, TEXT, Typeface.BOLD));
             } else {
-                passengerCard.addView(text("Ingresa nombre y documento tal como aparecen en su identificación.", 14, TEXT, Typeface.NORMAL));
-                passengerCard.addView(names[i]);
+                primerNombres[i] = input("Primer nombre *", defaultSaved(savedPassengerFirstNames, i, ""), false);
+                segundoNombres[i] = input("Segundo nombre (opcional)", defaultSaved(savedPassengerSecondNames, i, ""), false);
+                primerApellidos[i] = input("Primer apellido *", defaultSaved(savedPassengerFirstLastNames, i, ""), false);
+                segundoApellidos[i] = input("Segundo apellido (opcional)", defaultSaved(savedPassengerSecondLastNames, i, ""), false);
+                docTypes[i] = spinner(new String[]{"DPI", "PASAPORTE"}, defaultSaved(savedPassengerDocTypes, i, "DPI"));
+                docs[i] = input("Número de documento *", defaultSaved(savedPassengerDocs, i, ""), false);
+                passengerCard.addView(text("Ingresa los datos tal como aparecen en su identificación.", 14, TEXT, Typeface.NORMAL));
+                passengerCard.addView(primerNombres[i]);
+                passengerCard.addView(segundoNombres[i]);
+                passengerCard.addView(primerApellidos[i]);
+                passengerCard.addView(segundoApellidos[i]);
+                passengerCard.addView(label("Tipo de documento"));
+                passengerCard.addView(docTypes[i]);
                 passengerCard.addView(docs[i]);
-                passengerCard.addView(spinner(new String[]{"Pasaporte", "DPI", "Licencia"}, "Pasaporte"));
-                passengerCard.addView(input("Nacionalidad del documento *", "Guatemala", false));
             }
             card.addView(passengerCard);
         }
 
-        card.addView(primaryButton("Siguiente", v -> savePassengerStep(names, docs)), matchWrap());
+        card.addView(primaryButton("Siguiente", v -> savePassengerStep(primerNombres, segundoNombres, primerApellidos, segundoApellidos, docTypes, docs)), matchWrap());
         card.addView(tripSummaryBar());
         contentLayout.addView(card);
     }
 
-    private void savePassengerStep(EditText[] names, EditText[] docs) {
-        for (int i = 1; i < names.length; i++) {
-            if (isBlank(names[i]) || isBlank(docs[i])) {
-                markInvalid(names[i]);
-                markInvalid(docs[i]);
-                statusText.setText("Completa la información del pasajero.");
+    private void savePassengerStep(EditText[] primerNombres, EditText[] segundoNombres, EditText[] primerApellidos, EditText[] segundoApellidos, Spinner[] docTypes, EditText[] docs) {
+        for (int i = 1; i < primerNombres.length; i++) {
+            if (isBlank(primerNombres[i]) || isBlank(primerApellidos[i]) || isBlank(docs[i])) {
+                if (primerNombres[i] != null) markInvalid(primerNombres[i]);
+                if (primerApellidos[i] != null) markInvalid(primerApellidos[i]);
+                if (docs[i] != null) markInvalid(docs[i]);
+                statusText.setText("Completa primer nombre, primer apellido y documento de cada pasajero.");
                 return;
             }
         }
-        savedPassengerNames = textValues(names);
-        savedPassengerDocs = textValues(docs);
+        savedPassengerFirstNames = nullSafeTextValues(primerNombres);
+        savedPassengerSecondNames = nullSafeTextValues(segundoNombres);
+        savedPassengerFirstLastNames = nullSafeTextValues(primerApellidos);
+        savedPassengerSecondLastNames = nullSafeTextValues(segundoApellidos);
+        savedPassengerDocTypes = nullSafeSpinnerValues(docTypes, "DPI");
+        savedPassengerDocs = nullSafeTextValues(docs);
         activeView = "holder_info";
         render();
     }
@@ -1474,6 +1510,25 @@ public final class MainActivity extends Activity {
         servicesTotal += selectedBag ? SERVICE_BAG * passengers : 0;
         servicesTotal += selectedVip ? SERVICE_VIP * passengers : 0;
         servicesTotal += selectedPriority ? SERVICE_PRIORITY * passengers : 0;
+        JSONArray pasajerosAdicionales = new JSONArray();
+        for (int i = 1; i < savedPassengerFirstNames.length; i++) {
+            String primerNombre = savedPassengerFirstNames[i];
+            if (primerNombre == null || primerNombre.isEmpty()) continue;
+            String segundoNombre = (savedPassengerSecondNames.length > i && savedPassengerSecondNames[i] != null && !savedPassengerSecondNames[i].isEmpty()) ? savedPassengerSecondNames[i] : null;
+            String segundoApellido = (savedPassengerSecondLastNames.length > i && savedPassengerSecondLastNames[i] != null && !savedPassengerSecondLastNames[i].isEmpty()) ? savedPassengerSecondLastNames[i] : null;
+            pasajerosAdicionales.put(new JSONObject()
+                    .put("primerNombre", primerNombre)
+                    .put("segundoNombre", segundoNombre != null ? segundoNombre : JSONObject.NULL)
+                    .put("primerApellido", savedPassengerFirstLastNames.length > i ? savedPassengerFirstLastNames[i] : "")
+                    .put("segundoApellido", segundoApellido != null ? segundoApellido : JSONObject.NULL)
+                    .put("tipoDocumento", savedPassengerDocTypes.length > i ? savedPassengerDocTypes[i] : "DPI")
+                    .put("numeroDocumento", savedPassengerDocs.length > i ? savedPassengerDocs[i] : "")
+                    .put("fechaNacimiento", JSONObject.NULL)
+                    .put("nacionalidad", JSONObject.NULL)
+                    .put("sexo", JSONObject.NULL)
+                    .put("telefono", JSONObject.NULL)
+                    .put("email", JSONObject.NULL));
+        }
         return new JSONObject()
                 .put("usuarioId", parseInt(value(sessionUser, "usuarioId", "0"), 0))
                 .put("pasajeroId", parseInt(value(sessionUser, "pasajeroId", "0"), 0))
@@ -1485,7 +1540,8 @@ public final class MainActivity extends Activity {
                 .put("tarifaPagada", flightFare(flight, value(flight, "selectedClass", "economica"), passengers) + servicesTotal)
                 .put("metodoPagoId", parseInt(method.getSelectedItem().toString().substring(0, 1), 1))
                 .put("emailConfirmacion", sendConfirmationEmail ? savedHolderEmail : JSONObject.NULL)
-                .put("enviarCorreoConfirmacion", sendConfirmationEmail);
+                .put("enviarCorreoConfirmacion", sendConfirmationEmail)
+                .put("pasajerosAdicionales", pasajerosAdicionales.length() > 0 ? pasajerosAdicionales : JSONObject.NULL);
     }
 
     private JSONObject purchaseSummaryPayload(JSONArray responses, double total) throws Exception {
@@ -1724,14 +1780,38 @@ public final class MainActivity extends Activity {
     }
 
     private void renderLostObjects() {
-        contentLayout.addView(screenHeader("Objetos perdidos", "Reporta una perdida o revisa encontrados recientes.", "menu_more", "Actualizar", v -> loadLostObjects()));
+        String subtitle = isAdmin()
+                ? "Panel de administración de objetos encontrados por vuelo."
+                : "Reporta una perdida o revisa encontrados recientes.";
+        contentLayout.addView(screenHeader("Objetos perdidos", subtitle, "menu_more", "Actualizar", v -> loadLostObjects()));
 
+        if (isAdmin()) {
+            renderAdminLostObjectForm();
+        } else {
+            renderUserLostObjectForm();
+        }
+
+        String listTitle = isAdmin() ? "Todos los registros" : "Encontrados recientes";
+        int listLimit = isAdmin() ? 50 : 10;
+        contentLayout.addView(listSection(listTitle, lostObjects, listLimit, item -> {
+            String vueloId = value(item, "vueloId", "");
+            String vueloTag = vueloId.isEmpty() || vueloId.equals("null") ? "" : " · Vuelo #" + vueloId;
+            return new String[]{
+                    value(item, "descripcion", "Objeto"),
+                    value(item, "ubicacionEncontrado", "Ubicación pendiente") + vueloTag,
+                    "Fecha: " + shortDate(value(item, "fechaReporte", "-")),
+                    "Estado: " + value(item, "estado", "-")
+            };
+        }));
+    }
+
+    private void renderUserLostObjectForm() {
         LinearLayout form = card();
         form.addView(sectionTitle("Reportar perdida"));
         EditText descriptionInput = input("Ej. mochila negra con etiqueta roja", "", false);
         EditText nameInput = input("Nombre y apellido", "", false);
         EditText contactInput = input("Teléfono o email", "", false);
-        form.addView(label("Que perdiste?"));
+        form.addView(label("¿Qué perdiste?"));
         form.addView(descriptionInput);
         form.addView(label("Tu nombre"));
         form.addView(nameInput);
@@ -1743,22 +1823,119 @@ public final class MainActivity extends Activity {
                 nameInput.getText().toString(),
                 contactInput.getText().toString())), matchWrap());
         contentLayout.addView(form);
+    }
 
-        contentLayout.addView(listSection("Encontrados recientes", lostObjects, 10, item -> new String[]{
-                value(item, "descripcion", "Objeto"),
-                (value(item, "estado", "-").equalsIgnoreCase("REPORTADO") ? "Reporte en revisión" : value(item, "ubicacionEncontrado", "Ubicación pendiente")),
-                "Fecha: " + shortDate(value(item, "fechaReporte", "-")),
-                "Estado: " + value(item, "estado", "-")
-        }));
+    private void renderAdminLostObjectForm() {
+        LinearLayout form = card();
+        form.addView(sectionTitle("Registrar objeto encontrado"));
+
+        // Build flight spinner options
+        String[] flightLabels = new String[flights.length() + 1];
+        int[] flightIds = new int[flights.length() + 1];
+        flightLabels[0] = "— Sin vuelo —";
+        flightIds[0] = 0;
+        for (int i = 0; i < flights.length(); i++) {
+            JSONObject f = flights.optJSONObject(i);
+            if (f == null) continue;
+            flightLabels[i + 1] = value(f, "numeroVuelo", "Vuelo") + " · " + value(f, "origen", "-") + " → " + value(f, "destino", "-");
+            flightIds[i + 1] = parseInt(value(f, "id", "0"), 0);
+        }
+
+        Spinner flightSpinner = new Spinner(this);
+        android.widget.ArrayAdapter<String> flightAdapter = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_spinner_item, flightLabels);
+        flightAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        flightSpinner.setAdapter(flightAdapter);
+
+        EditText descInput = input("Ej. mochila negra, laptop plateada...", "", false);
+        EditText locationInput = input("Ej. Puerta 12, Banda de equipaje 3", "", false);
+
+        String[] estados = {"ENCONTRADO", "REPORTADO", "ENTREGADO", "NO_RECLAMADO"};
+        Spinner estadoSpinner = new Spinner(this);
+        android.widget.ArrayAdapter<String> estadoAdapter = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_spinner_item, estados);
+        estadoAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        estadoSpinner.setAdapter(estadoAdapter);
+
+        EditText repNombreInput = input("Primer nombre (opcional)", "", false);
+        EditText repApellidoInput = input("Primer apellido (opcional)", "", false);
+        EditText repContactoInput = input("Teléfono o email del personal (opcional)", "", false);
+
+        form.addView(label("Vuelo relacionado (opcional)"));
+        form.addView(flightSpinner);
+        form.addView(label("Descripción del objeto"));
+        form.addView(descInput);
+        form.addView(label("Ubicación donde fue encontrado"));
+        form.addView(locationInput);
+        form.addView(label("Estado"));
+        form.addView(estadoSpinner);
+        form.addView(label("Nombre de quien reporta (opcional)"));
+        form.addView(repNombreInput);
+        form.addView(label("Apellido de quien reporta (opcional)"));
+        form.addView(repApellidoInput);
+        form.addView(label("Contacto interno (opcional)"));
+        form.addView(repContactoInput);
+
+        form.addView(primaryButton("Registrar objeto", v -> {
+            int selectedFlightId = flightIds[flightSpinner.getSelectedItemPosition()];
+            String estado = estados[estadoSpinner.getSelectedItemPosition()];
+            registerFoundObject(
+                    selectedFlightId > 0 ? selectedFlightId : 0,
+                    descInput.getText().toString(),
+                    locationInput.getText().toString(),
+                    estado,
+                    repNombreInput.getText().toString(),
+                    repApellidoInput.getText().toString(),
+                    repContactoInput.getText().toString());
+        }), matchWrap());
+
+        contentLayout.addView(form);
     }
 
     private void loadLostObjects() {
-        runTask("Cargando objetos perdidos...", () -> apiClient.get("/api/objetos-perdidos?limit=30"), json -> {
+        runTask("Cargando objetos perdidos...", () -> apiClient.get("/api/objetos-perdidos?limit=50"), json -> {
             lostObjects = new JSONArray(json);
             lastMessage = "Objetos perdidos actualizados.";
             render();
         });
     }
+
+    private void registerFoundObject(int vueloId, String description, String location, String estado,
+                                     String repNombre, String repApellido, String repContacto) {
+        String cleanDesc = description == null ? "" : description.trim();
+        String cleanLoc = location == null ? "" : location.trim();
+
+        if (cleanDesc.isEmpty() || cleanLoc.isEmpty()) {
+            lastMessage = "Descripción y ubicación son obligatorias.";
+            render();
+            return;
+        }
+
+        runTask("Registrando objeto...", () -> {
+            JSONObject body = new JSONObject()
+                    .put("vueloId", vueloId > 0 ? vueloId : JSONObject.NULL)
+                    .put("aeropuertoId", defaultAirportId())
+                    .put("descripcion", cleanDesc)
+                    .put("fechaReporte", nowIso())
+                    .put("ubicacionEncontrado", cleanLoc)
+                    .put("estado", estado)
+                    .put("reportantePrimerNombre", repNombre.trim().isEmpty() ? JSONObject.NULL : repNombre.trim())
+                    .put("reportanteSegundoNombre", JSONObject.NULL)
+                    .put("reportantePrimerApellido", repApellido.trim().isEmpty() ? JSONObject.NULL : repApellido.trim())
+                    .put("reportanteSegundoApellido", JSONObject.NULL)
+                    .put("contactoReportante", repContacto.trim().isEmpty() ? JSONObject.NULL : repContacto.trim())
+                    .put("fechaEntrega", JSONObject.NULL)
+                    .put("reclamantePrimerNombre", JSONObject.NULL)
+                    .put("reclamanteSegundoNombre", JSONObject.NULL)
+                    .put("reclamantePrimerApellido", JSONObject.NULL)
+                    .put("reclamanteSegundoApellido", JSONObject.NULL);
+            apiClient.post("/api/objetos-perdidos", body.toString());
+            return apiClient.get("/api/objetos-perdidos?limit=50");
+        }, json -> {
+            lostObjects = new JSONArray(json);
+            lastMessage = "Objeto registrado correctamente.";
+            render();
+        });
+    }
+
 
     private void reportLostObject(String description, String name, String contact) {
         String cleanDescription = description == null ? "" : description.trim();
@@ -1815,6 +1992,363 @@ public final class MainActivity extends Activity {
 
     private String boardingCode(String reservationId, String passengerId) {
         return "GUA-" + reservationId + "-" + passengerId;
+    }
+
+    private void renderArrestos() {
+        if (!isAdmin()) {
+            addAlert("Solo administradores pueden acceder a esta sección.", true);
+            return;
+        }
+        contentLayout.addView(screenHeader("Arrestos", "Registro de pasajeros arrestados en el aeropuerto.", "menu_more", "Actualizar", v -> loadArrestosData()));
+
+        // Search panel
+        LinearLayout searchCard = card();
+        searchCard.addView(sectionTitle("Buscar pasajero por documento"));
+        EditText docInput = input("Número de documento", "", false);
+        searchCard.addView(docInput);
+
+        if (arrestFoundPassenger != null) {
+            String pasName = joinNames(
+                value(arrestFoundPassenger, "primerNombre", ""),
+                value(arrestFoundPassenger, "segundoNombre", ""),
+                value(arrestFoundPassenger, "primerApellido", ""),
+                value(arrestFoundPassenger, "segundoApellido", ""));
+            String pasDoc = value(arrestFoundPassenger, "tipoDocumento", "") + " " + value(arrestFoundPassenger, "numeroDocumento", "");
+            LinearLayout foundRow = compactCard();
+            foundRow.addView(text("Pasajero encontrado", 12, TEAL, Typeface.BOLD));
+            foundRow.addView(text(pasName, 16, TEXT, Typeface.BOLD));
+            foundRow.addView(text(pasDoc, 13, MUTED, Typeface.NORMAL));
+            searchCard.addView(foundRow);
+        }
+
+        LinearLayout searchActions = row();
+        searchActions.addView(outlineButton("Buscar", v -> {
+            String doc = docInput.getText().toString().trim();
+            if (doc.isEmpty()) {
+                lastMessage = "Ingresa un número de documento.";
+                render();
+                return;
+            }
+            arrestFoundPassenger = null;
+            for (int i = 0; i < passengersList.length(); i++) {
+                JSONObject p = passengersList.optJSONObject(i);
+                if (p == null) continue;
+                String pDoc = value(p, "numeroDocumento", "");
+                if (pDoc.toLowerCase(Locale.ROOT).contains(doc.toLowerCase(Locale.ROOT)) ||
+                        doc.toLowerCase(Locale.ROOT).contains(pDoc.toLowerCase(Locale.ROOT))) {
+                    arrestFoundPassenger = p;
+                    break;
+                }
+            }
+            if (arrestFoundPassenger == null) {
+                lastMessage = "No se encontró ningún pasajero con ese documento.";
+            } else {
+                lastMessage = "";
+            }
+            render();
+        }), weightedButtonParams());
+        searchActions.addView(outlineButton("Limpiar", v -> {
+            arrestFoundPassenger = null;
+            lastMessage = "";
+            render();
+        }), weightedButtonParams());
+        searchCard.addView(searchActions);
+        contentLayout.addView(searchCard);
+
+        // Arrest form (only enabled when passenger is found)
+        LinearLayout formCard = card();
+        formCard.addView(sectionTitle("Datos del arresto"));
+
+        // Flight spinner
+        String[] flightLabels = new String[flights.length() + 1];
+        int[] flightIds = new int[flights.length() + 1];
+        flightLabels[0] = "— Sin vuelo —";
+        flightIds[0] = 0;
+        for (int i = 0; i < flights.length(); i++) {
+            JSONObject f = flights.optJSONObject(i);
+            if (f == null) continue;
+            flightLabels[i + 1] = value(f, "numeroVuelo", "Vuelo") + " · " + value(f, "origen", "-") + " → " + value(f, "destino", "-");
+            flightIds[i + 1] = parseInt(value(f, "id", "0"), 0);
+        }
+        Spinner flightSpinner = new Spinner(this);
+        android.widget.ArrayAdapter<String> flightAdapter = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_spinner_item, flightLabels);
+        flightAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        flightSpinner.setAdapter(flightAdapter);
+
+        EditText motivoInput = input("Ej. Portación de armas, documentos falsos", "", false);
+        EditText autoridadInput = input("Ej. PNC, Migracion (opcional)", "", false);
+        EditText descripcionInput = input("Detalle adicional (opcional)", "", true);
+        EditText ubicacionInput = input("Ej. Puerta 7, Control de seguridad (opcional)", "", false);
+        EditText expedienteInput = input("Ej. EXP-2024-001 (opcional)", "", false);
+
+        String[] estados = {"ABIERTO", "EN_PROCESO", "CERRADO"};
+        Spinner estadoSpinner = new Spinner(this);
+        android.widget.ArrayAdapter<String> estadoAdapter = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_spinner_item, estados);
+        estadoAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        estadoSpinner.setAdapter(estadoAdapter);
+
+        formCard.addView(label("Vuelo relacionado (opcional)"));
+        formCard.addView(flightSpinner);
+        formCard.addView(label("Motivo del arresto"));
+        formCard.addView(motivoInput);
+        formCard.addView(label("Autoridad a cargo (opcional)"));
+        formCard.addView(autoridadInput);
+        formCard.addView(label("Descripcion del incidente (opcional)"));
+        formCard.addView(descripcionInput);
+        formCard.addView(label("Ubicacion del arresto (opcional)"));
+        formCard.addView(ubicacionInput);
+        formCard.addView(label("Estado del caso"));
+        formCard.addView(estadoSpinner);
+        formCard.addView(label("Numero de expediente (opcional)"));
+        formCard.addView(expedienteInput);
+
+        formCard.addView(primaryButton("Registrar arresto", v -> {
+            if (arrestFoundPassenger == null) {
+                lastMessage = "Busca y selecciona un pasajero primero.";
+                render();
+                return;
+            }
+            int selectedFlightId = flightIds[flightSpinner.getSelectedItemPosition()];
+            String estado = estados[estadoSpinner.getSelectedItemPosition()];
+            saveArrest(
+                    parseInt(value(arrestFoundPassenger, "id", "0"), 0),
+                    selectedFlightId > 0 ? selectedFlightId : 0,
+                    motivoInput.getText().toString(),
+                    autoridadInput.getText().toString(),
+                    descripcionInput.getText().toString(),
+                    ubicacionInput.getText().toString(),
+                    estado,
+                    expedienteInput.getText().toString());
+        }), matchWrap());
+        contentLayout.addView(formCard);
+
+        // Arrests list
+        contentLayout.addView(listSection("Arrestos registrados", arrestsList, 50, item -> {
+            String pasId = value(item, "pasajeroId", "-");
+            String pasName = "-";
+            for (int i = 0; i < passengersList.length(); i++) {
+                JSONObject p = passengersList.optJSONObject(i);
+                if (p != null && value(p, "id", "").equals(pasId)) {
+                    pasName = joinNames(value(p, "primerNombre", ""), value(p, "segundoNombre", ""),
+                            value(p, "primerApellido", ""), value(p, "segundoApellido", ""));
+                    break;
+                }
+            }
+            String vueloTag = value(item, "vueloId", "").equals("null") ? "" : " · Vuelo #" + value(item, "vueloId", "");
+            return new String[]{
+                    pasName + " (ID " + pasId + ")",
+                    value(item, "motivo", "-") + vueloTag,
+                    "Fecha: " + shortDate(value(item, "fechaHoraArresto", "-")),
+                    "Estado: " + value(item, "estadoCaso", "-")
+            };
+        }));
+    }
+
+    private String joinNames(String a, String b, String c, String d) {
+        StringBuilder sb = new StringBuilder();
+        for (String part : new String[]{a, b, c, d}) {
+            if (part != null && !part.isEmpty()) {
+                if (sb.length() > 0) sb.append(' ');
+                sb.append(part);
+            }
+        }
+        return sb.toString();
+    }
+
+    private void renderVuelosAdmin() {
+        if (!isAdmin()) {
+            addAlert("Solo administradores pueden acceder a esta seccion.", true);
+            return;
+        }
+        contentLayout.addView(screenHeader("Gestion de vuelos", "Cancela o reprograma vuelos programados.", "menu_more", "Actualizar", v -> loadAdminFlights()));
+
+        // Action panel for selected flight
+        if (actionFlightId > 0) {
+            JSONObject selectedFlight = null;
+            for (int i = 0; i < adminFlightsList.length(); i++) {
+                JSONObject f = adminFlightsList.optJSONObject(i);
+                if (f != null && f.optInt("id", 0) == actionFlightId) {
+                    selectedFlight = f;
+                    break;
+                }
+            }
+            if (selectedFlight != null) {
+                final JSONObject flight = selectedFlight;
+                LinearLayout actionCard = compactCard();
+                String numVuelo = value(flight, "numeroVuelo", "#" + actionFlightId);
+                String origen = value(flight, "origen", "?");
+                String destino = value(flight, "destino", "?");
+                String estado = value(flight, "estado", "?");
+
+                actionCard.addView(text(numVuelo + "  " + origen + " > " + destino, 15, TEAL, Typeface.BOLD));
+                actionCard.addView(text("Estado: " + estado, 13, MUTED, Typeface.NORMAL));
+
+                if (!"CANCELADO".equalsIgnoreCase(estado)) {
+                    LinearLayout btns = new LinearLayout(this);
+                    btns.setOrientation(LinearLayout.HORIZONTAL);
+                    btns.setLayoutParams(matchWrap());
+                    btns.addView(outlineButton("Cancelar vuelo", v -> {
+                        actionFlightAction = "cancel".equals(actionFlightAction) ? "" : "cancel";
+                        render();
+                    }));
+                    btns.addView(outlineButton("Reprogramar", v -> {
+                        actionFlightAction = "reschedule".equals(actionFlightAction) ? "" : "reschedule";
+                        render();
+                    }));
+                    actionCard.addView(btns);
+
+                    if ("cancel".equals(actionFlightAction)) {
+                        actionCard.addView(text("Confirmas cancelar este vuelo? No se puede deshacer.", 13, RED, Typeface.BOLD));
+                        actionCard.addView(primaryButton("Confirmar cancelacion", v -> cancelFlight(flight.optInt("id", 0))));
+                    } else if ("reschedule".equals(actionFlightAction)) {
+                        EditText dateInput = input("Nueva fecha (YYYY-MM-DD)", "", false);
+                        EditText timeInput = input("Nueva hora HH:MM (opcional)", "", false);
+                        actionCard.addView(dateInput);
+                        actionCard.addView(timeInput);
+                        actionCard.addView(primaryButton("Confirmar reprogramacion", v -> {
+                            String d = dateInput.getText().toString().trim();
+                            String t = timeInput.getText().toString().trim();
+                            if (d.isEmpty()) {
+                                lastMessage = "Ingresa la nueva fecha (YYYY-MM-DD).";
+                                render();
+                                return;
+                            }
+                            rescheduleFlight(flight.optInt("id", 0), d, t);
+                        }));
+                    }
+                } else {
+                    actionCard.addView(text("Este vuelo ya esta cancelado.", 13, RED, Typeface.ITALIC));
+                }
+
+                actionCard.addView(outlineButton("Cerrar panel", v -> {
+                    actionFlightId = 0;
+                    actionFlightAction = "";
+                    render();
+                }));
+                contentLayout.addView(actionCard);
+            }
+        }
+
+        LinearLayout flightListCard = card();
+        flightListCard.addView(sectionTitle("Vuelos (" + adminFlightsList.length() + ") — toca uno para seleccionarlo"));
+        boolean hasFlights = false;
+        for (int i = 0; i < Math.min(200, adminFlightsList.length()); i++) {
+            JSONObject item = adminFlightsList.optJSONObject(i);
+            if (item == null) continue;
+            hasFlights = true;
+            final int fId = item.optInt("id", 0);
+            String numVuelo = value(item, "numeroVuelo", "-");
+            String origen = value(item, "origen", "?");
+            String destino = value(item, "destino", "?");
+            String estado = value(item, "estado", "-");
+            String fecha = value(item, "fechaVuelo", "");
+            String fechaShort = fecha.length() >= 10 ? fecha.substring(0, 10) : fecha;
+            LinearLayout itemCard = compactCard();
+            if (fId == actionFlightId) {
+                itemCard.setBackgroundColor(Color.rgb(224, 242, 254));
+            }
+            itemCard.addView(text(numVuelo + "  " + origen + " > " + destino, 15, TEXT, Typeface.BOLD));
+            itemCard.addView(text(estado + (fechaShort.isEmpty() ? "" : "  .  " + fechaShort), 13, MUTED, Typeface.NORMAL));
+            itemCard.setOnClickListener(v -> {
+                actionFlightId = (actionFlightId == fId) ? 0 : fId;
+                actionFlightAction = "";
+                render();
+            });
+            flightListCard.addView(itemCard);
+        }
+        if (!hasFlights) {
+            flightListCard.addView(text("Sin vuelos cargados.", 13, MUTED, Typeface.NORMAL));
+        }
+        contentLayout.addView(flightListCard);
+
+        if (lastMessage != null && !lastMessage.isEmpty()) {
+            LinearLayout msgCard = compactCard();
+            msgCard.addView(text(lastMessage, 13, TEAL, Typeface.NORMAL));
+            contentLayout.addView(msgCard);
+            lastMessage = "";
+        }
+    }
+
+    private void loadAdminFlights() {
+        runTask("Cargando vuelos...", () -> apiClient.get("/api/vuelos?limit=200"), json -> {
+            adminFlightsList = new JSONArray(json);
+            render();
+        });
+    }
+
+    private void cancelFlight(int id) {
+        runTask("Cancelando vuelo...", () -> {
+            org.json.JSONObject body = new org.json.JSONObject();
+            body.put("estado", "CANCELADO");
+            return apiClient.put("/api/vuelos/" + id, body.toString());
+        }, json -> {
+            lastMessage = "Vuelo cancelado correctamente.";
+            actionFlightId = 0;
+            actionFlightAction = "";
+            loadAdminFlights();
+        });
+    }
+
+    private void rescheduleFlight(int id, String date, String time) {
+        runTask("Reprogramando vuelo...", () -> {
+            String fechaVuelo = time.isEmpty() ? date + "T00:00:00" : date + "T" + time + ":00";
+            org.json.JSONObject body = new org.json.JSONObject();
+            body.put("estado", "REPROGRAMADO");
+            body.put("fechaVuelo", fechaVuelo);
+            return apiClient.put("/api/vuelos/" + id, body.toString());
+        }, json -> {
+            lastMessage = "Vuelo reprogramado correctamente.";
+            actionFlightId = 0;
+            actionFlightAction = "";
+            loadAdminFlights();
+        });
+    }
+
+    private void loadArrestosData() {
+        runTask("Cargando arrestos...", () -> {
+            String arrestsJson = apiClient.get("/api/arrestos?limit=100");
+            String passengersJson = apiClient.get("/api/pasajeros?limit=1000");
+            return arrestsJson + "|||" + passengersJson;
+        }, combined -> {
+            String[] parts = combined.split("\\|\\|\\|", 2);
+            arrestsList = new JSONArray(parts[0]);
+            passengersList = new JSONArray(parts.length > 1 ? parts[1] : "[]");
+            lastMessage = "Arrestos actualizados.";
+            render();
+        });
+    }
+
+    private void saveArrest(int pasajeroId, int vueloId, String motivo, String autoridad,
+                            String descripcion, String ubicacion, String estado, String expediente) {
+        String cleanMotivo = motivo == null ? "" : motivo.trim();
+        if (cleanMotivo.isEmpty()) {
+            lastMessage = "El motivo del arresto es obligatorio.";
+            render();
+            return;
+        }
+        runTask("Registrando arresto...", () -> {
+            JSONObject body = new JSONObject()
+                    .put("pasajeroId", pasajeroId)
+                    .put("vueloId", vueloId > 0 ? vueloId : JSONObject.NULL)
+                    .put("aeropuertoId", defaultAirportId())
+                    .put("fechaHoraArresto", nowIso())
+                    .put("motivo", cleanMotivo)
+                    .put("autoridadCargo", autoridad.trim().isEmpty() ? JSONObject.NULL : autoridad.trim())
+                    .put("descripcionIncidente", descripcion.trim().isEmpty() ? JSONObject.NULL : descripcion.trim())
+                    .put("ubicacionArresto", ubicacion.trim().isEmpty() ? JSONObject.NULL : ubicacion.trim())
+                    .put("estadoCaso", estado)
+                    .put("numeroExpediente", expediente.trim().isEmpty() ? JSONObject.NULL : expediente.trim());
+            apiClient.post("/api/arrestos", body.toString());
+            String arrestsJson = apiClient.get("/api/arrestos?limit=100");
+            return arrestsJson + "|||" + apiClient.get("/api/pasajeros?limit=1000");
+        }, combined -> {
+            String[] parts = combined.split("\\|\\|\\|", 2);
+            arrestsList = new JSONArray(parts[0]);
+            passengersList = new JSONArray(parts.length > 1 ? parts[1] : "[]");
+            arrestFoundPassenger = null;
+            lastMessage = "Arresto registrado correctamente.";
+            render();
+        });
     }
 
     private void renderOperations() {
@@ -1926,21 +2460,33 @@ public final class MainActivity extends Activity {
         card.addView(classSpinner);
 
         card.addView(label("Pasajeros"));
-        EditText[] passengerNames = new EditText[passengerCount];
+        EditText[] passengerPrimerNombres = new EditText[passengerCount];
+        EditText[] passengerSegundoNombres = new EditText[passengerCount];
+        EditText[] passengerPrimerApellidos = new EditText[passengerCount];
+        EditText[] passengerSegundoApellidos = new EditText[passengerCount];
+        Spinner[] passengerDocTypes = new Spinner[passengerCount];
         EditText[] passengerDocs = new EditText[passengerCount];
         for (int i = 0; i < passengerCount; i++) {
             LinearLayout passengerCard = compactCard();
             passengerCard.addView(text(i == 0 ? "Pasajero principal" : "Pasajero " + (i + 1), 20, TEXT, Typeface.NORMAL));
-            passengerNames[i] = input("Nombre *", i == 0 ? value(sessionUser, "nombreCompleto", "") : "", false);
-            passengerDocs[i] = input("Documento *", i == 0 ? value(sessionUser, "numeroDocumento", "") : "", false);
             if (i == 0) {
                 passengerCard.addView(text("Usaremos los datos de tu cuenta para el titular del viaje.", 13, MUTED, Typeface.NORMAL));
                 passengerCard.addView(text(value(sessionUser, "nombreCompleto", value(sessionUser, "usuario", "Usuario")), 16, TEXT, Typeface.BOLD));
             } else {
-                passengerCard.addView(text("Ingresa el nombre y apellido exactamente como aparece en el pasaporte o documento.", 13, MUTED, Typeface.NORMAL));
-                passengerCard.addView(passengerNames[i]);
+                passengerPrimerNombres[i] = input("Primer nombre *", "", false);
+                passengerSegundoNombres[i] = input("Segundo nombre (opcional)", "", false);
+                passengerPrimerApellidos[i] = input("Primer apellido *", "", false);
+                passengerSegundoApellidos[i] = input("Segundo apellido (opcional)", "", false);
+                passengerDocTypes[i] = spinner(new String[]{"DPI", "PASAPORTE"}, "DPI");
+                passengerDocs[i] = input("Número de documento *", "", false);
+                passengerCard.addView(text("Ingresa los datos tal como aparecen en su identificación.", 13, MUTED, Typeface.NORMAL));
+                passengerCard.addView(passengerPrimerNombres[i]);
+                passengerCard.addView(passengerSegundoNombres[i]);
+                passengerCard.addView(passengerPrimerApellidos[i]);
+                passengerCard.addView(passengerSegundoApellidos[i]);
+                passengerCard.addView(label("Tipo de documento"));
+                passengerCard.addView(passengerDocTypes[i]);
                 passengerCard.addView(passengerDocs[i]);
-                passengerCard.addView(input("Nacionalidad del documento *", "Guatemala", false));
             }
             card.addView(passengerCard);
         }
@@ -1999,7 +2545,11 @@ public final class MainActivity extends Activity {
         card.addView(purchaseSummary);
         card.addView(primaryButton("Confirmar compra", v -> confirmPurchase(
                 classSpinner,
-                passengerNames,
+                passengerPrimerNombres,
+                passengerSegundoNombres,
+                passengerPrimerApellidos,
+                passengerSegundoApellidos,
+                passengerDocTypes,
                 passengerDocs,
                 holderName,
                 holderEmail,
@@ -2499,7 +3049,11 @@ public final class MainActivity extends Activity {
 
     private void confirmPurchase(
             Spinner classSpinner,
-            EditText[] passengerNames,
+            EditText[] passengerPrimerNombres,
+            EditText[] passengerSegundoNombres,
+            EditText[] passengerPrimerApellidos,
+            EditText[] passengerSegundoApellidos,
+            Spinner[] passengerDocTypes,
             EditText[] passengerDocs,
             EditText holderName,
             EditText holderEmail,
@@ -2516,7 +3070,7 @@ public final class MainActivity extends Activity {
         }
         String className = classSpinner.getSelectedItem().toString();
         int passengers = parseInt(value(checkoutFlight, "passengerCount", "1"), 1);
-        String validationError = checkoutValidationError(passengerNames, passengerDocs, holderName, holderEmail, method, cardNumber, cardMonth, cardYear);
+        String validationError = checkoutValidationError(passengerPrimerNombres, passengerPrimerApellidos, passengerDocs, holderName, holderEmail, method, cardNumber, cardMonth, cardYear);
         if (!validationError.isEmpty()) {
             statusText.setText(validationError);
             return;
@@ -2532,6 +3086,22 @@ public final class MainActivity extends Activity {
         try {
             String checkoutCartId = value(checkoutFlight, "cartId", "");
             String checkoutItemId = value(checkoutFlight, "itemCarritoId", "");
+            JSONArray pasajerosAdicionales = new JSONArray();
+            for (int i = 1; i < passengers; i++) {
+                if (passengerPrimerNombres[i] == null) continue;
+                pasajerosAdicionales.put(new JSONObject()
+                        .put("primerNombre", passengerPrimerNombres[i].getText().toString().trim())
+                        .put("segundoNombre", passengerSegundoNombres[i] != null && !passengerSegundoNombres[i].getText().toString().trim().isEmpty() ? passengerSegundoNombres[i].getText().toString().trim() : JSONObject.NULL)
+                        .put("primerApellido", passengerPrimerApellidos[i].getText().toString().trim())
+                        .put("segundoApellido", passengerSegundoApellidos[i] != null && !passengerSegundoApellidos[i].getText().toString().trim().isEmpty() ? passengerSegundoApellidos[i].getText().toString().trim() : JSONObject.NULL)
+                        .put("tipoDocumento", passengerDocTypes[i] != null ? passengerDocTypes[i].getSelectedItem().toString() : "DPI")
+                        .put("numeroDocumento", passengerDocs[i].getText().toString().trim())
+                        .put("fechaNacimiento", JSONObject.NULL)
+                        .put("nacionalidad", JSONObject.NULL)
+                        .put("sexo", JSONObject.NULL)
+                        .put("telefono", JSONObject.NULL)
+                        .put("email", JSONObject.NULL));
+            }
             JSONObject body = new JSONObject()
                     .put("usuarioId", parseInt(value(sessionUser, "usuarioId", "0"), 0))
                     .put("pasajeroId", parseInt(value(sessionUser, "pasajeroId", "0"), 0))
@@ -2543,7 +3113,8 @@ public final class MainActivity extends Activity {
                     .put("tarifaPagada", fare)
                     .put("metodoPagoId", methodId)
                     .put("emailConfirmacion", holderEmail.getText().toString().trim())
-                    .put("enviarCorreoConfirmacion", true);
+                    .put("enviarCorreoConfirmacion", true)
+                    .put("pasajerosAdicionales", pasajerosAdicionales.length() > 0 ? pasajerosAdicionales : JSONObject.NULL);
             runTask("Confirmando compra...", () -> {
                 String response = apiClient.post("/api/compras/vuelos", body.toString());
                 if (!checkoutItemId.isEmpty()) {
@@ -2764,6 +3335,12 @@ public final class MainActivity extends Activity {
         }
         if ("mis_viajes".equals(view) && sessionUser != null && myReservations.length() == 0) {
             loadMyTrips();
+        }
+        if ("arrestos".equals(view) && isAdmin() && arrestsList.length() == 0) {
+            loadArrestosData();
+        }
+        if ("vuelos_admin".equals(view) && isAdmin() && adminFlightsList.length() == 0) {
+            loadAdminFlights();
         }
         render();
     }
@@ -3395,20 +3972,38 @@ public final class MainActivity extends Activity {
         return values;
     }
 
+    private String[] nullSafeTextValues(EditText[] inputs) {
+        String[] values = new String[inputs.length];
+        for (int i = 0; i < inputs.length; i++) {
+            values[i] = inputs[i] != null ? inputs[i].getText().toString().trim() : "";
+        }
+        return values;
+    }
+
+    private String[] nullSafeSpinnerValues(Spinner[] spinners, String defaultValue) {
+        String[] values = new String[spinners.length];
+        for (int i = 0; i < spinners.length; i++) {
+            values[i] = spinners[i] != null ? spinners[i].getSelectedItem().toString() : defaultValue;
+        }
+        return values;
+    }
+
     private String checkoutValidationError(
-            EditText[] passengerNames,
-            EditText[] passengerDocs,
+            EditText[] primerNombres,
+            EditText[] primerApellidos,
+            EditText[] docs,
             EditText holderName,
             EditText holderEmail,
             Spinner method,
             EditText cardNumber,
             NumberPicker cardMonth,
             NumberPicker cardYear) {
-        for (int i = 1; i < passengerNames.length; i++) {
-            if (isBlank(passengerNames[i]) || isBlank(passengerDocs[i])) {
-                markInvalid(passengerNames[i]);
-                markInvalid(passengerDocs[i]);
-                return "Completa nombre y documento de los pasajeros adicionales.";
+        for (int i = 1; i < primerNombres.length; i++) {
+            if (isBlank(primerNombres[i]) || isBlank(primerApellidos[i]) || isBlank(docs[i])) {
+                if (primerNombres[i] != null) markInvalid(primerNombres[i]);
+                if (primerApellidos[i] != null) markInvalid(primerApellidos[i]);
+                if (docs[i] != null) markInvalid(docs[i]);
+                return "Completa primer nombre, primer apellido y documento de los pasajeros adicionales.";
             }
         }
 

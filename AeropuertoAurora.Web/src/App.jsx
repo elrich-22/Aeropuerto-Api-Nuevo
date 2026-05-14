@@ -580,6 +580,20 @@ function NavBar({ user, adminView, isAdmin, activeView, onAdminView, onNavigate,
               Reporteria
             </button>
             <button
+              className={adminView === 'arrestos' ? 'nav-admin-link active' : 'nav-admin-link'}
+              type="button"
+              onClick={() => onAdminView('arrestos')}
+            >
+              Arrestos
+            </button>
+            <button
+              className={adminView === 'vuelos' ? 'nav-admin-link active' : 'nav-admin-link'}
+              type="button"
+              onClick={() => onAdminView('vuelos')}
+            >
+              Vuelos
+            </button>
+            <button
               className={adminView === 'admin' ? 'nav-admin-link active' : 'nav-admin-link'}
               type="button"
               onClick={() => onAdminView('admin')}
@@ -1097,8 +1111,12 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
         titularNombre: user?.nombreCompleto || '',
         titularEmail: user?.email || '',
         pasajeros: Array.from({ length: passengerCount }, (_, index) => ({
-          nombre: index === 0 ? user?.nombreCompleto || '' : '',
-          documento: index === 0 ? user?.numeroDocumento || '' : ''
+          primerNombre: '',
+          segundoNombre: '',
+          primerApellido: '',
+          segundoApellido: '',
+          tipoDocumento: 'DPI',
+          numeroDocumento: index === 0 ? user?.numeroDocumento || '' : ''
         })),
         numeroTarjeta: '',
         mesTarjeta: '',
@@ -1140,8 +1158,9 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
     anioTarjeta: selectedPayment.requiresCard && !form.anioTarjeta ? 'Selecciona año.' : expiredCard ? 'La tarjeta está vencida.' : ''
   };
   const passengerErrors = form.pasajeros.map((passenger, index) => ({
-    nombre: index === 0 || passenger.nombre.trim() ? '' : 'Nombre obligatorio.',
-    documento: index === 0 || passenger.documento.trim() ? '' : 'Documento obligatorio.'
+    primerNombre: index === 0 || passenger.primerNombre.trim() ? '' : 'Nombre obligatorio.',
+    primerApellido: index === 0 || passenger.primerApellido.trim() ? '' : 'Apellido obligatorio.',
+    numeroDocumento: index === 0 || passenger.numeroDocumento.trim() ? '' : 'Documento obligatorio.'
   }));
 
   const updatePassenger = (index, field, value) => {
@@ -1158,7 +1177,7 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
   };
 
   const passengerStepValid = () =>
-    passengerErrors.every((passenger) => !passenger.nombre && !passenger.documento) &&
+    passengerErrors.every((passenger) => !passenger.primerNombre && !passenger.primerApellido && !passenger.numeroDocumento) &&
     !fieldErrors.titularNombre &&
     !fieldErrors.titularEmail;
 
@@ -1173,8 +1192,9 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
       titularNombre: true,
       titularEmail: true,
       ...Object.fromEntries(form.pasajeros.flatMap((_, index) => [
-        [`pasajeros.${index}.nombre`, true],
-        [`pasajeros.${index}.documento`, true]
+        [`pasajeros.${index}.primerNombre`, true],
+        [`pasajeros.${index}.primerApellido`, true],
+        [`pasajeros.${index}.numeroDocumento`, true]
       ]))
     }));
 
@@ -1226,7 +1246,22 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
         vueloId: item.id,
         clase: item.selectedClass || className,
         tarifaPagada: calculateFlightFare(item.selectedClass || className, passengerCount)
-      }))
+      })),
+      pasajerosAdicionales: passengerCount > 1
+        ? form.pasajeros.slice(1).map((p) => ({
+            primerNombre: p.primerNombre.trim(),
+            segundoNombre: p.segundoNombre.trim() || null,
+            primerApellido: p.primerApellido.trim(),
+            segundoApellido: p.segundoApellido.trim() || null,
+            tipoDocumento: p.tipoDocumento || 'DPI',
+            numeroDocumento: p.numeroDocumento.trim(),
+            fechaNacimiento: null,
+            nacionalidad: null,
+            sexo: null,
+            telefono: null,
+            email: null
+          }))
+        : undefined
     });
   };
 
@@ -1278,30 +1313,70 @@ function CheckoutView({ flight, user, onBack, onConfirm, submitting, error }) {
                           <small>Usaremos los datos guardados en tu cuenta.</small>
                         </div>
                       ) : (
-                        <>
-                          <label>
-                            Pasajero {index + 1}
-                            <input
-                              className={touched[`pasajeros.${index}.nombre`] && passengerErrors[index]?.nombre ? 'field-invalid' : ''}
-                              value={passenger.nombre}
-                              onBlur={() => markTouched(`pasajeros.${index}.nombre`)}
-                              onChange={(event) => updatePassenger(index, 'nombre', event.target.value)}
-                              placeholder="Nombre completo"
-                            />
-                            {touched[`pasajeros.${index}.nombre`] && passengerErrors[index]?.nombre && <small className="field-error">{passengerErrors[index].nombre}</small>}
-                          </label>
-                          <label>
-                            Documento
-                            <input
-                              className={touched[`pasajeros.${index}.documento`] && passengerErrors[index]?.documento ? 'field-invalid' : ''}
-                              value={passenger.documento}
-                              onBlur={() => markTouched(`pasajeros.${index}.documento`)}
-                              onChange={(event) => updatePassenger(index, 'documento', event.target.value)}
-                              placeholder="DPI o pasaporte"
-                            />
-                            {touched[`pasajeros.${index}.documento`] && passengerErrors[index]?.documento && <small className="field-error">{passengerErrors[index].documento}</small>}
-                          </label>
-                        </>
+                        <div className="passenger-additional">
+                          <p className="passenger-label">Pasajero {index + 1}</p>
+                          <div className="form-grid">
+                            <label>
+                              Primer nombre
+                              <input
+                                className={touched[`pasajeros.${index}.primerNombre`] && passengerErrors[index]?.primerNombre ? 'field-invalid' : ''}
+                                value={passenger.primerNombre}
+                                onBlur={() => markTouched(`pasajeros.${index}.primerNombre`)}
+                                onChange={(event) => updatePassenger(index, 'primerNombre', event.target.value)}
+                                placeholder="Primer nombre"
+                              />
+                              {touched[`pasajeros.${index}.primerNombre`] && passengerErrors[index]?.primerNombre && <small className="field-error">{passengerErrors[index].primerNombre}</small>}
+                            </label>
+                            <label>
+                              Segundo nombre <small>(opcional)</small>
+                              <input
+                                value={passenger.segundoNombre}
+                                onChange={(event) => updatePassenger(index, 'segundoNombre', event.target.value)}
+                                placeholder="Segundo nombre"
+                              />
+                            </label>
+                            <label>
+                              Primer apellido
+                              <input
+                                className={touched[`pasajeros.${index}.primerApellido`] && passengerErrors[index]?.primerApellido ? 'field-invalid' : ''}
+                                value={passenger.primerApellido}
+                                onBlur={() => markTouched(`pasajeros.${index}.primerApellido`)}
+                                onChange={(event) => updatePassenger(index, 'primerApellido', event.target.value)}
+                                placeholder="Primer apellido"
+                              />
+                              {touched[`pasajeros.${index}.primerApellido`] && passengerErrors[index]?.primerApellido && <small className="field-error">{passengerErrors[index].primerApellido}</small>}
+                            </label>
+                            <label>
+                              Segundo apellido <small>(opcional)</small>
+                              <input
+                                value={passenger.segundoApellido}
+                                onChange={(event) => updatePassenger(index, 'segundoApellido', event.target.value)}
+                                placeholder="Segundo apellido"
+                              />
+                            </label>
+                            <label>
+                              Tipo de documento
+                              <select
+                                value={passenger.tipoDocumento}
+                                onChange={(event) => updatePassenger(index, 'tipoDocumento', event.target.value)}
+                              >
+                                <option value="DPI">DPI</option>
+                                <option value="PASAPORTE">Pasaporte</option>
+                              </select>
+                            </label>
+                            <label>
+                              Número de documento
+                              <input
+                                className={touched[`pasajeros.${index}.numeroDocumento`] && passengerErrors[index]?.numeroDocumento ? 'field-invalid' : ''}
+                                value={passenger.numeroDocumento}
+                                onBlur={() => markTouched(`pasajeros.${index}.numeroDocumento`)}
+                                onChange={(event) => updatePassenger(index, 'numeroDocumento', event.target.value)}
+                                placeholder="Número de documento"
+                              />
+                              {touched[`pasajeros.${index}.numeroDocumento`] && passengerErrors[index]?.numeroDocumento && <small className="field-error">{passengerErrors[index].numeroDocumento}</small>}
+                            </label>
+                          </div>
+                        </div>
                       )}
                     </div>
                   ))}
@@ -2653,7 +2728,95 @@ function BaggageTrackerSection() {
   );
 }
 
-function LostObjectsSection({ airports }) {
+const LOST_OBJECT_ESTADOS = ['REPORTADO', 'ENCONTRADO', 'ENTREGADO', 'NO_RECLAMADO'];
+
+function AdminLostObjectPanel({ airports, onCreated }) {
+  const [flights, setFlights] = useState([]);
+  const [form, setForm] = useState({
+    vueloId: '',
+    descripcion: '',
+    ubicacionEncontrado: '',
+    estado: 'ENCONTRADO',
+    reportantePrimerNombre: '',
+    reportantePrimerApellido: '',
+    contactoReportante: ''
+  });
+  const [message, setMessage] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.flights(200).then(setFlights).catch(() => setFlights([]));
+  }, []);
+
+  const update = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!form.descripcion.trim() || !form.ubicacionEncontrado.trim()) {
+      setMessage('Descripción y ubicación son obligatorias.');
+      return;
+    }
+    setSaving(true);
+    setMessage('');
+    try {
+      await api.createLostObject({
+        vueloId: form.vueloId ? Number(form.vueloId) : null,
+        aeropuertoId: airports[0]?.id || 1,
+        descripcion: form.descripcion.trim(),
+        fechaReporte: new Date().toISOString(),
+        ubicacionEncontrado: form.ubicacionEncontrado.trim(),
+        estado: form.estado,
+        reportantePrimerNombre: form.reportantePrimerNombre.trim() || null,
+        reportanteSegundoNombre: null,
+        reportantePrimerApellido: form.reportantePrimerApellido.trim() || null,
+        reportanteSegundoApellido: null,
+        contactoReportante: form.contactoReportante.trim() || null,
+        fechaEntrega: null,
+        reclamantePrimerNombre: null,
+        reclamanteSegundoNombre: null,
+        reclamantePrimerApellido: null,
+        reclamanteSegundoApellido: null
+      });
+      setForm({ vueloId: '', descripcion: '', ubicacionEncontrado: '', estado: 'ENCONTRADO', reportantePrimerNombre: '', reportantePrimerApellido: '', contactoReportante: '' });
+      setMessage('Objeto registrado correctamente.');
+      onCreated();
+    } catch (err) {
+      setMessage(`Error al registrar: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form className="tool-panel lost-object-form" onSubmit={submit}>
+      <h2>Registrar objeto encontrado</h2>
+      {message && <div className="connection-alert">{message}</div>}
+      <label className="field">
+        <span>Vuelo relacionado <small>(opcional)</small></span>
+        <select value={form.vueloId} onChange={(e) => update('vueloId', e.target.value)}>
+          <option value="">— Sin vuelo —</option>
+          {flights.map((f) => (
+            <option key={f.id} value={f.id}>{f.numeroVuelo} · {f.origen} → {f.destino} · {formatDate(f.fechaVuelo)}</option>
+          ))}
+        </select>
+      </label>
+      <label className="field"><span>Descripción del objeto</span><textarea value={form.descripcion} onChange={(e) => update('descripcion', e.target.value)} placeholder="Ej. mochila negra con etiqueta roja, laptop plateada..." required /></label>
+      <label className="field"><span>Ubicación donde fue encontrado</span><input value={form.ubicacionEncontrado} onChange={(e) => update('ubicacionEncontrado', e.target.value)} placeholder="Ej. Puerta 12, Banda de equipaje 3" required /></label>
+      <label className="field">
+        <span>Estado</span>
+        <select value={form.estado} onChange={(e) => update('estado', e.target.value)}>
+          {LOST_OBJECT_ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </label>
+      <label className="field"><span>Nombre quien reporta <small>(opcional)</small></span><input value={form.reportantePrimerNombre} onChange={(e) => update('reportantePrimerNombre', e.target.value)} placeholder="Primer nombre" /></label>
+      <label className="field"><span>Apellido quien reporta <small>(opcional)</small></span><input value={form.reportantePrimerApellido} onChange={(e) => update('reportantePrimerApellido', e.target.value)} placeholder="Primer apellido" /></label>
+      <label className="field"><span>Contacto interno <small>(opcional)</small></span><input value={form.contactoReportante} onChange={(e) => update('contactoReportante', e.target.value)} placeholder="teléfono o email del personal" /></label>
+      <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Guardando...' : 'Registrar objeto'}</button>
+    </form>
+  );
+}
+
+function LostObjectsSection({ airports, isAdmin }) {
   const [items, setItems] = useState([]);
   const [form, setForm] = useState({
     descripcion: '',
@@ -2665,7 +2828,7 @@ function LostObjectsSection({ airports }) {
 
   const loadItems = useCallback(async () => {
     try {
-      setItems(await api.lostObjects(30));
+      setItems(await api.lostObjects(50));
     } catch {
       setItems([]);
     }
@@ -2720,25 +2883,36 @@ function LostObjectsSection({ airports }) {
         <div className="section-label">Objetos perdidos</div>
         <h1>Objetos encontrados y reportes</h1>
         {message && <div className="connection-alert">{message}</div>}
-        <p className="tool-intro">
-          Esta pantalla sirve para dos cosas: ver objetos encontrados recientemente y dejar un reporte si perdiste algo.
-          Los datos de contacto no se publican.
-        </p>
+        {!isAdmin && (
+          <p className="tool-intro">
+            Esta pantalla sirve para dos cosas: ver objetos encontrados recientemente y dejar un reporte si perdiste algo.
+            Los datos de contacto no se publican.
+          </p>
+        )}
         <div className="tool-grid lost-object-grid">
-          <form className="tool-panel lost-object-form" onSubmit={submit}>
-            <h2>Reportar pérdida</h2>
-            <label className="field"><span>¿Qué perdiste?</span><textarea value={form.descripcion} onChange={(event) => updateForm('descripcion', event.target.value)} placeholder="Ej. mochila negra con etiqueta roja" required /></label>
-            <label className="field"><span>Tu nombre</span><input value={form.reportanteNombre} onChange={(event) => updateForm('reportanteNombre', event.target.value)} placeholder="nombre y apellido" required /></label>
-            <label className="field"><span>Contacto privado</span><input value={form.contactoReportante} onChange={(event) => updateForm('contactoReportante', event.target.value)} placeholder="teléfono o email" required /></label>
-            <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Guardando' : 'Enviar reporte'}</button>
-          </form>
+          {isAdmin ? (
+            <AdminLostObjectPanel airports={airports} onCreated={loadItems} />
+          ) : (
+            <form className="tool-panel lost-object-form" onSubmit={submit}>
+              <h2>Reportar pérdida</h2>
+              <label className="field"><span>¿Qué perdiste?</span><textarea value={form.descripcion} onChange={(event) => updateForm('descripcion', event.target.value)} placeholder="Ej. mochila negra con etiqueta roja" required /></label>
+              <label className="field"><span>Tu nombre</span><input value={form.reportanteNombre} onChange={(event) => updateForm('reportanteNombre', event.target.value)} placeholder="nombre y apellido" required /></label>
+              <label className="field"><span>Contacto privado</span><input value={form.contactoReportante} onChange={(event) => updateForm('contactoReportante', event.target.value)} placeholder="teléfono o email" required /></label>
+              <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Guardando' : 'Enviar reporte'}</button>
+            </form>
+          )}
           <div className="tool-panel">
-            <h2>Encontrados recientes</h2>
-            {items.slice(0, 8).map((item) => (
+            <h2>{isAdmin ? 'Todos los registros' : 'Encontrados recientes'}</h2>
+            {items.length === 0 && <div className="board-empty">Sin registros.</div>}
+            {items.slice(0, isAdmin ? 50 : 8).map((item) => (
               <div className="operation-row" key={item.id}>
                 <div>
                   <strong>{item.descripcion}</strong>
-                  <small>{item.estado === 'REPORTADO' ? 'Reporte en revisión' : item.ubicacionEncontrado || 'Ubicación pendiente'} - {formatDateOnly(item.fechaReporte)}</small>
+                  <small>
+                    {item.ubicacionEncontrado || 'Ubicación pendiente'}
+                    {item.vueloId ? ` · Vuelo #${item.vueloId}` : ''}
+                    {' · '}{formatDateOnly(item.fechaReporte)}
+                  </small>
                 </div>
                 <span className={`status ${statusClassName(item.estado)}`}>{item.estado}</span>
               </div>
@@ -2776,6 +2950,340 @@ function PromotionsSection() {
             </article>
           ))}
         </div>
+      </section>
+    </main>
+  );
+}
+
+const ARREST_ESTADOS = ['ABIERTO', 'EN_PROCESO', 'CERRADO'];
+
+function ArrestosSection({ airports, flights }) {
+  const [passengers, setPassengers] = useState([]);
+  const [arrests, setArrests] = useState([]);
+  const [searchDoc, setSearchDoc] = useState('');
+  const [foundPassenger, setFoundPassenger] = useState(null);
+  const [searchMessage, setSearchMessage] = useState('');
+  const [form, setForm] = useState({
+    vueloId: '',
+    motivo: '',
+    autoridadCargo: '',
+    descripcionIncidente: '',
+    ubicacionArresto: '',
+    estadoCaso: 'ABIERTO',
+    numeroExpediente: ''
+  });
+  const [message, setMessage] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const loadData = useCallback(async () => {
+    try {
+      const [passengerList, arrestList] = await Promise.all([
+        api.passengers(1000),
+        api.arrests(100)
+      ]);
+      setPassengers(passengerList);
+      setArrests(arrestList);
+    } catch {
+      setPassengers([]);
+      setArrests([]);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const update = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+
+  const searchPassenger = () => {
+    const doc = searchDoc.trim();
+    if (!doc) { setSearchMessage('Ingresa un número de documento.'); return; }
+    const found = passengers.find((p) =>
+      normalize(p.numeroDocumento).includes(normalize(doc)) ||
+      normalize(doc).includes(normalize(p.numeroDocumento))
+    );
+    if (found) {
+      setFoundPassenger(found);
+      setSearchMessage('');
+    } else {
+      setFoundPassenger(null);
+      setSearchMessage('No se encontró ningún pasajero con ese documento.');
+    }
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!foundPassenger) { setMessage('Busca y selecciona un pasajero primero.'); return; }
+    if (!form.motivo.trim()) { setMessage('El motivo es obligatorio.'); return; }
+    setSaving(true);
+    setMessage('');
+    try {
+      await api.createArrest({
+        pasajeroId: foundPassenger.id,
+        vueloId: form.vueloId ? Number(form.vueloId) : null,
+        aeropuertoId: airports[0]?.id || 1,
+        fechaHoraArresto: new Date().toISOString(),
+        motivo: form.motivo.trim(),
+        autoridadCargo: form.autoridadCargo.trim() || null,
+        descripcionIncidente: form.descripcionIncidente.trim() || null,
+        ubicacionArresto: form.ubicacionArresto.trim() || null,
+        estadoCaso: form.estadoCaso,
+        numeroExpediente: form.numeroExpediente.trim() || null
+      });
+      setForm({ vueloId: '', motivo: '', autoridadCargo: '', descripcionIncidente: '', ubicacionArresto: '', estadoCaso: 'ABIERTO', numeroExpediente: '' });
+      setFoundPassenger(null);
+      setSearchDoc('');
+      setMessage('Arresto registrado correctamente.');
+      await loadData();
+    } catch (err) {
+      setMessage(`Error al registrar: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const passengerLabel = (p) =>
+    `${[p.primerNombre, p.segundoNombre, p.primerApellido, p.segundoApellido].filter(Boolean).join(' ')} · ${p.tipoDocumento} ${p.numeroDocumento}`;
+
+  return (
+    <main className="tab-page">
+      <section className="section passenger-tool">
+        <div className="section-label">Seguridad</div>
+        <h1>Registro de arrestos</h1>
+        {message && <div className="connection-alert">{message}</div>}
+        <div className="tool-grid lost-object-grid">
+          <form className="tool-panel lost-object-form" onSubmit={submit}>
+            <h2>Registrar arresto</h2>
+            <label className="field">
+              <span>Buscar pasajero por documento</span>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  value={searchDoc}
+                  onChange={(e) => setSearchDoc(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), searchPassenger())}
+                  placeholder="Número de documento"
+                />
+                <button className="btn" type="button" onClick={searchPassenger}>Buscar</button>
+              </div>
+            </label>
+            {searchMessage && <small style={{ color: 'var(--color-danger, #c00)' }}>{searchMessage}</small>}
+            {foundPassenger && (
+              <div className="operation-row" style={{ background: 'var(--color-surface-2, #f5f5f5)', borderRadius: '8px', padding: '10px' }}>
+                <div>
+                  <strong>{passengerLabel(foundPassenger)}</strong>
+                  <small>ID pasajero: {foundPassenger.id}</small>
+                </div>
+                <span className="status status-ok">Seleccionado</span>
+              </div>
+            )}
+            <label className="field">
+              <span>Vuelo relacionado <small>(opcional)</small></span>
+              <select value={form.vueloId} onChange={(e) => update('vueloId', e.target.value)}>
+                <option value="">— Sin vuelo —</option>
+                {flights.map((f) => (
+                  <option key={f.id} value={f.id}>{f.numeroVuelo} · {f.origen} → {f.destino} · {formatDate(f.fechaVuelo)}</option>
+                ))}
+              </select>
+            </label>
+            <label className="field"><span>Motivo del arresto</span><input value={form.motivo} onChange={(e) => update('motivo', e.target.value)} placeholder="Ej. Portación de armas, documentos falsos" required /></label>
+            <label className="field"><span>Autoridad a cargo <small>(opcional)</small></span><input value={form.autoridadCargo} onChange={(e) => update('autoridadCargo', e.target.value)} placeholder="Ej. PNC, Migración" /></label>
+            <label className="field"><span>Descripción del incidente <small>(opcional)</small></span><textarea value={form.descripcionIncidente} onChange={(e) => update('descripcionIncidente', e.target.value)} placeholder="Detalle adicional del incidente" /></label>
+            <label className="field"><span>Ubicación del arresto <small>(opcional)</small></span><input value={form.ubicacionArresto} onChange={(e) => update('ubicacionArresto', e.target.value)} placeholder="Ej. Puerta 7, Control de seguridad" /></label>
+            <label className="field">
+              <span>Estado del caso</span>
+              <select value={form.estadoCaso} onChange={(e) => update('estadoCaso', e.target.value)}>
+                {ARREST_ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </label>
+            <label className="field"><span>Número de expediente <small>(opcional)</small></span><input value={form.numeroExpediente} onChange={(e) => update('numeroExpediente', e.target.value)} placeholder="Ej. EXP-2024-001" /></label>
+            <button className="btn btn-primary" type="submit" disabled={saving || !foundPassenger}>{saving ? 'Guardando...' : 'Registrar arresto'}</button>
+          </form>
+          <div className="tool-panel">
+            <h2>Arrestos registrados</h2>
+            {arrests.length === 0 && <div className="board-empty">Sin registros.</div>}
+            {arrests.slice(0, 50).map((a) => {
+              const pas = passengers.find((p) => p.id === a.pasajeroId);
+              return (
+                <div className="operation-row" key={a.id}>
+                  <div>
+                    <strong>{pas ? passengerLabel(pas) : `Pasajero #${a.pasajeroId}`}</strong>
+                    <small>{a.motivo}{a.vueloId ? ` · Vuelo #${a.vueloId}` : ''} · {formatDateOnly(a.fechaHoraArresto)}</small>
+                    {a.autoridadCargo && <small>Autoridad: {a.autoridadCargo}</small>}
+                  </div>
+                  <span className={`status ${statusClassName(a.estadoCaso)}`}>{a.estadoCaso}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function VuelosAdminSection() {
+  const [flights, setFlights] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedId, setSelectedId] = useState(null);
+  const [action, setAction] = useState('');
+  const [newDate, setNewDate] = useState('');
+  const [newTime, setNewTime] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    api.flights(200).then(setFlights).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const selectedFlight = flights.find((f) => f.id === selectedId) ?? null;
+
+  const reload = () => {
+    setLoading(true);
+    api.flights(200).then(setFlights).catch(() => {}).finally(() => setLoading(false));
+  };
+
+  const handleCancel = async () => {
+    if (!selectedFlight) return;
+    setSaving(true);
+    setMessage('');
+    try {
+      await api.updateFlight(selectedFlight.id, { estado: 'CANCELADO' });
+      setMessage('Vuelo cancelado correctamente.');
+      setSelectedId(null);
+      setAction('');
+      reload();
+    } catch (e) {
+      setMessage(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReschedule = async () => {
+    if (!selectedFlight || !newDate) return;
+    setSaving(true);
+    setMessage('');
+    try {
+      const fechaVuelo = newTime
+        ? new Date(`${newDate}T${newTime}:00`)
+        : new Date(`${newDate}T00:00:00`);
+      await api.updateFlight(selectedFlight.id, { estado: 'REPROGRAMADO', fechaVuelo: fechaVuelo.toISOString() });
+      setMessage('Vuelo reprogramado correctamente.');
+      setSelectedId(null);
+      setAction('');
+      setNewDate('');
+      setNewTime('');
+      reload();
+    } catch (e) {
+      setMessage(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const selectFlight = (id) => {
+    setSelectedId(selectedId === id ? null : id);
+    setAction('');
+    setMessage('');
+  };
+
+  return (
+    <main className="tab-page">
+      <section className="section passenger-tool">
+        <div className="section-label">Admin</div>
+        <h1>Gestión de vuelos</h1>
+        <p className="section-sub">Selecciona un vuelo para cancelarlo o reprogramarlo.</p>
+        {message && <div className="connection-alert">{message}</div>}
+        {selectedFlight && (
+          <div className="card" style={{ marginBottom: '1.25rem', padding: '1.25rem' }}>
+            <h3 style={{ margin: '0 0 .25rem' }}>{selectedFlight.numeroVuelo}</h3>
+            <p style={{ margin: '0 0 .75rem', color: '#64748b', fontSize: '.9rem' }}>
+              {selectedFlight.origen} {'→'} {selectedFlight.destino} &middot; {formatDate(selectedFlight.fechaVuelo)} &middot; <strong>{selectedFlight.estado}</strong>
+            </p>
+            {selectedFlight.estado === 'CANCELADO' ? (
+              <p style={{ color: '#c0392b' }}>Este vuelo ya está cancelado.</p>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className={action === 'cancel' ? 'btn btn-danger' : 'btn btn-outline'}
+                    onClick={() => setAction(action === 'cancel' ? '' : 'cancel')}
+                  >
+                    Cancelar vuelo
+                  </button>
+                  <button
+                    type="button"
+                    className={action === 'reschedule' ? 'btn' : 'btn btn-outline'}
+                    onClick={() => setAction(action === 'reschedule' ? '' : 'reschedule')}
+                  >
+                    Reprogramar
+                  </button>
+                </div>
+                {action === 'cancel' && (
+                  <div style={{ background: '#fff5f5', border: '1px solid #fca5a5', borderRadius: '8px', padding: '1rem', marginBottom: '.75rem' }}>
+                    <p style={{ color: '#c0392b', marginBottom: '.75rem', fontWeight: 600 }}>
+                      ¿Confirmas cancelar este vuelo? Esta acción no se puede deshacer.
+                    </p>
+                    <button type="button" className="btn btn-danger" disabled={saving} onClick={handleCancel}>
+                      {saving ? 'Cancelando...' : 'Confirmar cancelación'}
+                    </button>
+                  </div>
+                )}
+                {action === 'reschedule' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                    <label className="field">
+                      <span>Nueva fecha</span>
+                      <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required />
+                    </label>
+                    <label className="field">
+                      <span>Nueva hora <small>(opcional)</small></span>
+                      <input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
+                    </label>
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={saving || !newDate}
+                      onClick={handleReschedule}
+                    >
+                      {saving ? 'Reprogramando...' : 'Confirmar reprogramación'}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ marginTop: '.75rem' }}
+              onClick={() => { setSelectedId(null); setAction(''); }}
+            >
+              Cerrar
+            </button>
+          </div>
+        )}
+        {loading ? (
+          <p>Cargando vuelos...</p>
+        ) : (
+          <div className="operations-list" style={{ marginTop: '1rem' }}>
+            {flights.length === 0 && <p>No hay vuelos disponibles.</p>}
+            {flights.map((f) => (
+              <div
+                key={f.id}
+                className="operation-row"
+                style={{ cursor: 'pointer', outline: selectedId === f.id ? '2px solid #0077b6' : 'none', borderRadius: '6px' }}
+                onClick={() => selectFlight(f.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && selectFlight(f.id)}
+              >
+                <div>
+                  <strong>{f.numeroVuelo} — {f.origen} {'→'} {f.destino}</strong>
+                  <small>{f.aerolinea} &middot; {formatDate(f.fechaVuelo)}</small>
+                </div>
+                <span className={`status ${statusClassName(f.estado)}`}>{f.estado}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </main>
   );
@@ -3538,7 +4046,8 @@ function App() {
           tarifaPagada: Number(leg.tarifaPagada || 0) + extraPerLeg,
           metodoPagoId: purchaseOptions.metodoPagoId,
           emailConfirmacion: shouldSendIndividualEmail ? purchaseOptions.emailConfirmacion : null,
-          enviarCorreoConfirmacion: shouldSendIndividualEmail
+          enviarCorreoConfirmacion: shouldSendIndividualEmail,
+          pasajerosAdicionales: purchaseOptions.pasajerosAdicionales
         }));
       }
 
@@ -3739,6 +4248,10 @@ function App() {
         <AdminSection tables={tables} selectedTable={selectedTable} onSelectTable={setSelectedTable} />
       ) : adminView === 'reporteria' && isAdmin ? (
         <ReporteriaSection />
+      ) : adminView === 'arrestos' && isAdmin ? (
+        <ArrestosSection airports={dashboard.airports} flights={dashboard.flights} />
+      ) : adminView === 'vuelos' && isAdmin ? (
+        <VuelosAdminSection />
       ) : activeView === 'success' && purchaseSuccess ? (
         <PurchaseSuccessView
           summary={purchaseSuccess}
@@ -3771,7 +4284,7 @@ function App() {
       ) : activeView === 'checkin' ? (
         <CheckInSection user={user} flights={dashboard.flights} onRequireLogin={() => setLoginOpen(true)} />
       ) : activeView === 'objetos' ? (
-        <LostObjectsSection airports={dashboard.airports} />
+        <LostObjectsSection airports={dashboard.airports} isAdmin={isAdmin} />
       ) : activeView === 'promos' ? (
         <PromotionsSection />
       ) : activeView === 'explorar' && travelCriteria ? (
