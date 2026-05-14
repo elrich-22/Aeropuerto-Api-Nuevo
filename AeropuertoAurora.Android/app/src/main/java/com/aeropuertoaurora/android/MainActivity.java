@@ -114,7 +114,11 @@ public final class MainActivity extends Activity {
     private String fareSelectionLeg = "ida";
     private JSONObject selectedOutboundFlight;
     private JSONObject selectedReturnFlight;
-    private String[] savedPassengerNames = new String[0];
+    private String[] savedPassengerFirstNames = new String[0];
+    private String[] savedPassengerSecondNames = new String[0];
+    private String[] savedPassengerFirstLastNames = new String[0];
+    private String[] savedPassengerSecondLastNames = new String[0];
+    private String[] savedPassengerDocTypes = new String[0];
     private String[] savedPassengerDocs = new String[0];
     private String savedHolderName = "";
     private String savedHolderEmail = "";
@@ -1277,42 +1281,58 @@ public final class MainActivity extends Activity {
         }), matchWrap());
         card.addView(sectionTitle("Información de pasajeros"));
 
-        EditText[] names = new EditText[passengerCount];
+        EditText[] primerNombres = new EditText[passengerCount];
+        EditText[] segundoNombres = new EditText[passengerCount];
+        EditText[] primerApellidos = new EditText[passengerCount];
+        EditText[] segundoApellidos = new EditText[passengerCount];
+        Spinner[] docTypes = new Spinner[passengerCount];
         EditText[] docs = new EditText[passengerCount];
         for (int i = 0; i < passengerCount; i++) {
             LinearLayout passengerCard = compactCard();
             passengerCard.addView(text(i == 0 ? "Pasajero principal" : "Pasajero " + (i + 1), 24, TEXT, Typeface.NORMAL));
-            names[i] = input("Nombre *", defaultSaved(savedPassengerNames, i, i == 0 ? value(sessionUser, "nombreCompleto", "") : ""), false);
-            docs[i] = input("Documento *", defaultSaved(savedPassengerDocs, i, i == 0 ? value(sessionUser, "numeroDocumento", "") : ""), false);
             if (i == 0) {
                 passengerCard.addView(text("Usaremos los datos de tu cuenta para el titular del viaje.", 14, MUTED, Typeface.NORMAL));
                 passengerCard.addView(text(value(sessionUser, "nombreCompleto", value(sessionUser, "usuario", "Usuario")), 16, TEXT, Typeface.BOLD));
             } else {
-                passengerCard.addView(text("Ingresa nombre y documento tal como aparecen en su identificación.", 14, TEXT, Typeface.NORMAL));
-                passengerCard.addView(names[i]);
+                primerNombres[i] = input("Primer nombre *", defaultSaved(savedPassengerFirstNames, i, ""), false);
+                segundoNombres[i] = input("Segundo nombre (opcional)", defaultSaved(savedPassengerSecondNames, i, ""), false);
+                primerApellidos[i] = input("Primer apellido *", defaultSaved(savedPassengerFirstLastNames, i, ""), false);
+                segundoApellidos[i] = input("Segundo apellido (opcional)", defaultSaved(savedPassengerSecondLastNames, i, ""), false);
+                docTypes[i] = spinner(new String[]{"DPI", "PASAPORTE"}, defaultSaved(savedPassengerDocTypes, i, "DPI"));
+                docs[i] = input("Número de documento *", defaultSaved(savedPassengerDocs, i, ""), false);
+                passengerCard.addView(text("Ingresa los datos tal como aparecen en su identificación.", 14, TEXT, Typeface.NORMAL));
+                passengerCard.addView(primerNombres[i]);
+                passengerCard.addView(segundoNombres[i]);
+                passengerCard.addView(primerApellidos[i]);
+                passengerCard.addView(segundoApellidos[i]);
+                passengerCard.addView(label("Tipo de documento"));
+                passengerCard.addView(docTypes[i]);
                 passengerCard.addView(docs[i]);
-                passengerCard.addView(spinner(new String[]{"Pasaporte", "DPI", "Licencia"}, "Pasaporte"));
-                passengerCard.addView(input("Nacionalidad del documento *", "Guatemala", false));
             }
             card.addView(passengerCard);
         }
 
-        card.addView(primaryButton("Siguiente", v -> savePassengerStep(names, docs)), matchWrap());
+        card.addView(primaryButton("Siguiente", v -> savePassengerStep(primerNombres, segundoNombres, primerApellidos, segundoApellidos, docTypes, docs)), matchWrap());
         card.addView(tripSummaryBar());
         contentLayout.addView(card);
     }
 
-    private void savePassengerStep(EditText[] names, EditText[] docs) {
-        for (int i = 1; i < names.length; i++) {
-            if (isBlank(names[i]) || isBlank(docs[i])) {
-                markInvalid(names[i]);
-                markInvalid(docs[i]);
-                statusText.setText("Completa la información del pasajero.");
+    private void savePassengerStep(EditText[] primerNombres, EditText[] segundoNombres, EditText[] primerApellidos, EditText[] segundoApellidos, Spinner[] docTypes, EditText[] docs) {
+        for (int i = 1; i < primerNombres.length; i++) {
+            if (isBlank(primerNombres[i]) || isBlank(primerApellidos[i]) || isBlank(docs[i])) {
+                if (primerNombres[i] != null) markInvalid(primerNombres[i]);
+                if (primerApellidos[i] != null) markInvalid(primerApellidos[i]);
+                if (docs[i] != null) markInvalid(docs[i]);
+                statusText.setText("Completa primer nombre, primer apellido y documento de cada pasajero.");
                 return;
             }
         }
-        savedPassengerNames = textValues(names);
-        savedPassengerDocs = textValues(docs);
+        savedPassengerFirstNames = nullSafeTextValues(primerNombres);
+        savedPassengerSecondNames = nullSafeTextValues(segundoNombres);
+        savedPassengerFirstLastNames = nullSafeTextValues(primerApellidos);
+        savedPassengerSecondLastNames = nullSafeTextValues(segundoApellidos);
+        savedPassengerDocTypes = nullSafeSpinnerValues(docTypes, "DPI");
+        savedPassengerDocs = nullSafeTextValues(docs);
         activeView = "holder_info";
         render();
     }
@@ -1474,6 +1494,25 @@ public final class MainActivity extends Activity {
         servicesTotal += selectedBag ? SERVICE_BAG * passengers : 0;
         servicesTotal += selectedVip ? SERVICE_VIP * passengers : 0;
         servicesTotal += selectedPriority ? SERVICE_PRIORITY * passengers : 0;
+        JSONArray pasajerosAdicionales = new JSONArray();
+        for (int i = 1; i < savedPassengerFirstNames.length; i++) {
+            String primerNombre = savedPassengerFirstNames[i];
+            if (primerNombre == null || primerNombre.isEmpty()) continue;
+            String segundoNombre = (savedPassengerSecondNames.length > i && savedPassengerSecondNames[i] != null && !savedPassengerSecondNames[i].isEmpty()) ? savedPassengerSecondNames[i] : null;
+            String segundoApellido = (savedPassengerSecondLastNames.length > i && savedPassengerSecondLastNames[i] != null && !savedPassengerSecondLastNames[i].isEmpty()) ? savedPassengerSecondLastNames[i] : null;
+            pasajerosAdicionales.put(new JSONObject()
+                    .put("primerNombre", primerNombre)
+                    .put("segundoNombre", segundoNombre != null ? segundoNombre : JSONObject.NULL)
+                    .put("primerApellido", savedPassengerFirstLastNames.length > i ? savedPassengerFirstLastNames[i] : "")
+                    .put("segundoApellido", segundoApellido != null ? segundoApellido : JSONObject.NULL)
+                    .put("tipoDocumento", savedPassengerDocTypes.length > i ? savedPassengerDocTypes[i] : "DPI")
+                    .put("numeroDocumento", savedPassengerDocs.length > i ? savedPassengerDocs[i] : "")
+                    .put("fechaNacimiento", JSONObject.NULL)
+                    .put("nacionalidad", JSONObject.NULL)
+                    .put("sexo", JSONObject.NULL)
+                    .put("telefono", JSONObject.NULL)
+                    .put("email", JSONObject.NULL));
+        }
         return new JSONObject()
                 .put("usuarioId", parseInt(value(sessionUser, "usuarioId", "0"), 0))
                 .put("pasajeroId", parseInt(value(sessionUser, "pasajeroId", "0"), 0))
@@ -1485,7 +1524,8 @@ public final class MainActivity extends Activity {
                 .put("tarifaPagada", flightFare(flight, value(flight, "selectedClass", "economica"), passengers) + servicesTotal)
                 .put("metodoPagoId", parseInt(method.getSelectedItem().toString().substring(0, 1), 1))
                 .put("emailConfirmacion", sendConfirmationEmail ? savedHolderEmail : JSONObject.NULL)
-                .put("enviarCorreoConfirmacion", sendConfirmationEmail);
+                .put("enviarCorreoConfirmacion", sendConfirmationEmail)
+                .put("pasajerosAdicionales", pasajerosAdicionales.length() > 0 ? pasajerosAdicionales : JSONObject.NULL);
     }
 
     private JSONObject purchaseSummaryPayload(JSONArray responses, double total) throws Exception {
@@ -1926,21 +1966,33 @@ public final class MainActivity extends Activity {
         card.addView(classSpinner);
 
         card.addView(label("Pasajeros"));
-        EditText[] passengerNames = new EditText[passengerCount];
+        EditText[] passengerPrimerNombres = new EditText[passengerCount];
+        EditText[] passengerSegundoNombres = new EditText[passengerCount];
+        EditText[] passengerPrimerApellidos = new EditText[passengerCount];
+        EditText[] passengerSegundoApellidos = new EditText[passengerCount];
+        Spinner[] passengerDocTypes = new Spinner[passengerCount];
         EditText[] passengerDocs = new EditText[passengerCount];
         for (int i = 0; i < passengerCount; i++) {
             LinearLayout passengerCard = compactCard();
             passengerCard.addView(text(i == 0 ? "Pasajero principal" : "Pasajero " + (i + 1), 20, TEXT, Typeface.NORMAL));
-            passengerNames[i] = input("Nombre *", i == 0 ? value(sessionUser, "nombreCompleto", "") : "", false);
-            passengerDocs[i] = input("Documento *", i == 0 ? value(sessionUser, "numeroDocumento", "") : "", false);
             if (i == 0) {
                 passengerCard.addView(text("Usaremos los datos de tu cuenta para el titular del viaje.", 13, MUTED, Typeface.NORMAL));
                 passengerCard.addView(text(value(sessionUser, "nombreCompleto", value(sessionUser, "usuario", "Usuario")), 16, TEXT, Typeface.BOLD));
             } else {
-                passengerCard.addView(text("Ingresa el nombre y apellido exactamente como aparece en el pasaporte o documento.", 13, MUTED, Typeface.NORMAL));
-                passengerCard.addView(passengerNames[i]);
+                passengerPrimerNombres[i] = input("Primer nombre *", "", false);
+                passengerSegundoNombres[i] = input("Segundo nombre (opcional)", "", false);
+                passengerPrimerApellidos[i] = input("Primer apellido *", "", false);
+                passengerSegundoApellidos[i] = input("Segundo apellido (opcional)", "", false);
+                passengerDocTypes[i] = spinner(new String[]{"DPI", "PASAPORTE"}, "DPI");
+                passengerDocs[i] = input("Número de documento *", "", false);
+                passengerCard.addView(text("Ingresa los datos tal como aparecen en su identificación.", 13, MUTED, Typeface.NORMAL));
+                passengerCard.addView(passengerPrimerNombres[i]);
+                passengerCard.addView(passengerSegundoNombres[i]);
+                passengerCard.addView(passengerPrimerApellidos[i]);
+                passengerCard.addView(passengerSegundoApellidos[i]);
+                passengerCard.addView(label("Tipo de documento"));
+                passengerCard.addView(passengerDocTypes[i]);
                 passengerCard.addView(passengerDocs[i]);
-                passengerCard.addView(input("Nacionalidad del documento *", "Guatemala", false));
             }
             card.addView(passengerCard);
         }
@@ -1999,7 +2051,11 @@ public final class MainActivity extends Activity {
         card.addView(purchaseSummary);
         card.addView(primaryButton("Confirmar compra", v -> confirmPurchase(
                 classSpinner,
-                passengerNames,
+                passengerPrimerNombres,
+                passengerSegundoNombres,
+                passengerPrimerApellidos,
+                passengerSegundoApellidos,
+                passengerDocTypes,
                 passengerDocs,
                 holderName,
                 holderEmail,
@@ -2499,7 +2555,11 @@ public final class MainActivity extends Activity {
 
     private void confirmPurchase(
             Spinner classSpinner,
-            EditText[] passengerNames,
+            EditText[] passengerPrimerNombres,
+            EditText[] passengerSegundoNombres,
+            EditText[] passengerPrimerApellidos,
+            EditText[] passengerSegundoApellidos,
+            Spinner[] passengerDocTypes,
             EditText[] passengerDocs,
             EditText holderName,
             EditText holderEmail,
@@ -2516,7 +2576,7 @@ public final class MainActivity extends Activity {
         }
         String className = classSpinner.getSelectedItem().toString();
         int passengers = parseInt(value(checkoutFlight, "passengerCount", "1"), 1);
-        String validationError = checkoutValidationError(passengerNames, passengerDocs, holderName, holderEmail, method, cardNumber, cardMonth, cardYear);
+        String validationError = checkoutValidationError(passengerPrimerNombres, passengerPrimerApellidos, passengerDocs, holderName, holderEmail, method, cardNumber, cardMonth, cardYear);
         if (!validationError.isEmpty()) {
             statusText.setText(validationError);
             return;
@@ -2532,6 +2592,22 @@ public final class MainActivity extends Activity {
         try {
             String checkoutCartId = value(checkoutFlight, "cartId", "");
             String checkoutItemId = value(checkoutFlight, "itemCarritoId", "");
+            JSONArray pasajerosAdicionales = new JSONArray();
+            for (int i = 1; i < passengers; i++) {
+                if (passengerPrimerNombres[i] == null) continue;
+                pasajerosAdicionales.put(new JSONObject()
+                        .put("primerNombre", passengerPrimerNombres[i].getText().toString().trim())
+                        .put("segundoNombre", passengerSegundoNombres[i] != null && !passengerSegundoNombres[i].getText().toString().trim().isEmpty() ? passengerSegundoNombres[i].getText().toString().trim() : JSONObject.NULL)
+                        .put("primerApellido", passengerPrimerApellidos[i].getText().toString().trim())
+                        .put("segundoApellido", passengerSegundoApellidos[i] != null && !passengerSegundoApellidos[i].getText().toString().trim().isEmpty() ? passengerSegundoApellidos[i].getText().toString().trim() : JSONObject.NULL)
+                        .put("tipoDocumento", passengerDocTypes[i] != null ? passengerDocTypes[i].getSelectedItem().toString() : "DPI")
+                        .put("numeroDocumento", passengerDocs[i].getText().toString().trim())
+                        .put("fechaNacimiento", JSONObject.NULL)
+                        .put("nacionalidad", JSONObject.NULL)
+                        .put("sexo", JSONObject.NULL)
+                        .put("telefono", JSONObject.NULL)
+                        .put("email", JSONObject.NULL));
+            }
             JSONObject body = new JSONObject()
                     .put("usuarioId", parseInt(value(sessionUser, "usuarioId", "0"), 0))
                     .put("pasajeroId", parseInt(value(sessionUser, "pasajeroId", "0"), 0))
@@ -2543,7 +2619,8 @@ public final class MainActivity extends Activity {
                     .put("tarifaPagada", fare)
                     .put("metodoPagoId", methodId)
                     .put("emailConfirmacion", holderEmail.getText().toString().trim())
-                    .put("enviarCorreoConfirmacion", true);
+                    .put("enviarCorreoConfirmacion", true)
+                    .put("pasajerosAdicionales", pasajerosAdicionales.length() > 0 ? pasajerosAdicionales : JSONObject.NULL);
             runTask("Confirmando compra...", () -> {
                 String response = apiClient.post("/api/compras/vuelos", body.toString());
                 if (!checkoutItemId.isEmpty()) {
@@ -3395,20 +3472,38 @@ public final class MainActivity extends Activity {
         return values;
     }
 
+    private String[] nullSafeTextValues(EditText[] inputs) {
+        String[] values = new String[inputs.length];
+        for (int i = 0; i < inputs.length; i++) {
+            values[i] = inputs[i] != null ? inputs[i].getText().toString().trim() : "";
+        }
+        return values;
+    }
+
+    private String[] nullSafeSpinnerValues(Spinner[] spinners, String defaultValue) {
+        String[] values = new String[spinners.length];
+        for (int i = 0; i < spinners.length; i++) {
+            values[i] = spinners[i] != null ? spinners[i].getSelectedItem().toString() : defaultValue;
+        }
+        return values;
+    }
+
     private String checkoutValidationError(
-            EditText[] passengerNames,
-            EditText[] passengerDocs,
+            EditText[] primerNombres,
+            EditText[] primerApellidos,
+            EditText[] docs,
             EditText holderName,
             EditText holderEmail,
             Spinner method,
             EditText cardNumber,
             NumberPicker cardMonth,
             NumberPicker cardYear) {
-        for (int i = 1; i < passengerNames.length; i++) {
-            if (isBlank(passengerNames[i]) || isBlank(passengerDocs[i])) {
-                markInvalid(passengerNames[i]);
-                markInvalid(passengerDocs[i]);
-                return "Completa nombre y documento de los pasajeros adicionales.";
+        for (int i = 1; i < primerNombres.length; i++) {
+            if (isBlank(primerNombres[i]) || isBlank(primerApellidos[i]) || isBlank(docs[i])) {
+                if (primerNombres[i] != null) markInvalid(primerNombres[i]);
+                if (primerApellidos[i] != null) markInvalid(primerApellidos[i]);
+                if (docs[i] != null) markInvalid(docs[i]);
+                return "Completa primer nombre, primer apellido y documento de los pasajeros adicionales.";
             }
         }
 
