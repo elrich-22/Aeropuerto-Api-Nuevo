@@ -106,8 +106,8 @@ BEGIN
   FOR i IN 1..8 LOOP
     INSERT INTO AER_PUERTA_EMBARQUE VALUES (100+i, 2, 'B'||LPAD(i,2,'0'), 'DISPONIBLE', 'nacional');
   END LOOP;
-  INSERT INTO AER_PUERTA_EMBARQUE VALUES (201,3,'C01','DISPONIBLE','carga');
-  INSERT INTO AER_PUERTA_EMBARQUE VALUES (202,3,'C02','DISPONIBLE','carga');
+  INSERT INTO AER_PUERTA_EMBARQUE VALUES (201,3,'C01','DISPONIBLE','internacional');
+  INSERT INTO AER_PUERTA_EMBARQUE VALUES (202,3,'C02','DISPONIBLE','internacional');
   INSERT INTO AER_PUERTA_EMBARQUE VALUES (301,1,'R01','DISPONIBLE','remota');
   INSERT INTO AER_PUERTA_EMBARQUE VALUES (302,1,'R02','MANTENIMIENTO','remota');
 END;
@@ -1394,9 +1394,11 @@ PROMPT    GUA<->CDG  : 1 vuelo/dia   (Air France)
 PROMPT    GUA<->LHR  : 4x semana     (British Airways)
 PROMPT    GUA<->DXB  : 2x semana     (Emirates)
 PROMPT
-PROMPT  Credenciales:
-PROMPT    admin.aurora        / AdminAurora1!
-PROMPT    soporte.operaciones / SoporteAurora1!
-PROMPT    [usuarios activos]  / AuroraDemo1!
-PROMPT    [usuarios inact/blq]/ DemoInactivo1!
+PROMPT  Credenciales de prueba:
+PROMPT    Usuario                  Contrasena         Rol
+PROMPT    ----------------------   ----------------   -------------------
+PROMPT    admin.aurora             AdminAurora1!      Administrador
+PROMPT    soporte.operaciones      SoporteAurora1!    Soporte
+PROMPT    [usuarios activos]       AuroraDemo1!       Pasajero activo
+PROMPT    [usuarios inact/bloq]    DemoInactivo1!     Pasajero inactivo
 PROMPT ============================================================

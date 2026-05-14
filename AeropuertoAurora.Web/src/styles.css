@@ -4474,6 +4474,17 @@ footer {
   background: var(--surface);
 }
 
+.nav-user-dropdown-menu button.active {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.nav-dropdown-divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 0.25rem 0;
+}
+
 .nav-avatar {
   display: grid;
   width: 2.2rem;
@@ -5206,5 +5217,30 @@ video {
 .explore-button:active,
 .explore-button:focus {
   transform: var(--explore-button-rest-transform) !important;
+}
+
+/* ── Vuelos admin acordeón ──────────────────────────────────── */
+.vuelo-row-open {
+  border-radius: 6px 6px 0 0 !important;
+  border-bottom-color: transparent !important;
+}
+
+.vuelo-accordion {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border, #e2e8f0);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  background: var(--surface, #f8fafc);
+  animation: accordion-open 0.18s ease;
+}
+
+@keyframes accordion-open {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.vuelo-chevron {
+  font-size: .7rem;
+  color: var(--muted, #94a3b8);
 }
 

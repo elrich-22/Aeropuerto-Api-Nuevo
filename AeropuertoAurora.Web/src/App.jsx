@@ -570,38 +570,6 @@ function NavBar({ user, adminView, isAdmin, activeView, onAdminView, onNavigate,
         <a className={activeView === 'objetos' ? 'active' : ''} href="#objetos" onClick={(event) => onNavigate(event, 'objetos')}>Objetos</a>
         <a className={activeView === 'promos' ? 'active' : ''} href="#promos" onClick={(event) => onNavigate(event, 'promos')}>Promos</a>
         <a className={activeView === 'ubicacion' ? 'active' : ''} href="#ubicacion" onClick={(event) => onNavigate(event, 'ubicacion')}>Ubicación</a>
-        {isAdmin && (
-          <>
-            <button
-              className={adminView === 'reporteria' ? 'nav-admin-link active' : 'nav-admin-link'}
-              type="button"
-              onClick={() => onAdminView('reporteria')}
-            >
-              Reporteria
-            </button>
-            <button
-              className={adminView === 'arrestos' ? 'nav-admin-link active' : 'nav-admin-link'}
-              type="button"
-              onClick={() => onAdminView('arrestos')}
-            >
-              Arrestos
-            </button>
-            <button
-              className={adminView === 'vuelos' ? 'nav-admin-link active' : 'nav-admin-link'}
-              type="button"
-              onClick={() => onAdminView('vuelos')}
-            >
-              Vuelos
-            </button>
-            <button
-              className={adminView === 'admin' ? 'nav-admin-link active' : 'nav-admin-link'}
-              type="button"
-              onClick={() => onAdminView('admin')}
-            >
-              Admin
-            </button>
-          </>
-        )}
         {user ? (
           <div className="nav-user-dropdown">
             <button
@@ -618,6 +586,39 @@ function NavBar({ user, adminView, isAdmin, activeView, onAdminView, onNavigate,
             </button>
             {userMenuOpen && (
               <div className="nav-user-dropdown-menu">
+                {isAdmin && (
+                  <>
+                    <button
+                      type="button"
+                      className={adminView === 'reporteria' ? 'active' : ''}
+                      onClick={() => { setUserMenuOpen(false); onAdminView('reporteria'); }}
+                    >
+                      Reportería
+                    </button>
+                    <button
+                      type="button"
+                      className={adminView === 'arrestos' ? 'active' : ''}
+                      onClick={() => { setUserMenuOpen(false); onAdminView('arrestos'); }}
+                    >
+                      Arrestos
+                    </button>
+                    <button
+                      type="button"
+                      className={adminView === 'vuelos' ? 'active' : ''}
+                      onClick={() => { setUserMenuOpen(false); onAdminView('vuelos'); }}
+                    >
+                      Vuelos
+                    </button>
+                    <button
+                      type="button"
+                      className={adminView === 'admin' ? 'active' : ''}
+                      onClick={() => { setUserMenuOpen(false); onAdminView('admin'); }}
+                    >
+                      Admin
+                    </button>
+                    <hr className="nav-dropdown-divider" />
+                  </>
+                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -3192,94 +3193,86 @@ function VuelosAdminSection() {
         <h1>Gestión de vuelos</h1>
         <p className="section-sub">Selecciona un vuelo para cancelarlo o reprogramarlo.</p>
         {message && <div className="connection-alert">{message}</div>}
-        {selectedFlight && (
-          <div className="card" style={{ marginBottom: '1.25rem', padding: '1.25rem' }}>
-            <h3 style={{ margin: '0 0 .25rem' }}>{selectedFlight.numeroVuelo}</h3>
-            <p style={{ margin: '0 0 .75rem', color: '#64748b', fontSize: '.9rem' }}>
-              {selectedFlight.origen} {'→'} {selectedFlight.destino} &middot; {formatDate(selectedFlight.fechaVuelo)} &middot; <strong>{selectedFlight.estado}</strong>
-            </p>
-            {selectedFlight.estado === 'CANCELADO' ? (
-              <p style={{ color: '#c0392b' }}>Este vuelo ya está cancelado.</p>
-            ) : (
-              <>
-                <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    className={action === 'cancel' ? 'btn btn-danger' : 'btn btn-outline'}
-                    onClick={() => setAction(action === 'cancel' ? '' : 'cancel')}
-                  >
-                    Cancelar vuelo
-                  </button>
-                  <button
-                    type="button"
-                    className={action === 'reschedule' ? 'btn' : 'btn btn-outline'}
-                    onClick={() => setAction(action === 'reschedule' ? '' : 'reschedule')}
-                  >
-                    Reprogramar
-                  </button>
-                </div>
-                {action === 'cancel' && (
-                  <div style={{ background: '#fff5f5', border: '1px solid #fca5a5', borderRadius: '8px', padding: '1rem', marginBottom: '.75rem' }}>
-                    <p style={{ color: '#c0392b', marginBottom: '.75rem', fontWeight: 600 }}>
-                      ¿Confirmas cancelar este vuelo? Esta acción no se puede deshacer.
-                    </p>
-                    <button type="button" className="btn btn-danger" disabled={saving} onClick={handleCancel}>
-                      {saving ? 'Cancelando...' : 'Confirmar cancelación'}
-                    </button>
-                  </div>
-                )}
-                {action === 'reschedule' && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-                    <label className="field">
-                      <span>Nueva fecha</span>
-                      <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required />
-                    </label>
-                    <label className="field">
-                      <span>Nueva hora <small>(opcional)</small></span>
-                      <input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
-                    </label>
-                    <button
-                      type="button"
-                      className="btn"
-                      disabled={saving || !newDate}
-                      onClick={handleReschedule}
-                    >
-                      {saving ? 'Reprogramando...' : 'Confirmar reprogramación'}
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-            <button
-              type="button"
-              className="btn btn-outline"
-              style={{ marginTop: '.75rem' }}
-              onClick={() => { setSelectedId(null); setAction(''); }}
-            >
-              Cerrar
-            </button>
-          </div>
-        )}
         {loading ? (
           <p>Cargando vuelos...</p>
         ) : (
           <div className="operations-list" style={{ marginTop: '1rem' }}>
             {flights.length === 0 && <p>No hay vuelos disponibles.</p>}
             {flights.map((f) => (
-              <div
-                key={f.id}
-                className="operation-row"
-                style={{ cursor: 'pointer', outline: selectedId === f.id ? '2px solid #0077b6' : 'none', borderRadius: '6px' }}
-                onClick={() => selectFlight(f.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && selectFlight(f.id)}
-              >
-                <div>
-                  <strong>{f.numeroVuelo} — {f.origen} {'→'} {f.destino}</strong>
-                  <small>{f.aerolinea} &middot; {formatDate(f.fechaVuelo)}</small>
+              <div key={f.id}>
+                <div
+                  className={`operation-row${selectedId === f.id ? ' vuelo-row-open' : ''}`}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => selectFlight(f.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && selectFlight(f.id)}
+                >
+                  <div>
+                    <strong>{f.numeroVuelo} — {f.origen} {'→'} {f.destino}</strong>
+                    <small>{f.aerolinea} &middot; {formatDate(f.fechaVuelo)}</small>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                    <span className={`status ${statusClassName(f.estado)}`}>{f.estado}</span>
+                    <span className="vuelo-chevron">{selectedId === f.id ? '▴' : '▾'}</span>
+                  </div>
                 </div>
-                <span className={`status ${statusClassName(f.estado)}`}>{f.estado}</span>
+                {selectedId === f.id && (
+                  <div className="vuelo-accordion">
+                    {f.estado === 'CANCELADO' ? (
+                      <p style={{ color: '#c0392b', margin: 0 }}>Este vuelo ya está cancelado.</p>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className={action === 'cancel' ? 'btn btn-danger' : 'btn btn-outline'}
+                            onClick={() => setAction(action === 'cancel' ? '' : 'cancel')}
+                          >
+                            Cancelar vuelo
+                          </button>
+                          <button
+                            type="button"
+                            className={action === 'reschedule' ? 'btn' : 'btn btn-outline'}
+                            onClick={() => setAction(action === 'reschedule' ? '' : 'reschedule')}
+                          >
+                            Reprogramar
+                          </button>
+                        </div>
+                        {action === 'cancel' && (
+                          <div style={{ background: '#fff5f5', border: '1px solid #fca5a5', borderRadius: '8px', padding: '1rem', marginBottom: '.75rem' }}>
+                            <p style={{ color: '#c0392b', marginBottom: '.75rem', fontWeight: 600 }}>
+                              ¿Confirmas cancelar este vuelo? Esta acción no se puede deshacer.
+                            </p>
+                            <button type="button" className="btn btn-danger" disabled={saving} onClick={handleCancel}>
+                              {saving ? 'Cancelando...' : 'Confirmar cancelación'}
+                            </button>
+                          </div>
+                        )}
+                        {action === 'reschedule' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                            <label className="field">
+                              <span>Nueva fecha</span>
+                              <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required />
+                            </label>
+                            <label className="field">
+                              <span>Nueva hora <small>(opcional)</small></span>
+                              <input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
+                            </label>
+                            <button
+                              type="button"
+                              className="btn"
+                              disabled={saving || !newDate}
+                              onClick={handleReschedule}
+                            >
+                              {saving ? 'Reprogramando...' : 'Confirmar reprogramación'}
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>

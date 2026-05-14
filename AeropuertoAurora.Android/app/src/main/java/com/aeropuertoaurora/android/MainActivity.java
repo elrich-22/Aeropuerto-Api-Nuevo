@@ -382,12 +382,6 @@ public final class MainActivity extends Activity {
             trip.addView(menuOption("\u2713", "Check-in", "Confirma tu reserva por vuelo o código", "checkin"));
         trip.addView(menuOption("?", "Objetos perdidos", "Reporta una perdida o revisa encontrados", "objetos"));
         trip.addView(menuOption("\u25C9", "Ubicación", "Ver donde está el aeropuerto", "ubicacion"));
-        if (isAdmin()) {
-            trip.addView(menuOption("⚠", "Arrestos", "Registro de pasajeros arrestados", "arrestos"));
-        }
-        if (isAdmin()) {
-            trip.addView(menuOption("✈", "Vuelos", "Cancelar o reprogramar vuelos", "vuelos_admin"));
-        }
         contentLayout.addView(trip);
     }
 
@@ -2162,27 +2156,38 @@ public final class MainActivity extends Activity {
         }
         contentLayout.addView(screenHeader("Gestion de vuelos", "Cancela o reprograma vuelos programados.", "menu_more", "Actualizar", v -> loadAdminFlights()));
 
-        // Action panel for selected flight
-        if (actionFlightId > 0) {
-            JSONObject selectedFlight = null;
-            for (int i = 0; i < adminFlightsList.length(); i++) {
-                JSONObject f = adminFlightsList.optJSONObject(i);
-                if (f != null && f.optInt("id", 0) == actionFlightId) {
-                    selectedFlight = f;
-                    break;
-                }
+        LinearLayout flightListCard = card();
+        flightListCard.addView(sectionTitle("Vuelos (" + adminFlightsList.length() + ") — toca uno para seleccionarlo"));
+        boolean hasFlights = false;
+        for (int i = 0; i < Math.min(200, adminFlightsList.length()); i++) {
+            JSONObject item = adminFlightsList.optJSONObject(i);
+            if (item == null) continue;
+            hasFlights = true;
+            final int fId = item.optInt("id", 0);
+            final String numVuelo = value(item, "numeroVuelo", "-");
+            final String origen = value(item, "origen", "?");
+            final String destino = value(item, "destino", "?");
+            final String estado = value(item, "estado", "-");
+            String fecha = value(item, "fechaVuelo", "");
+            String fechaShort = fecha.length() >= 10 ? fecha.substring(0, 10) : fecha;
+
+            LinearLayout itemCard = compactCard();
+            if (fId == actionFlightId) {
+                itemCard.setBackgroundColor(Color.rgb(224, 242, 254));
             }
-            if (selectedFlight != null) {
-                final JSONObject flight = selectedFlight;
+            itemCard.addView(text(numVuelo + "  " + origen + " > " + destino, 15, TEXT, Typeface.BOLD));
+            itemCard.addView(text(estado + (fechaShort.isEmpty() ? "" : "  ·  " + fechaShort), 13, MUTED, Typeface.NORMAL));
+            itemCard.setOnClickListener(v -> {
+                actionFlightId = (actionFlightId == fId) ? 0 : fId;
+                actionFlightAction = "";
+                render();
+            });
+            flightListCard.addView(itemCard);
+
+            if (fId == actionFlightId) {
+                final JSONObject flight = item;
                 LinearLayout actionCard = compactCard();
-                String numVuelo = value(flight, "numeroVuelo", "#" + actionFlightId);
-                String origen = value(flight, "origen", "?");
-                String destino = value(flight, "destino", "?");
-                String estado = value(flight, "estado", "?");
-
-                actionCard.addView(text(numVuelo + "  " + origen + " > " + destino, 15, TEAL, Typeface.BOLD));
-                actionCard.addView(text("Estado: " + estado, 13, MUTED, Typeface.NORMAL));
-
+                actionCard.setBackgroundColor(Color.rgb(241, 245, 249));
                 if (!"CANCELADO".equalsIgnoreCase(estado)) {
                     LinearLayout btns = new LinearLayout(this);
                     btns.setOrientation(LinearLayout.HORIZONTAL);
@@ -2196,7 +2201,6 @@ public final class MainActivity extends Activity {
                         render();
                     }));
                     actionCard.addView(btns);
-
                     if ("cancel".equals(actionFlightAction)) {
                         actionCard.addView(text("Confirmas cancelar este vuelo? No se puede deshacer.", 13, RED, Typeface.BOLD));
                         actionCard.addView(primaryButton("Confirmar cancelacion", v -> cancelFlight(flight.optInt("id", 0))));
@@ -2219,42 +2223,8 @@ public final class MainActivity extends Activity {
                 } else {
                     actionCard.addView(text("Este vuelo ya esta cancelado.", 13, RED, Typeface.ITALIC));
                 }
-
-                actionCard.addView(outlineButton("Cerrar panel", v -> {
-                    actionFlightId = 0;
-                    actionFlightAction = "";
-                    render();
-                }));
-                contentLayout.addView(actionCard);
+                flightListCard.addView(actionCard);
             }
-        }
-
-        LinearLayout flightListCard = card();
-        flightListCard.addView(sectionTitle("Vuelos (" + adminFlightsList.length() + ") — toca uno para seleccionarlo"));
-        boolean hasFlights = false;
-        for (int i = 0; i < Math.min(200, adminFlightsList.length()); i++) {
-            JSONObject item = adminFlightsList.optJSONObject(i);
-            if (item == null) continue;
-            hasFlights = true;
-            final int fId = item.optInt("id", 0);
-            String numVuelo = value(item, "numeroVuelo", "-");
-            String origen = value(item, "origen", "?");
-            String destino = value(item, "destino", "?");
-            String estado = value(item, "estado", "-");
-            String fecha = value(item, "fechaVuelo", "");
-            String fechaShort = fecha.length() >= 10 ? fecha.substring(0, 10) : fecha;
-            LinearLayout itemCard = compactCard();
-            if (fId == actionFlightId) {
-                itemCard.setBackgroundColor(Color.rgb(224, 242, 254));
-            }
-            itemCard.addView(text(numVuelo + "  " + origen + " > " + destino, 15, TEXT, Typeface.BOLD));
-            itemCard.addView(text(estado + (fechaShort.isEmpty() ? "" : "  .  " + fechaShort), 13, MUTED, Typeface.NORMAL));
-            itemCard.setOnClickListener(v -> {
-                actionFlightId = (actionFlightId == fId) ? 0 : fId;
-                actionFlightAction = "";
-                render();
-            });
-            flightListCard.addView(itemCard);
         }
         if (!hasFlights) {
             flightListCard.addView(text("Sin vuelos cargados.", 13, MUTED, Typeface.NORMAL));
@@ -2909,9 +2879,22 @@ public final class MainActivity extends Activity {
 
     private void showAccountMenu(View anchor) {
         PopupMenu menu = new PopupMenu(this, anchor);
-        menu.getMenu().add("Cerrar sesión");
+        if (isAdmin()) {
+            menu.getMenu().add(0, 1, 0, "Arrestos");
+            menu.getMenu().add(0, 2, 1, "Vuelos");
+            menu.getMenu().add(1, 3, 2, "Cerrar sesión");
+        } else {
+            menu.getMenu().add(1, 3, 0, "Cerrar sesión");
+        }
         menu.setOnMenuItemClickListener(item -> {
-            logout();
+            String title = item.getTitle().toString();
+            if ("Arrestos".equals(title)) {
+                navigateTo("arrestos");
+            } else if ("Vuelos".equals(title)) {
+                navigateTo("vuelos_admin");
+            } else {
+                logout();
+            }
             return true;
         });
         menu.show();
