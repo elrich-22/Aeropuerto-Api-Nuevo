@@ -1764,14 +1764,38 @@ public final class MainActivity extends Activity {
     }
 
     private void renderLostObjects() {
-        contentLayout.addView(screenHeader("Objetos perdidos", "Reporta una perdida o revisa encontrados recientes.", "menu_more", "Actualizar", v -> loadLostObjects()));
+        String subtitle = isAdmin()
+                ? "Panel de administración de objetos encontrados por vuelo."
+                : "Reporta una perdida o revisa encontrados recientes.";
+        contentLayout.addView(screenHeader("Objetos perdidos", subtitle, "menu_more", "Actualizar", v -> loadLostObjects()));
 
+        if (isAdmin()) {
+            renderAdminLostObjectForm();
+        } else {
+            renderUserLostObjectForm();
+        }
+
+        String listTitle = isAdmin() ? "Todos los registros" : "Encontrados recientes";
+        int listLimit = isAdmin() ? 50 : 10;
+        contentLayout.addView(listSection(listTitle, lostObjects, listLimit, item -> {
+            String vueloId = value(item, "vueloId", "");
+            String vueloTag = vueloId.isEmpty() || vueloId.equals("null") ? "" : " · Vuelo #" + vueloId;
+            return new String[]{
+                    value(item, "descripcion", "Objeto"),
+                    value(item, "ubicacionEncontrado", "Ubicación pendiente") + vueloTag,
+                    "Fecha: " + shortDate(value(item, "fechaReporte", "-")),
+                    "Estado: " + value(item, "estado", "-")
+            };
+        }));
+    }
+
+    private void renderUserLostObjectForm() {
         LinearLayout form = card();
         form.addView(sectionTitle("Reportar perdida"));
         EditText descriptionInput = input("Ej. mochila negra con etiqueta roja", "", false);
         EditText nameInput = input("Nombre y apellido", "", false);
         EditText contactInput = input("Teléfono o email", "", false);
-        form.addView(label("Que perdiste?"));
+        form.addView(label("¿Qué perdiste?"));
         form.addView(descriptionInput);
         form.addView(label("Tu nombre"));
         form.addView(nameInput);
@@ -1783,22 +1807,119 @@ public final class MainActivity extends Activity {
                 nameInput.getText().toString(),
                 contactInput.getText().toString())), matchWrap());
         contentLayout.addView(form);
+    }
 
-        contentLayout.addView(listSection("Encontrados recientes", lostObjects, 10, item -> new String[]{
-                value(item, "descripcion", "Objeto"),
-                (value(item, "estado", "-").equalsIgnoreCase("REPORTADO") ? "Reporte en revisión" : value(item, "ubicacionEncontrado", "Ubicación pendiente")),
-                "Fecha: " + shortDate(value(item, "fechaReporte", "-")),
-                "Estado: " + value(item, "estado", "-")
-        }));
+    private void renderAdminLostObjectForm() {
+        LinearLayout form = card();
+        form.addView(sectionTitle("Registrar objeto encontrado"));
+
+        // Build flight spinner options
+        String[] flightLabels = new String[flights.length() + 1];
+        int[] flightIds = new int[flights.length() + 1];
+        flightLabels[0] = "— Sin vuelo —";
+        flightIds[0] = 0;
+        for (int i = 0; i < flights.length(); i++) {
+            JSONObject f = flights.optJSONObject(i);
+            if (f == null) continue;
+            flightLabels[i + 1] = value(f, "numeroVuelo", "Vuelo") + " · " + value(f, "origen", "-") + " → " + value(f, "destino", "-");
+            flightIds[i + 1] = parseInt(value(f, "id", "0"), 0);
+        }
+
+        Spinner flightSpinner = new Spinner(this);
+        android.widget.ArrayAdapter<String> flightAdapter = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_spinner_item, flightLabels);
+        flightAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        flightSpinner.setAdapter(flightAdapter);
+
+        EditText descInput = input("Ej. mochila negra, laptop plateada...", "", false);
+        EditText locationInput = input("Ej. Puerta 12, Banda de equipaje 3", "", false);
+
+        String[] estados = {"ENCONTRADO", "REPORTADO", "ENTREGADO", "NO_RECLAMADO"};
+        Spinner estadoSpinner = new Spinner(this);
+        android.widget.ArrayAdapter<String> estadoAdapter = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_spinner_item, estados);
+        estadoAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        estadoSpinner.setAdapter(estadoAdapter);
+
+        EditText repNombreInput = input("Primer nombre (opcional)", "", false);
+        EditText repApellidoInput = input("Primer apellido (opcional)", "", false);
+        EditText repContactoInput = input("Teléfono o email del personal (opcional)", "", false);
+
+        form.addView(label("Vuelo relacionado (opcional)"));
+        form.addView(flightSpinner);
+        form.addView(label("Descripción del objeto"));
+        form.addView(descInput);
+        form.addView(label("Ubicación donde fue encontrado"));
+        form.addView(locationInput);
+        form.addView(label("Estado"));
+        form.addView(estadoSpinner);
+        form.addView(label("Nombre de quien reporta (opcional)"));
+        form.addView(repNombreInput);
+        form.addView(label("Apellido de quien reporta (opcional)"));
+        form.addView(repApellidoInput);
+        form.addView(label("Contacto interno (opcional)"));
+        form.addView(repContactoInput);
+
+        form.addView(primaryButton("Registrar objeto", v -> {
+            int selectedFlightId = flightIds[flightSpinner.getSelectedItemPosition()];
+            String estado = estados[estadoSpinner.getSelectedItemPosition()];
+            registerFoundObject(
+                    selectedFlightId > 0 ? selectedFlightId : 0,
+                    descInput.getText().toString(),
+                    locationInput.getText().toString(),
+                    estado,
+                    repNombreInput.getText().toString(),
+                    repApellidoInput.getText().toString(),
+                    repContactoInput.getText().toString());
+        }), matchWrap());
+
+        contentLayout.addView(form);
     }
 
     private void loadLostObjects() {
-        runTask("Cargando objetos perdidos...", () -> apiClient.get("/api/objetos-perdidos?limit=30"), json -> {
+        runTask("Cargando objetos perdidos...", () -> apiClient.get("/api/objetos-perdidos?limit=50"), json -> {
             lostObjects = new JSONArray(json);
             lastMessage = "Objetos perdidos actualizados.";
             render();
         });
     }
+
+    private void registerFoundObject(int vueloId, String description, String location, String estado,
+                                     String repNombre, String repApellido, String repContacto) {
+        String cleanDesc = description == null ? "" : description.trim();
+        String cleanLoc = location == null ? "" : location.trim();
+
+        if (cleanDesc.isEmpty() || cleanLoc.isEmpty()) {
+            lastMessage = "Descripción y ubicación son obligatorias.";
+            render();
+            return;
+        }
+
+        runTask("Registrando objeto...", () -> {
+            JSONObject body = new JSONObject()
+                    .put("vueloId", vueloId > 0 ? vueloId : JSONObject.NULL)
+                    .put("aeropuertoId", defaultAirportId())
+                    .put("descripcion", cleanDesc)
+                    .put("fechaReporte", nowIso())
+                    .put("ubicacionEncontrado", cleanLoc)
+                    .put("estado", estado)
+                    .put("reportantePrimerNombre", repNombre.trim().isEmpty() ? JSONObject.NULL : repNombre.trim())
+                    .put("reportanteSegundoNombre", JSONObject.NULL)
+                    .put("reportantePrimerApellido", repApellido.trim().isEmpty() ? JSONObject.NULL : repApellido.trim())
+                    .put("reportanteSegundoApellido", JSONObject.NULL)
+                    .put("contactoReportante", repContacto.trim().isEmpty() ? JSONObject.NULL : repContacto.trim())
+                    .put("fechaEntrega", JSONObject.NULL)
+                    .put("reclamantePrimerNombre", JSONObject.NULL)
+                    .put("reclamanteSegundoNombre", JSONObject.NULL)
+                    .put("reclamantePrimerApellido", JSONObject.NULL)
+                    .put("reclamanteSegundoApellido", JSONObject.NULL);
+            apiClient.post("/api/objetos-perdidos", body.toString());
+            return apiClient.get("/api/objetos-perdidos?limit=50");
+        }, json -> {
+            lostObjects = new JSONArray(json);
+            lastMessage = "Objeto registrado correctamente.";
+            render();
+        });
+    }
+
 
     private void reportLostObject(String description, String name, String contact) {
         String cleanDescription = description == null ? "" : description.trim();

@@ -2709,7 +2709,95 @@ function BaggageTrackerSection() {
   );
 }
 
-function LostObjectsSection({ airports }) {
+const LOST_OBJECT_ESTADOS = ['REPORTADO', 'ENCONTRADO', 'ENTREGADO', 'NO_RECLAMADO'];
+
+function AdminLostObjectPanel({ airports, onCreated }) {
+  const [flights, setFlights] = useState([]);
+  const [form, setForm] = useState({
+    vueloId: '',
+    descripcion: '',
+    ubicacionEncontrado: '',
+    estado: 'ENCONTRADO',
+    reportantePrimerNombre: '',
+    reportantePrimerApellido: '',
+    contactoReportante: ''
+  });
+  const [message, setMessage] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.flights(200).then(setFlights).catch(() => setFlights([]));
+  }, []);
+
+  const update = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+
+  const submit = async (event) => {
+    event.preventDefault();
+    if (!form.descripcion.trim() || !form.ubicacionEncontrado.trim()) {
+      setMessage('Descripción y ubicación son obligatorias.');
+      return;
+    }
+    setSaving(true);
+    setMessage('');
+    try {
+      await api.createLostObject({
+        vueloId: form.vueloId ? Number(form.vueloId) : null,
+        aeropuertoId: airports[0]?.id || 1,
+        descripcion: form.descripcion.trim(),
+        fechaReporte: new Date().toISOString(),
+        ubicacionEncontrado: form.ubicacionEncontrado.trim(),
+        estado: form.estado,
+        reportantePrimerNombre: form.reportantePrimerNombre.trim() || null,
+        reportanteSegundoNombre: null,
+        reportantePrimerApellido: form.reportantePrimerApellido.trim() || null,
+        reportanteSegundoApellido: null,
+        contactoReportante: form.contactoReportante.trim() || null,
+        fechaEntrega: null,
+        reclamantePrimerNombre: null,
+        reclamanteSegundoNombre: null,
+        reclamantePrimerApellido: null,
+        reclamanteSegundoApellido: null
+      });
+      setForm({ vueloId: '', descripcion: '', ubicacionEncontrado: '', estado: 'ENCONTRADO', reportantePrimerNombre: '', reportantePrimerApellido: '', contactoReportante: '' });
+      setMessage('Objeto registrado correctamente.');
+      onCreated();
+    } catch (err) {
+      setMessage(`Error al registrar: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form className="tool-panel lost-object-form" onSubmit={submit}>
+      <h2>Registrar objeto encontrado</h2>
+      {message && <div className="connection-alert">{message}</div>}
+      <label className="field">
+        <span>Vuelo relacionado <small>(opcional)</small></span>
+        <select value={form.vueloId} onChange={(e) => update('vueloId', e.target.value)}>
+          <option value="">— Sin vuelo —</option>
+          {flights.map((f) => (
+            <option key={f.id} value={f.id}>{f.numeroVuelo} · {f.origen} → {f.destino} · {formatDate(f.fechaVuelo)}</option>
+          ))}
+        </select>
+      </label>
+      <label className="field"><span>Descripción del objeto</span><textarea value={form.descripcion} onChange={(e) => update('descripcion', e.target.value)} placeholder="Ej. mochila negra con etiqueta roja, laptop plateada..." required /></label>
+      <label className="field"><span>Ubicación donde fue encontrado</span><input value={form.ubicacionEncontrado} onChange={(e) => update('ubicacionEncontrado', e.target.value)} placeholder="Ej. Puerta 12, Banda de equipaje 3" required /></label>
+      <label className="field">
+        <span>Estado</span>
+        <select value={form.estado} onChange={(e) => update('estado', e.target.value)}>
+          {LOST_OBJECT_ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+      </label>
+      <label className="field"><span>Nombre quien reporta <small>(opcional)</small></span><input value={form.reportantePrimerNombre} onChange={(e) => update('reportantePrimerNombre', e.target.value)} placeholder="Primer nombre" /></label>
+      <label className="field"><span>Apellido quien reporta <small>(opcional)</small></span><input value={form.reportantePrimerApellido} onChange={(e) => update('reportantePrimerApellido', e.target.value)} placeholder="Primer apellido" /></label>
+      <label className="field"><span>Contacto interno <small>(opcional)</small></span><input value={form.contactoReportante} onChange={(e) => update('contactoReportante', e.target.value)} placeholder="teléfono o email del personal" /></label>
+      <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Guardando...' : 'Registrar objeto'}</button>
+    </form>
+  );
+}
+
+function LostObjectsSection({ airports, isAdmin }) {
   const [items, setItems] = useState([]);
   const [form, setForm] = useState({
     descripcion: '',
@@ -2721,7 +2809,7 @@ function LostObjectsSection({ airports }) {
 
   const loadItems = useCallback(async () => {
     try {
-      setItems(await api.lostObjects(30));
+      setItems(await api.lostObjects(50));
     } catch {
       setItems([]);
     }
@@ -2776,25 +2864,36 @@ function LostObjectsSection({ airports }) {
         <div className="section-label">Objetos perdidos</div>
         <h1>Objetos encontrados y reportes</h1>
         {message && <div className="connection-alert">{message}</div>}
-        <p className="tool-intro">
-          Esta pantalla sirve para dos cosas: ver objetos encontrados recientemente y dejar un reporte si perdiste algo.
-          Los datos de contacto no se publican.
-        </p>
+        {!isAdmin && (
+          <p className="tool-intro">
+            Esta pantalla sirve para dos cosas: ver objetos encontrados recientemente y dejar un reporte si perdiste algo.
+            Los datos de contacto no se publican.
+          </p>
+        )}
         <div className="tool-grid lost-object-grid">
-          <form className="tool-panel lost-object-form" onSubmit={submit}>
-            <h2>Reportar pérdida</h2>
-            <label className="field"><span>¿Qué perdiste?</span><textarea value={form.descripcion} onChange={(event) => updateForm('descripcion', event.target.value)} placeholder="Ej. mochila negra con etiqueta roja" required /></label>
-            <label className="field"><span>Tu nombre</span><input value={form.reportanteNombre} onChange={(event) => updateForm('reportanteNombre', event.target.value)} placeholder="nombre y apellido" required /></label>
-            <label className="field"><span>Contacto privado</span><input value={form.contactoReportante} onChange={(event) => updateForm('contactoReportante', event.target.value)} placeholder="teléfono o email" required /></label>
-            <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Guardando' : 'Enviar reporte'}</button>
-          </form>
+          {isAdmin ? (
+            <AdminLostObjectPanel airports={airports} onCreated={loadItems} />
+          ) : (
+            <form className="tool-panel lost-object-form" onSubmit={submit}>
+              <h2>Reportar pérdida</h2>
+              <label className="field"><span>¿Qué perdiste?</span><textarea value={form.descripcion} onChange={(event) => updateForm('descripcion', event.target.value)} placeholder="Ej. mochila negra con etiqueta roja" required /></label>
+              <label className="field"><span>Tu nombre</span><input value={form.reportanteNombre} onChange={(event) => updateForm('reportanteNombre', event.target.value)} placeholder="nombre y apellido" required /></label>
+              <label className="field"><span>Contacto privado</span><input value={form.contactoReportante} onChange={(event) => updateForm('contactoReportante', event.target.value)} placeholder="teléfono o email" required /></label>
+              <button className="btn btn-primary" type="submit" disabled={saving}>{saving ? 'Guardando' : 'Enviar reporte'}</button>
+            </form>
+          )}
           <div className="tool-panel">
-            <h2>Encontrados recientes</h2>
-            {items.slice(0, 8).map((item) => (
+            <h2>{isAdmin ? 'Todos los registros' : 'Encontrados recientes'}</h2>
+            {items.length === 0 && <div className="board-empty">Sin registros.</div>}
+            {items.slice(0, isAdmin ? 50 : 8).map((item) => (
               <div className="operation-row" key={item.id}>
                 <div>
                   <strong>{item.descripcion}</strong>
-                  <small>{item.estado === 'REPORTADO' ? 'Reporte en revisión' : item.ubicacionEncontrado || 'Ubicación pendiente'} - {formatDateOnly(item.fechaReporte)}</small>
+                  <small>
+                    {item.ubicacionEncontrado || 'Ubicación pendiente'}
+                    {item.vueloId ? ` · Vuelo #${item.vueloId}` : ''}
+                    {' · '}{formatDateOnly(item.fechaReporte)}
+                  </small>
                 </div>
                 <span className={`status ${statusClassName(item.estado)}`}>{item.estado}</span>
               </div>
@@ -3828,7 +3927,7 @@ function App() {
       ) : activeView === 'checkin' ? (
         <CheckInSection user={user} flights={dashboard.flights} onRequireLogin={() => setLoginOpen(true)} />
       ) : activeView === 'objetos' ? (
-        <LostObjectsSection airports={dashboard.airports} />
+        <LostObjectsSection airports={dashboard.airports} isAdmin={isAdmin} />
       ) : activeView === 'promos' ? (
         <PromotionsSection />
       ) : activeView === 'explorar' && travelCriteria ? (
