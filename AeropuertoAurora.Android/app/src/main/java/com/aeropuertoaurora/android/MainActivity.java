@@ -99,6 +99,9 @@ public final class MainActivity extends Activity {
     private JSONArray maintenance = new JSONArray();
     private JSONArray occupancy = new JSONArray();
     private JSONArray lostObjects = new JSONArray();
+    private JSONArray arrestsList = new JSONArray();
+    private JSONArray passengersList = new JSONArray();
+    private JSONObject arrestFoundPassenger = null;
     private JSONArray myReservations = new JSONArray();
     private JSONArray myCheckIns = new JSONArray();
     private JSONArray myBoardingPasses = new JSONArray();
@@ -274,6 +277,8 @@ public final class MainActivity extends Activity {
             renderCheckIn();
         } else if ("objetos".equals(activeView)) {
             renderLostObjects();
+        } else if ("arrestos".equals(activeView)) {
+            renderArrestos();
         } else if ("operaciones".equals(activeView)) {
             renderOperations();
         } else if ("reportes".equals(activeView)) {
@@ -372,6 +377,9 @@ public final class MainActivity extends Activity {
             trip.addView(menuOption("\u2713", "Check-in", "Confirma tu reserva por vuelo o código", "checkin"));
         trip.addView(menuOption("?", "Objetos perdidos", "Reporta una perdida o revisa encontrados", "objetos"));
         trip.addView(menuOption("\u25C9", "Ubicación", "Ver donde está el aeropuerto", "ubicacion"));
+        if (isAdmin()) {
+            trip.addView(menuOption("⚠", "Arrestos", "Registro de pasajeros arrestados", "arrestos"));
+        }
         contentLayout.addView(trip);
     }
 
@@ -1978,6 +1986,214 @@ public final class MainActivity extends Activity {
         return "GUA-" + reservationId + "-" + passengerId;
     }
 
+    private void renderArrestos() {
+        if (!isAdmin()) {
+            addAlert("Solo administradores pueden acceder a esta sección.", true);
+            return;
+        }
+        contentLayout.addView(screenHeader("Arrestos", "Registro de pasajeros arrestados en el aeropuerto.", "menu_more", "Actualizar", v -> loadArrestosData()));
+
+        // Search panel
+        LinearLayout searchCard = card();
+        searchCard.addView(sectionTitle("Buscar pasajero por documento"));
+        EditText docInput = input("Número de documento", "", false);
+        searchCard.addView(docInput);
+
+        if (arrestFoundPassenger != null) {
+            String pasName = joinNames(
+                value(arrestFoundPassenger, "primerNombre", ""),
+                value(arrestFoundPassenger, "segundoNombre", ""),
+                value(arrestFoundPassenger, "primerApellido", ""),
+                value(arrestFoundPassenger, "segundoApellido", ""));
+            String pasDoc = value(arrestFoundPassenger, "tipoDocumento", "") + " " + value(arrestFoundPassenger, "numeroDocumento", "");
+            LinearLayout foundRow = compactCard();
+            foundRow.addView(text("Pasajero encontrado", 12, TEAL, Typeface.BOLD));
+            foundRow.addView(text(pasName, 16, TEXT, Typeface.BOLD));
+            foundRow.addView(text(pasDoc, 13, MUTED, Typeface.NORMAL));
+            searchCard.addView(foundRow);
+        }
+
+        LinearLayout searchActions = row();
+        searchActions.addView(outlineButton("Buscar", v -> {
+            String doc = docInput.getText().toString().trim();
+            if (doc.isEmpty()) {
+                lastMessage = "Ingresa un número de documento.";
+                render();
+                return;
+            }
+            arrestFoundPassenger = null;
+            for (int i = 0; i < passengersList.length(); i++) {
+                JSONObject p = passengersList.optJSONObject(i);
+                if (p == null) continue;
+                String pDoc = value(p, "numeroDocumento", "");
+                if (pDoc.toLowerCase(Locale.ROOT).contains(doc.toLowerCase(Locale.ROOT)) ||
+                        doc.toLowerCase(Locale.ROOT).contains(pDoc.toLowerCase(Locale.ROOT))) {
+                    arrestFoundPassenger = p;
+                    break;
+                }
+            }
+            if (arrestFoundPassenger == null) {
+                lastMessage = "No se encontró ningún pasajero con ese documento.";
+            } else {
+                lastMessage = "";
+            }
+            render();
+        }), weightedButtonParams());
+        searchActions.addView(outlineButton("Limpiar", v -> {
+            arrestFoundPassenger = null;
+            lastMessage = "";
+            render();
+        }), weightedButtonParams());
+        searchCard.addView(searchActions);
+        contentLayout.addView(searchCard);
+
+        // Arrest form (only enabled when passenger is found)
+        LinearLayout formCard = card();
+        formCard.addView(sectionTitle("Datos del arresto"));
+
+        // Flight spinner
+        String[] flightLabels = new String[flights.length() + 1];
+        int[] flightIds = new int[flights.length() + 1];
+        flightLabels[0] = "— Sin vuelo —";
+        flightIds[0] = 0;
+        for (int i = 0; i < flights.length(); i++) {
+            JSONObject f = flights.optJSONObject(i);
+            if (f == null) continue;
+            flightLabels[i + 1] = value(f, "numeroVuelo", "Vuelo") + " · " + value(f, "origen", "-") + " → " + value(f, "destino", "-");
+            flightIds[i + 1] = parseInt(value(f, "id", "0"), 0);
+        }
+        Spinner flightSpinner = new Spinner(this);
+        android.widget.ArrayAdapter<String> flightAdapter = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_spinner_item, flightLabels);
+        flightAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        flightSpinner.setAdapter(flightAdapter);
+
+        EditText motivoInput = input("Ej. Portación de armas, documentos falsos", "", false);
+        EditText autoridadInput = input("Ej. PNC, Migracion (opcional)", "", false);
+        EditText descripcionInput = input("Detalle adicional (opcional)", "", true);
+        EditText ubicacionInput = input("Ej. Puerta 7, Control de seguridad (opcional)", "", false);
+        EditText expedienteInput = input("Ej. EXP-2024-001 (opcional)", "", false);
+
+        String[] estados = {"ABIERTO", "EN_PROCESO", "CERRADO"};
+        Spinner estadoSpinner = new Spinner(this);
+        android.widget.ArrayAdapter<String> estadoAdapter = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_spinner_item, estados);
+        estadoAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        estadoSpinner.setAdapter(estadoAdapter);
+
+        formCard.addView(label("Vuelo relacionado (opcional)"));
+        formCard.addView(flightSpinner);
+        formCard.addView(label("Motivo del arresto"));
+        formCard.addView(motivoInput);
+        formCard.addView(label("Autoridad a cargo (opcional)"));
+        formCard.addView(autoridadInput);
+        formCard.addView(label("Descripcion del incidente (opcional)"));
+        formCard.addView(descripcionInput);
+        formCard.addView(label("Ubicacion del arresto (opcional)"));
+        formCard.addView(ubicacionInput);
+        formCard.addView(label("Estado del caso"));
+        formCard.addView(estadoSpinner);
+        formCard.addView(label("Numero de expediente (opcional)"));
+        formCard.addView(expedienteInput);
+
+        formCard.addView(primaryButton("Registrar arresto", v -> {
+            if (arrestFoundPassenger == null) {
+                lastMessage = "Busca y selecciona un pasajero primero.";
+                render();
+                return;
+            }
+            int selectedFlightId = flightIds[flightSpinner.getSelectedItemPosition()];
+            String estado = estados[estadoSpinner.getSelectedItemPosition()];
+            saveArrest(
+                    parseInt(value(arrestFoundPassenger, "id", "0"), 0),
+                    selectedFlightId > 0 ? selectedFlightId : 0,
+                    motivoInput.getText().toString(),
+                    autoridadInput.getText().toString(),
+                    descripcionInput.getText().toString(),
+                    ubicacionInput.getText().toString(),
+                    estado,
+                    expedienteInput.getText().toString());
+        }), matchWrap());
+        contentLayout.addView(formCard);
+
+        // Arrests list
+        contentLayout.addView(listSection("Arrestos registrados", arrestsList, 50, item -> {
+            String pasId = value(item, "pasajeroId", "-");
+            String pasName = "-";
+            for (int i = 0; i < passengersList.length(); i++) {
+                JSONObject p = passengersList.optJSONObject(i);
+                if (p != null && value(p, "id", "").equals(pasId)) {
+                    pasName = joinNames(value(p, "primerNombre", ""), value(p, "segundoNombre", ""),
+                            value(p, "primerApellido", ""), value(p, "segundoApellido", ""));
+                    break;
+                }
+            }
+            String vueloTag = value(item, "vueloId", "").equals("null") ? "" : " · Vuelo #" + value(item, "vueloId", "");
+            return new String[]{
+                    pasName + " (ID " + pasId + ")",
+                    value(item, "motivo", "-") + vueloTag,
+                    "Fecha: " + shortDate(value(item, "fechaHoraArresto", "-")),
+                    "Estado: " + value(item, "estadoCaso", "-")
+            };
+        }));
+    }
+
+    private String joinNames(String a, String b, String c, String d) {
+        StringBuilder sb = new StringBuilder();
+        for (String part : new String[]{a, b, c, d}) {
+            if (part != null && !part.isEmpty()) {
+                if (sb.length() > 0) sb.append(' ');
+                sb.append(part);
+            }
+        }
+        return sb.toString();
+    }
+
+    private void loadArrestosData() {
+        runTask("Cargando arrestos...", () -> {
+            String arrestsJson = apiClient.get("/api/arrestos?limit=100");
+            String passengersJson = apiClient.get("/api/pasajeros?limit=1000");
+            return arrestsJson + "|||" + passengersJson;
+        }, combined -> {
+            String[] parts = combined.split("\\|\\|\\|", 2);
+            arrestsList = new JSONArray(parts[0]);
+            passengersList = new JSONArray(parts.length > 1 ? parts[1] : "[]");
+            lastMessage = "Arrestos actualizados.";
+            render();
+        });
+    }
+
+    private void saveArrest(int pasajeroId, int vueloId, String motivo, String autoridad,
+                            String descripcion, String ubicacion, String estado, String expediente) {
+        String cleanMotivo = motivo == null ? "" : motivo.trim();
+        if (cleanMotivo.isEmpty()) {
+            lastMessage = "El motivo del arresto es obligatorio.";
+            render();
+            return;
+        }
+        runTask("Registrando arresto...", () -> {
+            JSONObject body = new JSONObject()
+                    .put("pasajeroId", pasajeroId)
+                    .put("vueloId", vueloId > 0 ? vueloId : JSONObject.NULL)
+                    .put("aeropuertoId", defaultAirportId())
+                    .put("fechaHoraArresto", nowIso())
+                    .put("motivo", cleanMotivo)
+                    .put("autoridadCargo", autoridad.trim().isEmpty() ? JSONObject.NULL : autoridad.trim())
+                    .put("descripcionIncidente", descripcion.trim().isEmpty() ? JSONObject.NULL : descripcion.trim())
+                    .put("ubicacionArresto", ubicacion.trim().isEmpty() ? JSONObject.NULL : ubicacion.trim())
+                    .put("estadoCaso", estado)
+                    .put("numeroExpediente", expediente.trim().isEmpty() ? JSONObject.NULL : expediente.trim());
+            apiClient.post("/api/arrestos", body.toString());
+            String arrestsJson = apiClient.get("/api/arrestos?limit=100");
+            return arrestsJson + "|||" + apiClient.get("/api/pasajeros?limit=1000");
+        }, combined -> {
+            String[] parts = combined.split("\\|\\|\\|", 2);
+            arrestsList = new JSONArray(parts[0]);
+            passengersList = new JSONArray(parts.length > 1 ? parts[1] : "[]");
+            arrestFoundPassenger = null;
+            lastMessage = "Arresto registrado correctamente.";
+            render();
+        });
+    }
+
     private void renderOperations() {
         contentLayout.addView(listSection("Equipaje", baggage, 20, item -> new String[]{
                 value(item, "codigoBarras", "Equipaje"),
@@ -2962,6 +3178,9 @@ public final class MainActivity extends Activity {
         }
         if ("mis_viajes".equals(view) && sessionUser != null && myReservations.length() == 0) {
             loadMyTrips();
+        }
+        if ("arrestos".equals(view) && isAdmin() && arrestsList.length() == 0) {
+            loadArrestosData();
         }
         render();
     }
