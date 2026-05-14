@@ -116,6 +116,9 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+if (!app.Environment.IsDevelopment())
+    app.UseHttpsRedirection();
+
 app.UseCors("Frontend");
 app.UseApiKeyProtection();
 app.UseAuthentication();

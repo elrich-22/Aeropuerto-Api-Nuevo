@@ -9,7 +9,7 @@ public sealed class ApiKeyMiddleware(RequestDelegate next, IOptions<ApiSecurityO
 
     public async Task InvokeAsync(HttpContext context)
     {
-        if (IsPublicEndpoint(context) || string.IsNullOrWhiteSpace(_options.ApiKey))
+        if (IsPublicEndpoint(context) || !_options.Enabled)
         {
             await next(context);
             return;
