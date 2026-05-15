@@ -296,7 +296,12 @@ public sealed class OracleCrudRepository(
         IReadOnlyList<string> allowedColumns,
         IReadOnlyDictionary<string, object?> values)
     {
-        return allowedColumns.ToDictionary(column => column, column => values[column], StringComparer.OrdinalIgnoreCase);
+        var now = DateTime.Now;
+
+        return allowedColumns.ToDictionary(
+            column => column,
+            column => DateColumnDefaults.ShouldUseCurrentTimestamp(column) ? now : values[column],
+            StringComparer.OrdinalIgnoreCase);
     }
 
     private static IReadOnlyDictionary<string, object?> ReadRow(OracleDataReader reader)

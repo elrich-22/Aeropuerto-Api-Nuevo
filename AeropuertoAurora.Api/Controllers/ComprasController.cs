@@ -102,9 +102,17 @@ public sealed class ComprasController(
             return BadRequest(new { message = mainPassportValidationError });
         }
 
-        var mainPassengerId = dto.PasajeroPrincipal is null
-            ? dto.PasajeroId
-            : await EnsurePassengerExistsAsync(dto.PasajeroPrincipal, now, cancellationToken);
+        int mainPassengerId;
+        try
+        {
+            mainPassengerId = dto.PasajeroPrincipal is null
+                ? dto.PasajeroId
+                : await EnsurePassengerExistsAsync(dto.PasajeroPrincipal, now, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
         var mainPassenger = await repository.GetByIdAsync(PasajerosTable, mainPassengerId, cancellationToken) ?? buyerPassenger;
 
         var reservationCode = await GenerateUniqueReservationCodeAsync(mainPassengerId, dto.VueloId, cancellationToken);
@@ -314,6 +322,12 @@ public sealed class ComprasController(
 
         if (matchedPassenger is not null)
         {
+            if (!PassengerIdentityMatches(matchedPassenger, dto))
+            {
+                throw new InvalidOperationException(
+                    $"Ya existe un pasajero con el documento {dto.TipoDocumento} {dto.NumeroDocumento}, pero el nombre no coincide con el registro existente.");
+            }
+
             return matchedPassenger.ToInt("PAS_ID_PASAJERO");
         }
 
@@ -332,6 +346,21 @@ public sealed class ComprasController(
             ["PAS_EMAIL"] = dto.Email,
             ["PAS_FECHA_REGISTRO"] = registeredAt
         }, cancellationToken);
+    }
+
+    private static bool PassengerIdentityMatches(IReadOnlyDictionary<string, object?> passenger, PasajeroAdicionalDto dto)
+    {
+        return string.Equals(NormalizeIdentityValue(passenger.ToNullableString("PAS_PRIMER_NOMBRE")), NormalizeIdentityValue(dto.PrimerNombre), StringComparison.Ordinal) &&
+            string.Equals(NormalizeIdentityValue(passenger.ToNullableString("PAS_SEGUNDO_NOMBRE")), NormalizeIdentityValue(dto.SegundoNombre), StringComparison.Ordinal) &&
+            string.Equals(NormalizeIdentityValue(passenger.ToNullableString("PAS_PRIMER_APELLIDO")), NormalizeIdentityValue(dto.PrimerApellido), StringComparison.Ordinal) &&
+            string.Equals(NormalizeIdentityValue(passenger.ToNullableString("PAS_SEGUNDO_APELLIDO")), NormalizeIdentityValue(dto.SegundoApellido), StringComparison.Ordinal);
+    }
+
+    private static string NormalizeIdentityValue(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : value.Trim().ToUpperInvariant();
     }
 
     private async Task UpsertPassengerDocumentAsync(
