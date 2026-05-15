@@ -236,7 +236,9 @@ public sealed class TableReadRepository(
                 continue;
             }
 
-            filtered[column.Nombre] = ConvertValue(column, value.Value);
+            filtered[column.Nombre] = DateColumnDefaults.ShouldUseCurrentTimestamp(column.Nombre)
+                ? DateTime.Now
+                : ConvertValue(column, value.Value);
         }
 
         return filtered;

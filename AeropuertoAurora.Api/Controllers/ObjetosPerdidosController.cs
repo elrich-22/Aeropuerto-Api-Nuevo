@@ -72,7 +72,7 @@ public sealed class ObjetosPerdidosController(IOracleCrudRepository repository) 
         ["OBJ_ID_VUELO"] = dto.VueloId,
         ["OBJ_ID_AEROPUERTO"] = dto.AeropuertoId,
         ["OBJ_DESCRIPCION"] = dto.Descripcion,
-        ["OBJ_FECHA_REPORTE"] = dto.FechaReporte,
+        ["OBJ_FECHA_REPORTE"] = DateTime.Today,
         ["OBJ_UBICACION_ENCONTRADO"] = dto.UbicacionEncontrado,
         ["OBJ_ESTADO"] = dto.Estado,
         ["OBJ_REP_PRIMER_NOMBRE"] = dto.ReportantePrimerNombre,

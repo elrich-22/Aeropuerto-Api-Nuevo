@@ -2864,7 +2864,6 @@ function AdminLostObjectPanel({ airports, onCreated }) {
         vueloId: form.vueloId ? Number(form.vueloId) : null,
         aeropuertoId: airports[0]?.id || 1,
         descripcion: form.descripcion.trim(),
-        fechaReporte: new Date().toISOString(),
         ubicacionEncontrado: form.ubicacionEncontrado.trim(),
         estado: form.estado,
         reportantePrimerNombre: form.reportantePrimerNombre.trim() || null,
@@ -2954,7 +2953,6 @@ function LostObjectsSection({ airports, isAdmin }) {
         vueloId: null,
         aeropuertoId: airports[0]?.id || 1,
         descripcion: form.descripcion,
-        fechaReporte: new Date().toISOString(),
         ubicacionEncontrado: 'Pendiente de revisión',
         estado: 'REPORTADO',
         reportantePrimerNombre: firstName,
@@ -4178,6 +4176,7 @@ function App() {
           metodoPagoId: purchaseOptions.metodoPagoId,
           emailConfirmacion: shouldSendIndividualEmail ? purchaseOptions.emailConfirmacion : null,
           enviarCorreoConfirmacion: shouldSendIndividualEmail,
+          pasajeroPrincipal: purchaseOptions.pasajeroPrincipal,
           pasajerosAdicionales: purchaseOptions.pasajerosAdicionales
         }));
       }
