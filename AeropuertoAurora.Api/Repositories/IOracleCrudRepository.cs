@@ -33,4 +33,17 @@ public interface IOracleCrudRepository
         string column,
         object value,
         CancellationToken cancellationToken);
+
+    Task<IReadOnlyDictionary<string, object?>?> GetByLoginIdentifierAsync(
+        CrudTableDefinition table,
+        string usernameColumn,
+        string emailColumn,
+        string identifier,
+        CancellationToken cancellationToken);
+
+    Task<bool> UpdatePartialAsync(
+        CrudTableDefinition table,
+        int id,
+        IReadOnlyDictionary<string, object?> partialValues,
+        CancellationToken cancellationToken);
 }

@@ -215,7 +215,7 @@ public sealed class AeropuertoReadRepository(IOracleConnectionFactory connection
             reader.GetStringOrNull("STATUS") ?? string.Empty), cancellationToken, Limit(limit));
     }
 
-    public Task<IReadOnlyList<VueloDto>> GetFlightsAsync(DateTime? date, int limit, CancellationToken cancellationToken)
+    public Task<IReadOnlyList<VueloDto>> GetFlightsAsync(DateTime? date, string? origen, string? destino, int limit, CancellationToken cancellationToken)
     {
         const string sql = """
             SELECT * FROM (
@@ -240,11 +240,17 @@ public sealed class AeropuertoReadRepository(IOracleConnectionFactory connection
                 INNER JOIN AER_AEROPUERTO ad ON ad.AER_ID = pv.PRV_ID_AEROPUERTO_DESTINO
                 INNER JOIN AER_AVION av ON av.AVI_ID = vu.VUE_ID_AVION
                 WHERE (:flightDate IS NULL OR TRUNC(vu.VUE_FECHA_VUELO) = TRUNC(:flightDate))
+                  AND (:origen IS NULL OR UPPER(ao.AER_NOMBRE) LIKE '%' || UPPER(:origen) || '%')
+                  AND (:destino IS NULL OR UPPER(ad.AER_NOMBRE) LIKE '%' || UPPER(:destino) || '%')
                 ORDER BY vu.VUE_FECHA_VUELO, pv.PRV_NUMERO_VUELO
             ) WHERE ROWNUM <= :limit
             """;
 
-        return QueryAsync(sql, MapFlight, cancellationToken, NullableDateParam("flightDate", date), Limit(limit));
+        return QueryAsync(sql, MapFlight, cancellationToken,
+            NullableDateParam("flightDate", date),
+            NullableStringParam("origen", origen),
+            NullableStringParam("destino", destino),
+            Limit(limit));
     }
 
     public async Task<VueloDto?> GetFlightByIdAsync(int id, CancellationToken cancellationToken)
@@ -735,6 +741,11 @@ public sealed class AeropuertoReadRepository(IOracleConnectionFactory connection
     private static OracleParameter NullableDateParam(string name, DateTime? value)
     {
         return new OracleParameter(name, OracleDbType.Date) { Value = value.HasValue ? value.Value : DBNull.Value };
+    }
+
+    private static OracleParameter NullableStringParam(string name, string? value)
+    {
+        return new OracleParameter(name, OracleDbType.Varchar2) { Value = string.IsNullOrWhiteSpace(value) ? DBNull.Value : (object)value };
     }
 
     private static int? ToNullableInt(object value)

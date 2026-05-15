@@ -19,17 +19,13 @@ public sealed record UsuarioLoginDto(
     int PasajeroId,
     string Usuario,
     string Email,
-    string ContrasenaHash,
-    string Sal,
     string Estado,
     string EmailVerificado,
-    string? TokenVerificacion,
     DateTime? FechaRegistro,
     DateTime? UltimoAcceso,
     int IntentosFallidos,
     DateTime? BloqueadoHasta,
-    string? TokenRecuperacion,
-    DateTime? VencimientoToken);
+    string Rol);
 
 public sealed record CrearUsuarioLoginDto(
     int PasajeroId,

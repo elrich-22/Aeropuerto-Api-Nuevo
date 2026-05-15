@@ -1,9 +1,11 @@
 using AeropuertoAurora.Api.DTOs;
 using AeropuertoAurora.Api.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AeropuertoAurora.Api.Controllers;
 
+[Authorize(Roles = "ADMIN")]
 [ApiController]
 [Route("api/usuarios-login")]
 public sealed class UsuariosLoginController(IOracleCrudRepository repository) : ControllerBase
@@ -11,7 +13,7 @@ public sealed class UsuariosLoginController(IOracleCrudRepository repository) : 
     private static readonly CrudTableDefinition Table = new(
         "AER_USUARIO_LOGIN",
         "USL_ID_USUARIO",
-        ["USL_ID_PASAJERO", "USL_USUARIO", "USL_EMAIL", "USL_CONTRASENA_HASH", "USL_SAL", "USL_ESTADO", "USL_EMAIL_VERIFICADO", "USL_TOKEN_VERIFICACION", "USL_FECHA_REGISTRO", "USL_ULTIMO_ACCESO", "USL_INTENTOS_FALLIDOS", "USL_BLOQUEADO_HASTA", "USL_TOKEN_RECUPERACION", "USL_VENCIMIENTO_TOKEN"],
+        ["USL_ID_PASAJERO", "USL_USUARIO", "USL_EMAIL", "USL_CONTRASENA_HASH", "USL_SAL", "USL_ESTADO", "USL_EMAIL_VERIFICADO", "USL_TOKEN_VERIFICACION", "USL_FECHA_REGISTRO", "USL_ULTIMO_ACCESO", "USL_INTENTOS_FALLIDOS", "USL_BLOQUEADO_HASTA", "USL_TOKEN_RECUPERACION", "USL_VENCIMIENTO_TOKEN", "USL_ROL"],
         ["USL_ID_PASAJERO", "USL_USUARIO", "USL_EMAIL", "USL_CONTRASENA_HASH", "USL_SAL", "USL_ESTADO", "USL_EMAIL_VERIFICADO", "USL_TOKEN_VERIFICACION", "USL_FECHA_REGISTRO", "USL_ULTIMO_ACCESO", "USL_INTENTOS_FALLIDOS", "USL_BLOQUEADO_HASTA", "USL_TOKEN_RECUPERACION", "USL_VENCIMIENTO_TOKEN"]);
 
     [HttpGet]
@@ -55,17 +57,13 @@ public sealed class UsuariosLoginController(IOracleCrudRepository repository) : 
             row.ToInt("USL_ID_PASAJERO"),
             row.ToStringValue("USL_USUARIO"),
             row.ToStringValue("USL_EMAIL"),
-            row.ToStringValue("USL_CONTRASENA_HASH"),
-            row.ToStringValue("USL_SAL"),
             row.ToStringValue("USL_ESTADO"),
             row.ToStringValue("USL_EMAIL_VERIFICADO"),
-            row.ToNullableString("USL_TOKEN_VERIFICACION"),
             row.ToNullableDateTime("USL_FECHA_REGISTRO"),
             row.ToNullableDateTime("USL_ULTIMO_ACCESO"),
             row.ToNullableInt("USL_INTENTOS_FALLIDOS") ?? 0,
             row.ToNullableDateTime("USL_BLOQUEADO_HASTA"),
-            row.ToNullableString("USL_TOKEN_RECUPERACION"),
-            row.ToNullableDateTime("USL_VENCIMIENTO_TOKEN"));
+            row.ToStringValue("USL_ROL") ?? "PASAJERO");
     }
 
     private static IReadOnlyDictionary<string, object?> ToValues(CrearUsuarioLoginDto dto) => new Dictionary<string, object?>

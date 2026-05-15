@@ -12,7 +12,7 @@ public interface IAeropuertoQueryService
     Task<IReadOnlyList<AvionDto>> GetAircraftAsync(int limit, CancellationToken cancellationToken);
     Task<IReadOnlyList<AsientoAvionDto>> GetAircraftSeatsAsync(int aircraftId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ProgramaVueloDto>> GetFlightProgramsAsync(int limit, CancellationToken cancellationToken);
-    Task<IReadOnlyList<VueloDto>> GetFlightsAsync(DateTime? date, int limit, CancellationToken cancellationToken);
+    Task<IReadOnlyList<VueloDto>> GetFlightsAsync(DateTime? date, string? origen, string? destino, int limit, CancellationToken cancellationToken);
     Task<VueloDto?> GetFlightByIdAsync(int id, CancellationToken cancellationToken);
     Task<IReadOnlyList<PasajeroDto>> GetPassengersAsync(int limit, CancellationToken cancellationToken);
     Task<IReadOnlyList<ReservaDto>> GetReservationsAsync(int? passengerId, int limit, CancellationToken cancellationToken);

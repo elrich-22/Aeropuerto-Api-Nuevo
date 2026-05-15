@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 final class ApiClient {
     private final String baseUrl;
     private final String apiKey;
+    private String token = "";
 
     ApiClient(String baseUrl, String apiKey) {
         String cleanBaseUrl = baseUrl == null ? "" : baseUrl.trim();
@@ -21,6 +22,10 @@ final class ApiClient {
 
         this.baseUrl = cleanBaseUrl;
         this.apiKey = apiKey == null ? "" : apiKey.trim();
+    }
+
+    void setToken(String token) {
+        this.token = token == null ? "" : token.trim();
     }
 
     String get(String path) throws IOException {
@@ -51,6 +56,9 @@ final class ApiClient {
 
             if (!apiKey.isEmpty()) {
                 connection.setRequestProperty("X-Api-Key", apiKey);
+            }
+            if (!token.isEmpty()) {
+                connection.setRequestProperty("Authorization", "Bearer " + token);
             }
 
             if (body != null) {

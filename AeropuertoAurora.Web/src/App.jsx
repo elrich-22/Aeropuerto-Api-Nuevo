@@ -522,8 +522,11 @@ const sanitizeRegisterValue = (field, value = '') => {
 
 const isAdminUser = (currentUser) => {
   if (!currentUser) return false;
-
-  return [currentUser.usuario, currentUser.email, currentUser.nombreCompleto, currentUser.rol, currentUser.role]
+  if (currentUser.rol) {
+    return currentUser.rol.toUpperCase() === 'ADMIN';
+  }
+  // Fallback para sesiones anteriores sin campo rol
+  return [currentUser.usuario, currentUser.email, currentUser.nombreCompleto, currentUser.role]
     .filter(Boolean)
     .some((value) => {
       const normalized = normalize(value);
@@ -589,38 +592,6 @@ function NavBar({ user, adminView, isAdmin, activeView, onAdminView, onNavigate,
         <a className={activeView === 'objetos' ? 'active' : ''} href="#objetos" onClick={(event) => onNavigate(event, 'objetos')}>Objetos</a>
         <a className={activeView === 'promos' ? 'active' : ''} href="#promos" onClick={(event) => onNavigate(event, 'promos')}>Promos</a>
         <a className={activeView === 'ubicacion' ? 'active' : ''} href="#ubicacion" onClick={(event) => onNavigate(event, 'ubicacion')}>Ubicación</a>
-        {isAdmin && (
-          <>
-            <button
-              className={adminView === 'reporteria' ? 'nav-admin-link active' : 'nav-admin-link'}
-              type="button"
-              onClick={() => onAdminView('reporteria')}
-            >
-              Reporteria
-            </button>
-            <button
-              className={adminView === 'arrestos' ? 'nav-admin-link active' : 'nav-admin-link'}
-              type="button"
-              onClick={() => onAdminView('arrestos')}
-            >
-              Arrestos
-            </button>
-            <button
-              className={adminView === 'vuelos' ? 'nav-admin-link active' : 'nav-admin-link'}
-              type="button"
-              onClick={() => onAdminView('vuelos')}
-            >
-              Vuelos
-            </button>
-            <button
-              className={adminView === 'admin' ? 'nav-admin-link active' : 'nav-admin-link'}
-              type="button"
-              onClick={() => onAdminView('admin')}
-            >
-              Admin
-            </button>
-          </>
-        )}
         {user ? (
           <div className="nav-user-dropdown">
             <button
@@ -637,6 +608,39 @@ function NavBar({ user, adminView, isAdmin, activeView, onAdminView, onNavigate,
             </button>
             {userMenuOpen && (
               <div className="nav-user-dropdown-menu">
+                {isAdmin && (
+                  <>
+                    <button
+                      type="button"
+                      className={adminView === 'reporteria' ? 'active' : ''}
+                      onClick={() => { setUserMenuOpen(false); onAdminView('reporteria'); }}
+                    >
+                      Reportería
+                    </button>
+                    <button
+                      type="button"
+                      className={adminView === 'arrestos' ? 'active' : ''}
+                      onClick={() => { setUserMenuOpen(false); onAdminView('arrestos'); }}
+                    >
+                      Arrestos
+                    </button>
+                    <button
+                      type="button"
+                      className={adminView === 'vuelos' ? 'active' : ''}
+                      onClick={() => { setUserMenuOpen(false); onAdminView('vuelos'); }}
+                    >
+                      Vuelos
+                    </button>
+                    <button
+                      type="button"
+                      className={adminView === 'admin' ? 'active' : ''}
+                      onClick={() => { setUserMenuOpen(false); onAdminView('admin'); }}
+                    >
+                      Admin
+                    </button>
+                    <hr className="nav-dropdown-divider" />
+                  </>
+                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -894,6 +898,11 @@ function AuthModal({ open, onClose, onLogin, onRegister }) {
         <div className="section-label">Portal de compra</div>
         <h2 id="login-title">{mode === 'login' ? 'Iniciar sesión' : 'Crear usuario'}</h2>
         <p>{mode === 'login' ? 'Entra para comprar vuelos y ver tus viajes.' : 'Crea tu pasajero y usuario para comprar boletos en línea.'}</p>
+        {mode === 'login' && (
+          <small>
+            Demo: <strong>admin.aurora</strong> / <strong>AdminAurora1!</strong>
+          </small>
+        )}
         <div className="auth-tabs">
           <button type="button" className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); setError(''); }}>Entrar</button>
           <button type="button" className={mode === 'register' ? 'active' : ''} onClick={() => { setMode('register'); setError(''); }}>Crear cuenta</button>
@@ -1970,6 +1979,8 @@ function PassengerPicker({ open, groups, onClose, onApply }) {
 }
 
 function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
+  const [routeFlights, setRouteFlights] = useState([]);
+
   const airportOptions = useMemo(() => {
     const values = new Map();
     airports.forEach((airport) => {
@@ -2035,14 +2046,23 @@ function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
     }));
   };
 
+  const resolvedOrigin = resolveAirportQuery(criteria.origin, airportOptions);
+  const resolvedDestination = resolveAirportQuery(criteria.destination, airportOptions);
+
+  useEffect(() => {
+    if (!resolvedOrigin || !resolvedDestination) { setRouteFlights([]); return undefined; }
+    Promise.all([
+      api.flightsByRoute(resolvedOrigin, resolvedDestination),
+      api.flightsByRoute(resolvedDestination, resolvedOrigin)
+    ])
+      .then(([outbound, inbound]) => setRouteFlights([...outbound, ...inbound]))
+      .catch(() => setRouteFlights([]));
+    return undefined;
+  }, [resolvedOrigin, resolvedDestination]);
+
   const submit = (event) => {
     event.preventDefault();
-    onExplore({
-      ...criteria,
-      origin: resolveAirportQuery(criteria.origin, airportOptions),
-      destination: resolveAirportQuery(criteria.destination, airportOptions),
-      currency
-    });
+    onExplore({ ...criteria, origin: resolvedOrigin, destination: resolvedDestination, currency });
   };
 
   return (
@@ -2111,9 +2131,9 @@ function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
           tripType={criteria.tripType}
           departureDate={criteria.departureDate}
           returnDate={criteria.returnDate}
-          flights={flights}
-          origin={resolveAirportQuery(criteria.origin, airportOptions)}
-          destination={resolveAirportQuery(criteria.destination, airportOptions)}
+          flights={routeFlights.length > 0 ? routeFlights : flights}
+          origin={resolvedOrigin}
+          destination={resolvedDestination}
           passengerCount={passengerCountFromGroups(criteria.passengerGroups)}
           currency={currency}
           onClose={() => setDatePickerOpen(false)}
@@ -2128,8 +2148,26 @@ function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
 }
 
 function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, onBuyFlight, buyingFlightId }) {
-  const outboundResults = useMemo(() => getTravelResults(flights, criteria, 'departure'), [criteria, flights]);
-  const returnResults = useMemo(() => getTravelResults(flights, criteria, 'return'), [criteria, flights]);
+  const [dateFlights, setDateFlights] = useState(null);
+  const [loadingDateFlights, setLoadingDateFlights] = useState(false);
+
+  useEffect(() => {
+    const dates = [criteria?.departureDate, criteria?.returnDate].filter(Boolean);
+    if (dates.length === 0) {
+      setDateFlights(null);
+      return undefined;
+    }
+    setLoadingDateFlights(true);
+    Promise.all(dates.map((d) => api.flightsByDate(d)))
+      .then((results) => setDateFlights(results.flat()))
+      .catch(() => setDateFlights(null))
+      .finally(() => setLoadingDateFlights(false));
+    return undefined;
+  }, [criteria?.departureDate, criteria?.returnDate]);
+
+  const resultsFlights = dateFlights ?? flights;
+  const outboundResults = useMemo(() => getTravelResults(resultsFlights, criteria, 'departure'), [criteria, resultsFlights]);
+  const returnResults = useMemo(() => getTravelResults(resultsFlights, criteria, 'return'), [criteria, resultsFlights]);
   const [expandedFlightId, setExpandedFlightId] = useState(null);
   const [pendingUpgrade, setPendingUpgrade] = useState(null);
   const [selectedDeparture, setSelectedDeparture] = useState(null);
@@ -2202,7 +2240,7 @@ function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, on
             <div className="section-label">Resultados</div>
             <h2>{activeTitle}</h2>
           </div>
-          <span>{results.length} opciones - {isRoundtrip ? (activeDirection === 'return' ? 'vuelta' : 'ida') : 'solo ida'}</span>
+          <span>{loadingDateFlights ? 'Buscando...' : `${results.length} opciones`} - {isRoundtrip ? (activeDirection === 'return' ? 'vuelta' : 'ida') : 'solo ida'}</span>
         </div>
 
         {selectedDeparture && (
@@ -3395,20 +3433,80 @@ function VuelosAdminSection() {
           <div className="operations-list" style={{ marginTop: '1rem' }}>
             {flights.length === 0 && <p>No hay vuelos disponibles.</p>}
             {flights.map((f) => (
-              <div
-                key={f.id}
-                className="operation-row"
-                style={{ cursor: 'pointer', outline: selectedId === f.id ? '2px solid #0077b6' : 'none', borderRadius: '6px' }}
-                onClick={() => selectFlight(f.id)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => e.key === 'Enter' && selectFlight(f.id)}
-              >
-                <div>
-                  <strong>{f.numeroVuelo} — {f.origen} {'→'} {f.destino}</strong>
-                  <small>{f.aerolinea} &middot; {formatDate(f.fechaVuelo)}</small>
+              <div key={f.id}>
+                <div
+                  className={`operation-row${selectedId === f.id ? ' vuelo-row-open' : ''}`}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => selectFlight(f.id)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && selectFlight(f.id)}
+                >
+                  <div>
+                    <strong>{f.numeroVuelo} — {f.origen} {'→'} {f.destino}</strong>
+                    <small>{f.aerolinea} &middot; {formatDate(f.fechaVuelo)}</small>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+                    <span className={`status ${statusClassName(f.estado)}`}>{f.estado}</span>
+                    <span className="vuelo-chevron">{selectedId === f.id ? '▴' : '▾'}</span>
+                  </div>
                 </div>
-                <span className={`status ${statusClassName(f.estado)}`}>{f.estado}</span>
+                {selectedId === f.id && (
+                  <div className="vuelo-accordion">
+                    {f.estado === 'CANCELADO' ? (
+                      <p style={{ color: '#c0392b', margin: 0 }}>Este vuelo ya está cancelado.</p>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', gap: '.5rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className={action === 'cancel' ? 'btn btn-danger' : 'btn btn-outline'}
+                            onClick={() => setAction(action === 'cancel' ? '' : 'cancel')}
+                          >
+                            Cancelar vuelo
+                          </button>
+                          <button
+                            type="button"
+                            className={action === 'reschedule' ? 'btn' : 'btn btn-outline'}
+                            onClick={() => setAction(action === 'reschedule' ? '' : 'reschedule')}
+                          >
+                            Reprogramar
+                          </button>
+                        </div>
+                        {action === 'cancel' && (
+                          <div style={{ background: '#fff5f5', border: '1px solid #fca5a5', borderRadius: '8px', padding: '1rem', marginBottom: '.75rem' }}>
+                            <p style={{ color: '#c0392b', marginBottom: '.75rem', fontWeight: 600 }}>
+                              ¿Confirmas cancelar este vuelo? Esta acción no se puede deshacer.
+                            </p>
+                            <button type="button" className="btn btn-danger" disabled={saving} onClick={handleCancel}>
+                              {saving ? 'Cancelando...' : 'Confirmar cancelación'}
+                            </button>
+                          </div>
+                        )}
+                        {action === 'reschedule' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+                            <label className="field">
+                              <span>Nueva fecha</span>
+                              <input type="date" value={newDate} onChange={(e) => setNewDate(e.target.value)} required />
+                            </label>
+                            <label className="field">
+                              <span>Nueva hora <small>(opcional)</small></span>
+                              <input type="time" value={newTime} onChange={(e) => setNewTime(e.target.value)} />
+                            </label>
+                            <button
+                              type="button"
+                              className="btn"
+                              disabled={saving || !newDate}
+                              onClick={handleReschedule}
+                            >
+                              {saving ? 'Reprogramando...' : 'Confirmar reprogramación'}
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -3929,14 +4027,14 @@ function App() {
   }, [dashboard.health, error, loadDashboard]);
 
   useEffect(() => {
-    if (activeView !== 'inicio') return undefined;
+    if (activeView !== 'inicio' || error) return undefined;
 
     const interval = window.setInterval(() => {
       refreshTopDestinations();
     }, 5000);
 
     return () => window.clearInterval(interval);
-  }, [activeView]);
+  }, [activeView, error]);
 
   const openIncidents = useMemo(
     () => dashboard.severities.reduce((sum, severity) => sum + Number(severity.abiertos || 0), 0),

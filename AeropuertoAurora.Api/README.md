@@ -1,12 +1,14 @@
 # Aeropuerto Aurora API
 
-API ASP.NET Core para consultar y administrar la base Oracle del proyecto Aeropuerto Aurora. Sirve al frontend web y a la app Android.
+API ASP.NET Core para consultar y administrar la base Oracle del proyecto Aeropuerto Aurora. Sirve al frontend web y a la app Android, con autenticacion JWT y roles.
 
 ## Stack
 
 - ASP.NET Core sobre `.NET 10`.
 - `Oracle.ManagedDataAccess.Core` para conexion con Oracle.
 - Swagger/OpenAPI con `Swashbuckle.AspNetCore`.
+- JWT con `Microsoft.AspNetCore.Authentication.JwtBearer`.
+- Rate limiting integrado de ASP.NET Core (`AddRateLimiter`).
 - Scripts SQL versionados en `Database/`.
 
 ## Configuracion
@@ -16,16 +18,31 @@ La cadena de conexion no debe quemarse en codigo. En desarrollo puedes usar `app
 ```powershell
 $env:Database__ConnectionString="User Id=AEROPUERTO_AURORA;Password=1234;Data Source=localhost:1521/ORCLPDB"
 $env:ApiSecurity__ApiKey="clave-local-segura"
+$env:Jwt__Secret="cadena-larga-secreta-min-32-chars"
+$env:Jwt__Issuer="aeropuerto-aurora"
+$env:Jwt__Audience="aeropuerto-aurora-clients"
 dotnet run --urls http://localhost:5185
 ```
 
-Si `ApiSecurity:ApiKey` esta configurada, los clientes deben enviar:
+### API key
+
+Si `ApiSecurity:Enabled` esta en `true`, los clientes deben enviar:
 
 ```http
 X-Api-Key: clave-local-segura
 ```
 
-En el archivo de desarrollo actual la API key esta vacia, por lo que no se exige ese header localmente.
+En el archivo de desarrollo actual `ApiSecurity:Enabled` viene en `false`, por lo que no se exige ese header localmente.
+
+### JWT
+
+Si la configuracion `Jwt:Secret` esta presente, la API activa autenticacion JWT. El token se obtiene desde `POST /api/auth/login` y se envia en cada request:
+
+```http
+Authorization: Bearer eyJhbGciOi...
+```
+
+El token incluye claims: `sub`, `email`, `usuario`, `pasajeroId`, `rol` y `jti`.
 
 ## Correo SMTP
 
@@ -50,22 +67,31 @@ Si `Email:Enabled` esta en `false` o falta algun dato SMTP, la compra se confirm
 
 Los scripts de Oracle estan en [Database](./Database):
 
-- `Database/aeropuerto_aurora_v2.sql`: crea la estructura completa de la base de datos.
-- `Database/aeropuerto_aurora_seed.sql`: carga data de prueba con IDs fijos.
-- `Database/reset-identities.sql`: resincroniza columnas identity despues del seed.
+- `Database/aeropuerto_aurora_v2.sql`: estructura completa de la base de datos.
+- `Database/aeropuerto_aurora_add_rol.sql`: agrega columna `USL_ROL` y constraint para roles.
+- `Database/alter_add_documento_pasajero.sql`: agrega columnas de documento al pasajero.
+- `Database/alter_add_venta_cantidad_boletos.sql`: agrega cantidad de boletos en `AER_VENTABOLETO`.
+- `Database/alter_detalle_boleto_pasajero_snapshot.sql`: snapshot del pasajero en detalle de boleto.
+- `Database/aeropuerto_aurora_seed_presentacion.sql`: seed con ~18,000 vuelos, 120 pasajeros y 150 reservas.
+- `Database/aeropuerto_aurora_reset_total.sql`: limpia tablas y reinicia identities.
+
+Credenciales demo del seed de presentacion:
+
+- `admin.aurora` / `AdminAurora1!` (rol ADMIN)
+- `soporte.operaciones` / `SoporteAurora1!` (rol ADMIN)
+- `auditoria.seguridad` / `SoporteAurora1!` (rol ADMIN)
+- Usuarios pasajero genericos / `AuroraDemo1!`
+- Usuarios inactivos o bloqueados / `DemoInactivo1!`
 
 Orden recomendado de ejecucion:
 
 ```sql
 @Database/aeropuerto_aurora_v2.sql
-@Database/aeropuerto_aurora_seed.sql
-@Database/reset-identities.sql
-```
-
-El seed inserta IDs fijos. Si luego haces `POST` desde Swagger y Oracle devuelve `ORA-00001` sobre una PK, ejecuta:
-
-```sql
-@Database/reset-identities.sql
+@Database/aeropuerto_aurora_add_rol.sql
+@Database/alter_add_documento_pasajero.sql
+@Database/alter_add_venta_cantidad_boletos.sql
+@Database/alter_detalle_boleto_pasajero_snapshot.sql
+@Database/aeropuerto_aurora_seed_presentacion.sql
 ```
 
 ## Ejecutar
@@ -88,18 +114,32 @@ URLs utiles:
 - OpenAPI JSON: `http://localhost:5185/swagger/v1/swagger.json`
 - Health check: `http://localhost:5185/api/health`
 
+## Seguridad
+
+- **JWT**: HMAC-SHA256 con `sub`, `email`, `usuario`, `pasajeroId`, `rol`, `jti`.
+- **Contrasenas**: PBKDF2 con SHA-256, 100,000 iteraciones y sal aleatoria por usuario.
+- **Bloqueo**: 5 intentos fallidos consecutivos bloquean la cuenta por 30 minutos.
+- **Rate limiting**: `POST /api/auth/login` limitado a 5 requests/min por IP.
+- **Roles**: `ADMIN` y `PASAJERO`. Endpoints administrativos usan `[Authorize(Roles = "ADMIN")]`.
+- **HSTS y HTTPS**: `UseHttpsRedirection` y `UseHsts` activos cuando el entorno no es Development.
+- **Validacion de DTOs**: longitudes maximas, regex de email y filtrado de caracteres peligrosos.
+- **CORS**: politica `Frontend` configurable desde `appsettings`.
+
 ## Endpoints principales
 
 Autenticacion:
 
-- `POST /api/auth/login`
+- `POST /api/auth/login` - devuelve JWT
 - `POST /api/auth/register`
+- `GET /api/auth/perfil` - requiere JWT
 
 Vuelos y compra:
 
 - `GET /api/vuelos?fecha=2026-04-24&limit=50`
+- `GET /api/vuelos?origen=La%20Aurora&destino=Miami&limit=500`
 - `GET /api/vuelos/{id}`
 - `GET /api/vuelos/programas`
+- `PUT /api/vuelos/{id}` - solo rol ADMIN
 - `GET /api/aeropuertos`
 - `GET /api/aerolineas`
 - `GET /api/metodos-pago`
@@ -138,7 +178,7 @@ Todos los listados aceptan `limit` cuando el controlador lo soporta, por ejemplo
 
 ## CRUD administrativo
 
-La API incluye controladores CRUD para catalogos y tablas operativas. La mayoria exponen:
+Los controladores CRUD requieren rol `ADMIN`. La mayoria exponen:
 
 - `GET /api/{recurso}`
 - `GET /api/{recurso}/{id}`

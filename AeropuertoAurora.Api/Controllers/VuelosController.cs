@@ -1,6 +1,7 @@
 using AeropuertoAurora.Api.DTOs;
 using AeropuertoAurora.Api.Repositories;
 using AeropuertoAurora.Api.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AeropuertoAurora.Api.Controllers;
@@ -16,9 +17,9 @@ public sealed class VuelosController(IAeropuertoQueryService service, IOracleCru
         ["VUE_ESTADO", "VUE_FECHA_VUELO"]);
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] DateTime? fecha, [FromQuery] int limit = 100, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetAll([FromQuery] DateTime? fecha, [FromQuery] string? origen, [FromQuery] string? destino, [FromQuery] int limit = 100, CancellationToken cancellationToken = default)
     {
-        return Ok(await service.GetFlightsAsync(fecha, limit, cancellationToken));
+        return Ok(await service.GetFlightsAsync(fecha, origen, destino, limit, cancellationToken));
     }
 
     [HttpGet("{id:int}")]
@@ -34,6 +35,7 @@ public sealed class VuelosController(IAeropuertoQueryService service, IOracleCru
         return Ok(await service.GetFlightProgramsAsync(limit, cancellationToken));
     }
 
+    [Authorize(Roles = "ADMIN")]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> ActualizarVuelo(int id, ActualizarVueloEstadoDto dto, CancellationToken cancellationToken)
     {
@@ -64,6 +66,15 @@ public sealed class VuelosController(IAeropuertoQueryService service, IOracleCru
         if (string.Equals(requestedStatus, "REPROGRAMADO", StringComparison.OrdinalIgnoreCase) && !dto.FechaVuelo.HasValue)
         {
             return BadRequest(new { message = "Debes indicar la nueva fecha del vuelo para reprogramarlo." });
+        }
+
+        if (dto.FechaVuelo.HasValue)
+        {
+            var now = DateTime.UtcNow;
+            if (dto.FechaVuelo.Value < now)
+                return BadRequest(new { message = "La fecha del vuelo no puede ser en el pasado." });
+            if (dto.FechaVuelo.Value > now.AddYears(2))
+                return BadRequest(new { message = "La fecha del vuelo no puede ser mas de 2 años en el futuro." });
         }
 
         var values = new Dictionary<string, object?>
