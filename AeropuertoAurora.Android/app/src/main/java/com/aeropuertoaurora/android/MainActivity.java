@@ -220,6 +220,7 @@ public final class MainActivity extends Activity {
         } catch (Exception ignored) {
             sessionUser = null;
         }
+        apiClient.setToken(sessionUser == null ? "" : value(sessionUser, "token", ""));
 
         cartItems.clear();
         try {
@@ -2647,6 +2648,7 @@ public final class MainActivity extends Activity {
     private void saveConnection() {
         settingsStore.save(baseUrlInput.getText().toString(), apiKeyInput.getText().toString());
         apiClient = new ApiClient(settingsStore.getBaseUrl(), settingsStore.getApiKey());
+        apiClient.setToken(sessionUser == null ? "" : value(sessionUser, "token", ""));
         statusText.setText("Conexion guardada.");
     }
 
@@ -2724,6 +2726,7 @@ public final class MainActivity extends Activity {
             runTask("Iniciando sesión...", () -> apiClient.post("/api/auth/login", body.toString()), json -> {
                 sessionUser = new JSONObject(json);
                 settingsStore.saveSessionJson(sessionUser.toString());
+                apiClient.setToken(value(sessionUser, "token", ""));
                 statusText.setText("Sesión iniciada.");
                 activeView = "inicio";
                 lastMessage = "Bienvenido " + value(sessionUser, "nombreCompleto", value(sessionUser, "usuario", "usuario")) + ".";
@@ -2859,6 +2862,7 @@ public final class MainActivity extends Activity {
             runTask("Creando cuenta...", () -> apiClient.post("/api/auth/register", body.toString()), json -> {
                 sessionUser = new JSONObject(json);
                 settingsStore.saveSessionJson(sessionUser.toString());
+                apiClient.setToken(value(sessionUser, "token", ""));
                 statusText.setText("Cuenta creada.");
                 activeView = "inicio";
                 lastMessage = "Cuenta creada e iniciada.";
@@ -2871,6 +2875,7 @@ public final class MainActivity extends Activity {
 
     private void logout() {
         sessionUser = null;
+        apiClient.setToken("");
         settingsStore.clearSession();
         activeView = "inicio";
         statusText.setText("Sesión cerrada.");
@@ -3069,6 +3074,26 @@ public final class MainActivity extends Activity {
         try {
             String checkoutCartId = value(checkoutFlight, "cartId", "");
             String checkoutItemId = value(checkoutFlight, "itemCarritoId", "");
+            JSONObject pasajeroPrincipal = null;
+            if (passengerPrimerNombres[0] != null) {
+                String pNombre = passengerPrimerNombres[0].getText().toString().trim();
+                String pApellido = passengerPrimerApellidos[0] != null ? passengerPrimerApellidos[0].getText().toString().trim() : "";
+                String pDoc = passengerDocs[0] != null ? passengerDocs[0].getText().toString().trim() : "";
+                if (!pNombre.isEmpty() && !pApellido.isEmpty() && !pDoc.isEmpty()) {
+                    pasajeroPrincipal = new JSONObject()
+                            .put("primerNombre", pNombre)
+                            .put("segundoNombre", passengerSegundoNombres[0] != null && !passengerSegundoNombres[0].getText().toString().trim().isEmpty() ? passengerSegundoNombres[0].getText().toString().trim() : JSONObject.NULL)
+                            .put("primerApellido", pApellido)
+                            .put("segundoApellido", passengerSegundoApellidos[0] != null && !passengerSegundoApellidos[0].getText().toString().trim().isEmpty() ? passengerSegundoApellidos[0].getText().toString().trim() : JSONObject.NULL)
+                            .put("tipoDocumento", passengerDocTypes[0] != null ? passengerDocTypes[0].getSelectedItem().toString() : "DPI")
+                            .put("numeroDocumento", pDoc)
+                            .put("fechaNacimiento", JSONObject.NULL)
+                            .put("nacionalidad", JSONObject.NULL)
+                            .put("sexo", JSONObject.NULL)
+                            .put("telefono", JSONObject.NULL)
+                            .put("email", JSONObject.NULL);
+                }
+            }
             JSONArray pasajerosAdicionales = new JSONArray();
             for (int i = 1; i < passengers; i++) {
                 if (passengerPrimerNombres[i] == null) continue;
@@ -3097,6 +3122,7 @@ public final class MainActivity extends Activity {
                     .put("metodoPagoId", methodId)
                     .put("emailConfirmacion", holderEmail.getText().toString().trim())
                     .put("enviarCorreoConfirmacion", true)
+                    .put("pasajeroPrincipal", pasajeroPrincipal != null ? pasajeroPrincipal : JSONObject.NULL)
                     .put("pasajerosAdicionales", pasajerosAdicionales.length() > 0 ? pasajerosAdicionales : JSONObject.NULL);
             runTask("Confirmando compra...", () -> {
                 String response = apiClient.post("/api/compras/vuelos", body.toString());
