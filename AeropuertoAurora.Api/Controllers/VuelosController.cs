@@ -39,6 +39,10 @@ public sealed class VuelosController(IAeropuertoQueryService service, IOracleCru
     {
         var validStatuses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             { "PROGRAMADO", "EN_VUELO", "ATERRIZADO", "CANCELADO", "REPROGRAMADO", "RETRASADO" };
+        var requestedStatus = dto.Estado?.Trim().ToUpperInvariant();
+        var persistedStatus = string.Equals(requestedStatus, "REPROGRAMADO", StringComparison.OrdinalIgnoreCase)
+            ? "RETRASADO"
+            : requestedStatus;
 
         if (string.IsNullOrWhiteSpace(dto.Estado) || !validStatuses.Contains(dto.Estado))
             return BadRequest(new { message = "Estado invalido. Valores permitidos: PROGRAMADO, EN_VUELO, ATERRIZADO, CANCELADO, REPROGRAMADO, RETRASADO." });
@@ -50,12 +54,33 @@ public sealed class VuelosController(IAeropuertoQueryService service, IOracleCru
         if (string.Equals(flight.Estado, "CANCELADO", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { message = "El vuelo ya esta cancelado y no puede modificarse." });
 
-        var values = new Dictionary<string, object?> { ["VUE_ESTADO"] = dto.Estado.ToUpperInvariant() };
-        if (dto.FechaVuelo.HasValue)
-            values["VUE_FECHA_VUELO"] = dto.FechaVuelo.Value;
+        if ((string.Equals(requestedStatus, "CANCELADO", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(requestedStatus, "REPROGRAMADO", StringComparison.OrdinalIgnoreCase)) &&
+            string.Equals(flight.Estado, "ATERRIZADO", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "No se puede cancelar ni reprogramar un vuelo que ya aterrizo." });
+        }
+
+        if (string.Equals(requestedStatus, "REPROGRAMADO", StringComparison.OrdinalIgnoreCase) && !dto.FechaVuelo.HasValue)
+        {
+            return BadRequest(new { message = "Debes indicar la nueva fecha del vuelo para reprogramarlo." });
+        }
+
+        var values = new Dictionary<string, object?>
+        {
+            ["VUE_ESTADO"] = persistedStatus,
+            ["VUE_FECHA_VUELO"] = dto.FechaVuelo ?? flight.FechaVuelo
+        };
 
         return await repository.UpdateAsync(VuelosTable, id, values, cancellationToken)
-            ? Ok(new { message = "Vuelo actualizado correctamente.", id, estado = dto.Estado.ToUpperInvariant() })
+            ? Ok(new
+            {
+                message = string.Equals(requestedStatus, "REPROGRAMADO", StringComparison.OrdinalIgnoreCase)
+                    ? "Vuelo reprogramado correctamente."
+                    : "Vuelo actualizado correctamente.",
+                id,
+                estado = persistedStatus
+            })
             : NotFound(new { message = "No se encontro el vuelo para actualizar." });
     }
 }

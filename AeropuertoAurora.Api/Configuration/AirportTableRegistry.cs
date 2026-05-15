@@ -23,6 +23,7 @@ public static class AirportTableRegistry
         "AER_ASISTENCIA",
         "AER_PLANILLA",
         "AER_PASAJERO",
+        "AER_DOCUMENTO_PASAJERO",
         "AER_USUARIO_LOGIN",
         "AER_SESIONUSUARIO",
         "AER_PREFERENCIACLIENTE",

@@ -2,18 +2,28 @@ using AeropuertoAurora.Api.DTOs;
 using AeropuertoAurora.Api.Repositories;
 using AeropuertoAurora.Api.Services;
 using Microsoft.AspNetCore.Mvc;
+using Oracle.ManagedDataAccess.Client;
 
 namespace AeropuertoAurora.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public sealed class AuthController(IOracleCrudRepository repository, IAeropuertoQueryService service) : ControllerBase
+public sealed class AuthController(
+    IOracleCrudRepository repository,
+    IAeropuertoQueryService service,
+    ILogger<AuthController> logger) : ControllerBase
 {
     private static readonly CrudTableDefinition PassengersTable = new(
         "AER_PASAJERO",
         "PAS_ID_PASAJERO",
         ["PAS_NUMERO_DOCUMENTO", "PAS_TIPO_DOCUMENTO", "PAS_PRIMER_NOMBRE", "PAS_SEGUNDO_NOMBRE", "PAS_PRIMER_APELLIDO", "PAS_SEGUNDO_APELLIDO", "PAS_FECHA_NACIMIENTO", "PAS_NACIONALIDAD", "PAS_SEXO", "PAS_TELEFONO", "PAS_EMAIL", "PAS_FECHA_REGISTRO"],
         ["PAS_NUMERO_DOCUMENTO", "PAS_TIPO_DOCUMENTO", "PAS_PRIMER_NOMBRE", "PAS_SEGUNDO_NOMBRE", "PAS_PRIMER_APELLIDO", "PAS_SEGUNDO_APELLIDO", "PAS_FECHA_NACIMIENTO", "PAS_NACIONALIDAD", "PAS_SEXO", "PAS_TELEFONO", "PAS_EMAIL", "PAS_FECHA_REGISTRO"]);
+
+    private static readonly CrudTableDefinition PassengerDocumentsTable = new(
+        "AER_DOCUMENTO_PASAJERO",
+        "DCP_ID_DOCUMENTO",
+        ["DCP_ID_PASAJERO", "DCP_TIPO_DOCUMENTO", "DCP_NUMERO_DOCUMENTO", "DCP_PAIS_EMISOR", "DCP_FECHA_VENCIMIENTO", "DCP_ESTADO_VALIDACION", "DCP_FECHA_REGISTRO", "DCP_FECHA_VALIDACION"],
+        ["DCP_ID_PASAJERO", "DCP_TIPO_DOCUMENTO", "DCP_NUMERO_DOCUMENTO", "DCP_PAIS_EMISOR", "DCP_FECHA_VENCIMIENTO", "DCP_ESTADO_VALIDACION", "DCP_FECHA_REGISTRO", "DCP_FECHA_VALIDACION"]);
 
     private static readonly CrudTableDefinition UsersTable = new(
         "AER_USUARIO_LOGIN",
@@ -58,7 +68,11 @@ public sealed class AuthController(IOracleCrudRepository repository, IAeropuerto
             fullName,
             passenger?.NumeroDocumento,
             passenger?.TipoDocumento,
-            passenger?.Telefono));
+            passenger?.Telefono,
+            passenger?.PrimerNombre,
+            passenger?.SegundoNombre,
+            passenger?.PrimerApellido,
+            passenger?.SegundoApellido));
     }
 
     [HttpPost("register")]
@@ -94,6 +108,12 @@ public sealed class AuthController(IOracleCrudRepository repository, IAeropuerto
             return Conflict(new { message = "Ya existe un usuario con ese nombre o email." });
         }
 
+        var passportValidationError = ValidatePassportDocument(dto.TipoDocumento, dto.NumeroDocumento, dto.PaisEmisorDocumento, dto.FechaVencimientoDocumento);
+        if (passportValidationError is not null)
+        {
+            return BadRequest(new { message = passportValidationError });
+        }
+
         var passengerId = await repository.CreateAsync(PassengersTable, new Dictionary<string, object?>
         {
             ["PAS_NUMERO_DOCUMENTO"] = dto.NumeroDocumento,
@@ -109,6 +129,14 @@ public sealed class AuthController(IOracleCrudRepository repository, IAeropuerto
             ["PAS_EMAIL"] = dto.Email,
             ["PAS_FECHA_REGISTRO"] = DateTime.Now
         }, cancellationToken);
+
+        await TryUpsertPassengerDocumentAsync(
+            passengerId,
+            dto.TipoDocumento,
+            dto.NumeroDocumento,
+            dto.PaisEmisorDocumento,
+            dto.FechaVencimientoDocumento,
+            cancellationToken);
 
         var salt = Guid.NewGuid().ToString("N")[..12];
         var userId = await repository.CreateAsync(UsersTable, new Dictionary<string, object?>
@@ -139,7 +167,11 @@ public sealed class AuthController(IOracleCrudRepository repository, IAeropuerto
             fullName,
             dto.NumeroDocumento,
             dto.TipoDocumento,
-            dto.Telefono));
+            dto.Telefono,
+            dto.PrimerNombre,
+            dto.SegundoNombre,
+            dto.PrimerApellido,
+            dto.SegundoApellido));
     }
 
     private static bool PasswordMatches(string password, string storedHash, string salt)
@@ -156,5 +188,135 @@ public sealed class AuthController(IOracleCrudRepository repository, IAeropuerto
         }
 
         return string.Equals($"{password}:{salt}", storedHash, StringComparison.Ordinal);
+    }
+
+    private async Task UpsertPassengerDocumentAsync(
+        int passengerId,
+        string tipoDocumento,
+        string numeroDocumento,
+        string? paisEmisor,
+        DateTime? fechaVencimiento,
+        CancellationToken cancellationToken)
+    {
+        var existingByPassenger = await repository.GetByColumnAsync(PassengerDocumentsTable, "DCP_ID_PASAJERO", passengerId, cancellationToken);
+        var normalizedType = NormalizeDocumentType(tipoDocumento);
+        var now = DateTime.Now;
+        var validationStatus = normalizedType == "PASAPORTE" ? "VALIDADO" : "NO_REQUIERE";
+
+        var existingDocument = existingByPassenger.FirstOrDefault(row =>
+            string.Equals(row.ToNullableString("DCP_TIPO_DOCUMENTO"), normalizedType, StringComparison.OrdinalIgnoreCase));
+
+        if (existingDocument is not null)
+        {
+            await repository.UpdateAsync(PassengerDocumentsTable, existingDocument.ToInt("DCP_ID_DOCUMENTO"), new Dictionary<string, object?>
+            {
+                ["DCP_ID_PASAJERO"] = passengerId,
+                ["DCP_TIPO_DOCUMENTO"] = normalizedType,
+                ["DCP_NUMERO_DOCUMENTO"] = numeroDocumento.Trim(),
+                ["DCP_PAIS_EMISOR"] = string.IsNullOrWhiteSpace(paisEmisor) ? null : paisEmisor.Trim(),
+                ["DCP_FECHA_VENCIMIENTO"] = fechaVencimiento,
+                ["DCP_ESTADO_VALIDACION"] = validationStatus,
+                ["DCP_FECHA_REGISTRO"] = existingDocument.ToNullableDateTime("DCP_FECHA_REGISTRO") ?? now,
+                ["DCP_FECHA_VALIDACION"] = normalizedType == "PASAPORTE" ? now : null
+            }, cancellationToken);
+
+            return;
+        }
+
+        await repository.CreateAsync(PassengerDocumentsTable, new Dictionary<string, object?>
+        {
+            ["DCP_ID_PASAJERO"] = passengerId,
+            ["DCP_TIPO_DOCUMENTO"] = normalizedType,
+            ["DCP_NUMERO_DOCUMENTO"] = numeroDocumento.Trim(),
+            ["DCP_PAIS_EMISOR"] = string.IsNullOrWhiteSpace(paisEmisor) ? null : paisEmisor.Trim(),
+            ["DCP_FECHA_VENCIMIENTO"] = fechaVencimiento,
+            ["DCP_ESTADO_VALIDACION"] = validationStatus,
+            ["DCP_FECHA_REGISTRO"] = now,
+            ["DCP_FECHA_VALIDACION"] = normalizedType == "PASAPORTE" ? now : null
+        }, cancellationToken);
+    }
+
+    private async Task TryUpsertPassengerDocumentAsync(
+        int passengerId,
+        string tipoDocumento,
+        string numeroDocumento,
+        string? paisEmisor,
+        DateTime? fechaVencimiento,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await UpsertPassengerDocumentAsync(
+                passengerId,
+                tipoDocumento,
+                numeroDocumento,
+                paisEmisor,
+                fechaVencimiento,
+                cancellationToken);
+        }
+        catch (OracleException ex) when (IsMissingPassengerDocumentsTable(ex))
+        {
+            logger.LogWarning(
+                "Se omitio el guardado en AER_DOCUMENTO_PASAJERO para el pasajero {PassengerId} porque la tabla aun no existe. Ejecuta la migracion alter_add_documento_pasajero.sql. Detalle: {Error}",
+                passengerId,
+                ex.Message);
+        }
+    }
+
+    private static string? ValidatePassportDocument(
+        string? tipoDocumento,
+        string? numeroDocumento,
+        string? paisEmisor,
+        DateTime? fechaVencimiento)
+    {
+        if (!string.Equals(NormalizeDocumentType(tipoDocumento), "PASAPORTE", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(numeroDocumento) || numeroDocumento.Trim().Length < 6)
+        {
+            return "El numero de pasaporte no tiene un formato valido.";
+        }
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(numeroDocumento.Trim(), "^[A-Za-z0-9-]{6,20}$"))
+        {
+            return "El numero de pasaporte solo puede contener letras, numeros o guiones.";
+        }
+
+        if (string.IsNullOrWhiteSpace(paisEmisor))
+        {
+            return "Debes indicar el pais emisor del pasaporte.";
+        }
+
+        if (!fechaVencimiento.HasValue)
+        {
+            return "Debes indicar la fecha de vencimiento del pasaporte.";
+        }
+
+        if (fechaVencimiento.Value.Date <= DateTime.Today)
+        {
+            return "El pasaporte ya esta vencido o vence hoy.";
+        }
+
+        return null;
+    }
+
+    private static string NormalizeDocumentType(string? value)
+    {
+        var normalized = value?.Trim().ToUpperInvariant();
+        return normalized switch
+        {
+            "PASAPORTE" or "PASSPORT" => "PASAPORTE",
+            "DPI" => "DPI",
+            "LICENCIA" => "LICENCIA",
+            _ => normalized ?? string.Empty
+        };
+    }
+
+    private static bool IsMissingPassengerDocumentsTable(OracleException exception)
+    {
+        return exception.Number == 942 ||
+            exception.Message.Contains("ORA-00942", StringComparison.OrdinalIgnoreCase);
     }
 }

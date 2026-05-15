@@ -11,8 +11,8 @@ public sealed class DetallesVentaBoletoController(IOracleCrudRepository reposito
     private static readonly CrudTableDefinition Table = new(
         "AER_DETALLEVENTABOLETO",
         "DEV_ID_DETALLE_VENTA",
-        ["DEV_ID_VENTA", "DEV_ID_RESERVA", "DEV_PRECIO_BASE", "DEV_CARGOS_ADICIONALES"],
-        ["DEV_ID_VENTA", "DEV_ID_RESERVA", "DEV_PRECIO_BASE", "DEV_CARGOS_ADICIONALES"]);
+        ["DEV_ID_VENTA", "DEV_ID_RESERVA", "DEV_PRECIO_BASE", "DEV_CARGOS_ADICIONALES", "DEV_NOMBRE_PASAJERO", "DEV_TIPO_DOCUMENTO", "DEV_NUMERO_DOCUMENTO"],
+        ["DEV_ID_VENTA", "DEV_ID_RESERVA", "DEV_PRECIO_BASE", "DEV_CARGOS_ADICIONALES", "DEV_NOMBRE_PASAJERO", "DEV_TIPO_DOCUMENTO", "DEV_NUMERO_DOCUMENTO"]);
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] int limit = 100, CancellationToken cancellationToken = default)
@@ -55,7 +55,10 @@ public sealed class DetallesVentaBoletoController(IOracleCrudRepository reposito
             row.ToInt("DEV_ID_VENTA"),
             row.ToInt("DEV_ID_RESERVA"),
             row.ToNullableDecimal("DEV_PRECIO_BASE") ?? 0m,
-            row.ToNullableDecimal("DEV_CARGOS_ADICIONALES"));
+            row.ToNullableDecimal("DEV_CARGOS_ADICIONALES"),
+            row.ToStringValue("DEV_NOMBRE_PASAJERO"),
+            row.ToNullableString("DEV_TIPO_DOCUMENTO"),
+            row.ToNullableString("DEV_NUMERO_DOCUMENTO"));
     }
 
     private static IReadOnlyDictionary<string, object?> ToValues(CrearDetalleVentaBoletoDto dto) => new Dictionary<string, object?>
@@ -63,7 +66,10 @@ public sealed class DetallesVentaBoletoController(IOracleCrudRepository reposito
         ["DEV_ID_VENTA"] = dto.VentaId,
         ["DEV_ID_RESERVA"] = dto.ReservaId,
         ["DEV_PRECIO_BASE"] = dto.PrecioBase,
-        ["DEV_CARGOS_ADICIONALES"] = dto.CargosAdicionales
+        ["DEV_CARGOS_ADICIONALES"] = dto.CargosAdicionales,
+        ["DEV_NOMBRE_PASAJERO"] = dto.NombrePasajero,
+        ["DEV_TIPO_DOCUMENTO"] = dto.TipoDocumento,
+        ["DEV_NUMERO_DOCUMENTO"] = dto.NumeroDocumento
     };
 
     private static IReadOnlyDictionary<string, object?> ToValues(ActualizarDetalleVentaBoletoDto dto) => new Dictionary<string, object?>
@@ -71,6 +77,9 @@ public sealed class DetallesVentaBoletoController(IOracleCrudRepository reposito
         ["DEV_ID_VENTA"] = dto.VentaId,
         ["DEV_ID_RESERVA"] = dto.ReservaId,
         ["DEV_PRECIO_BASE"] = dto.PrecioBase,
-        ["DEV_CARGOS_ADICIONALES"] = dto.CargosAdicionales
+        ["DEV_CARGOS_ADICIONALES"] = dto.CargosAdicionales,
+        ["DEV_NOMBRE_PASAJERO"] = dto.NombrePasajero,
+        ["DEV_TIPO_DOCUMENTO"] = dto.TipoDocumento,
+        ["DEV_NUMERO_DOCUMENTO"] = dto.NumeroDocumento
     };
 }
