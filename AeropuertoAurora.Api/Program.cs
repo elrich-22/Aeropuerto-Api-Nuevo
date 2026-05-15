@@ -106,17 +106,11 @@ builder.Services.AddCors(options =>
     options.AddPolicy("Frontend", policy =>
     {
         var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
-
         if (origins.Length == 0)
-        {
-            policy.AllowAnyOrigin();
-        }
-        else
-        {
-            policy.WithOrigins(origins);
-        }
+            throw new InvalidOperationException("Cors:AllowedOrigins no puede estar vacio. Configura al menos un origen en appsettings.");
 
-        policy.AllowAnyHeader()
+        policy.WithOrigins(origins)
+            .AllowAnyHeader()
             .AllowAnyMethod();
     });
 });
