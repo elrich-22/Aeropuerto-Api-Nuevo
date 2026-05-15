@@ -80,6 +80,7 @@ export const api = {
   health: () => request('/api/health'),
   airports: (limit = 100) => request(`/api/aeropuertos?limit=${limit}`),
   flights: (limit = 8) => request(`/api/vuelos?limit=${limit}`),
+  flightsByDate: (date, limit = 500) => request(`/api/vuelos?fecha=${date}&limit=${limit}`),
   topDestinations: (limit = 5) => request(`/api/reportes/destinos-mas-buscados?limit=${limit}`),
   salesByDate: () => request('/api/reportes/ventas-por-fecha'),
   paymentMethodsReport: () => request('/api/reportes/metodos-pago'),

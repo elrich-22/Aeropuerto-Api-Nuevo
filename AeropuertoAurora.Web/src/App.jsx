@@ -2031,8 +2031,26 @@ function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
 }
 
 function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, onBuyFlight, buyingFlightId }) {
-  const outboundResults = useMemo(() => getTravelResults(flights, criteria, 'departure'), [criteria, flights]);
-  const returnResults = useMemo(() => getTravelResults(flights, criteria, 'return'), [criteria, flights]);
+  const [dateFlights, setDateFlights] = useState(null);
+  const [loadingDateFlights, setLoadingDateFlights] = useState(false);
+
+  useEffect(() => {
+    const dates = [criteria?.departureDate, criteria?.returnDate].filter(Boolean);
+    if (dates.length === 0) {
+      setDateFlights(null);
+      return undefined;
+    }
+    setLoadingDateFlights(true);
+    Promise.all(dates.map((d) => api.flightsByDate(d)))
+      .then((results) => setDateFlights(results.flat()))
+      .catch(() => setDateFlights(null))
+      .finally(() => setLoadingDateFlights(false));
+    return undefined;
+  }, [criteria?.departureDate, criteria?.returnDate]);
+
+  const resultsFlights = dateFlights ?? flights;
+  const outboundResults = useMemo(() => getTravelResults(resultsFlights, criteria, 'departure'), [criteria, resultsFlights]);
+  const returnResults = useMemo(() => getTravelResults(resultsFlights, criteria, 'return'), [criteria, resultsFlights]);
   const [expandedFlightId, setExpandedFlightId] = useState(null);
   const [pendingUpgrade, setPendingUpgrade] = useState(null);
   const [selectedDeparture, setSelectedDeparture] = useState(null);
@@ -2105,7 +2123,7 @@ function TravelResultsView({ criteria, flights, user, onBack, onRequireLogin, on
             <div className="section-label">Resultados</div>
             <h2>{activeTitle}</h2>
           </div>
-          <span>{results.length} opciones - {isRoundtrip ? (activeDirection === 'return' ? 'vuelta' : 'ida') : 'solo ida'}</span>
+          <span>{loadingDateFlights ? 'Buscando...' : `${results.length} opciones`} - {isRoundtrip ? (activeDirection === 'return' ? 'vuelta' : 'ida') : 'solo ida'}</span>
         </div>
 
         {selectedDeparture && (
