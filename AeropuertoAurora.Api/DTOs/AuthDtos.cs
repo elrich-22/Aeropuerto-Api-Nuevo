@@ -19,7 +19,9 @@ public sealed record RegisterRequestDto(
     DateTime? FechaNacimiento,
     [StringLength(50)] string? Nacionalidad,
     [StringLength(1)] string? Sexo,
-    [StringLength(20)] string? Telefono);
+    [StringLength(20)] string? Telefono,
+    string? PaisEmisorDocumento = null,
+    DateTime? FechaVencimientoDocumento = null);
 
 public sealed record UsuarioSesionDto(
     int UsuarioId,
@@ -51,7 +53,9 @@ public sealed record PasajeroAdicionalDto(
     string? Nacionalidad,
     string? Sexo,
     string? Telefono,
-    [EmailAddress] string? Email);
+    [EmailAddress] string? Email,
+    string? PaisEmisorDocumento = null,
+    DateTime? FechaVencimientoDocumento = null);
 
 public sealed record ReservaAdicionalInfo(
     int PasajeroId,
@@ -70,6 +74,7 @@ public sealed record CompraVueloRequestDto(
     int MetodoPagoId,
     string? EmailConfirmacion,
     bool? EnviarCorreoConfirmacion,
+    PasajeroAdicionalDto? PasajeroPrincipal = null,
     IReadOnlyList<PasajeroAdicionalDto>? PasajerosAdicionales = null);
 
 public sealed record CompraVueloResponseDto(

@@ -11,8 +11,8 @@ public sealed class VentasBoletoController(IOracleCrudRepository repository) : C
     private static readonly CrudTableDefinition Table = new(
         "AER_VENTABOLETO",
         "VEN_ID_VENTA",
-        ["VEN_NUMERO_VENTA", "VEN_ID_PUNTO_VENTA", "VEN_ID_EMPLEADO_VENDEDOR", "VEN_ID_PASAJERO", "VEN_FECHA_VENTA", "VEN_MONTO_SUBTOTAL", "VEN_IMPUESTOS", "VEN_DESCUENTOS", "VEN_MONTO_TOTAL", "VEN_ID_METODO_PAGO", "VEN_CANAL_VENTA", "VEN_ESTADO"],
-        ["VEN_NUMERO_VENTA", "VEN_ID_PUNTO_VENTA", "VEN_ID_EMPLEADO_VENDEDOR", "VEN_ID_PASAJERO", "VEN_FECHA_VENTA", "VEN_MONTO_SUBTOTAL", "VEN_IMPUESTOS", "VEN_DESCUENTOS", "VEN_MONTO_TOTAL", "VEN_ID_METODO_PAGO", "VEN_CANAL_VENTA", "VEN_ESTADO"]);
+        ["VEN_NUMERO_VENTA", "VEN_ID_PUNTO_VENTA", "VEN_ID_EMPLEADO_VENDEDOR", "VEN_ID_PASAJERO", "VEN_FECHA_VENTA", "VEN_MONTO_SUBTOTAL", "VEN_IMPUESTOS", "VEN_DESCUENTOS", "VEN_MONTO_TOTAL", "VEN_ID_METODO_PAGO", "VEN_CANTIDAD_BOLETOS", "VEN_CANAL_VENTA", "VEN_ESTADO"],
+        ["VEN_NUMERO_VENTA", "VEN_ID_PUNTO_VENTA", "VEN_ID_EMPLEADO_VENDEDOR", "VEN_ID_PASAJERO", "VEN_FECHA_VENTA", "VEN_MONTO_SUBTOTAL", "VEN_IMPUESTOS", "VEN_DESCUENTOS", "VEN_MONTO_TOTAL", "VEN_ID_METODO_PAGO", "VEN_CANTIDAD_BOLETOS", "VEN_CANAL_VENTA", "VEN_ESTADO"]);
 
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] int limit = 100, CancellationToken cancellationToken = default)
@@ -62,6 +62,7 @@ public sealed class VentasBoletoController(IOracleCrudRepository repository) : C
             row.ToNullableDecimal("VEN_DESCUENTOS"),
             row.ToNullableDecimal("VEN_MONTO_TOTAL") ?? 0m,
             row.ToInt("VEN_ID_METODO_PAGO"),
+            row.ToNullableInt("VEN_CANTIDAD_BOLETOS") ?? 1,
             row.ToStringValue("VEN_CANAL_VENTA"),
             row.ToStringValue("VEN_ESTADO"));
     }
@@ -78,6 +79,7 @@ public sealed class VentasBoletoController(IOracleCrudRepository repository) : C
         ["VEN_DESCUENTOS"] = dto.Descuentos,
         ["VEN_MONTO_TOTAL"] = dto.MontoTotal,
         ["VEN_ID_METODO_PAGO"] = dto.MetodoPagoId,
+        ["VEN_CANTIDAD_BOLETOS"] = dto.CantidadBoletos,
         ["VEN_CANAL_VENTA"] = dto.CanalVenta,
         ["VEN_ESTADO"] = dto.Estado
     };
@@ -94,6 +96,7 @@ public sealed class VentasBoletoController(IOracleCrudRepository repository) : C
         ["VEN_DESCUENTOS"] = dto.Descuentos,
         ["VEN_MONTO_TOTAL"] = dto.MontoTotal,
         ["VEN_ID_METODO_PAGO"] = dto.MetodoPagoId,
+        ["VEN_CANTIDAD_BOLETOS"] = dto.CantidadBoletos,
         ["VEN_CANAL_VENTA"] = dto.CanalVenta,
         ["VEN_ESTADO"] = dto.Estado
     };

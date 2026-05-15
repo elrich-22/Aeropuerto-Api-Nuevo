@@ -98,6 +98,7 @@ public sealed record VentaBoletoDto(
     decimal? Descuentos,
     decimal MontoTotal,
     int MetodoPagoId,
+    int CantidadBoletos,
     string CanalVenta,
     string Estado);
 
@@ -112,6 +113,7 @@ public sealed record CrearVentaBoletoDto(
     decimal? Descuentos,
     decimal MontoTotal,
     int MetodoPagoId,
+    int CantidadBoletos,
     string CanalVenta,
     string Estado);
 
@@ -126,6 +128,7 @@ public sealed record ActualizarVentaBoletoDto(
     decimal? Descuentos,
     decimal MontoTotal,
     int MetodoPagoId,
+    int CantidadBoletos,
     string CanalVenta,
     string Estado);
 
@@ -134,19 +137,28 @@ public sealed record DetalleVentaBoletoDto(
     int VentaId,
     int ReservaId,
     decimal PrecioBase,
-    decimal? CargosAdicionales);
+    decimal? CargosAdicionales,
+    string NombrePasajero,
+    string? TipoDocumento,
+    string? NumeroDocumento);
 
 public sealed record CrearDetalleVentaBoletoDto(
     int VentaId,
     int ReservaId,
     decimal PrecioBase,
-    decimal? CargosAdicionales);
+    decimal? CargosAdicionales,
+    string NombrePasajero,
+    string? TipoDocumento,
+    string? NumeroDocumento);
 
 public sealed record ActualizarDetalleVentaBoletoDto(
     int VentaId,
     int ReservaId,
     decimal PrecioBase,
-    decimal? CargosAdicionales);
+    decimal? CargosAdicionales,
+    string NombrePasajero,
+    string? TipoDocumento,
+    string? NumeroDocumento);
 
 public sealed record TransaccionPagoDto(
     int Id,
