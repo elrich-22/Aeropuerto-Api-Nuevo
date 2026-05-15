@@ -8,8 +8,11 @@ function currentUserHeader() {
     if (!stored) return {};
 
     const user = JSON.parse(stored);
+    const headers = {};
     const value = user?.usuario || user?.email || user?.nombreCompleto;
-    return value ? { 'X-User': value } : {};
+    if (value) headers['X-User'] = value;
+    if (user?.token) headers['Authorization'] = `Bearer ${user.token}`;
+    return headers;
   } catch {
     return {};
   }
