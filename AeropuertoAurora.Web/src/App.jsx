@@ -4027,14 +4027,14 @@ function App() {
   }, [dashboard.health, error, loadDashboard]);
 
   useEffect(() => {
-    if (activeView !== 'inicio') return undefined;
+    if (activeView !== 'inicio' || error) return undefined;
 
     const interval = window.setInterval(() => {
       refreshTopDestinations();
     }, 5000);
 
     return () => window.clearInterval(interval);
-  }, [activeView]);
+  }, [activeView, error]);
 
   const openIncidents = useMemo(
     () => dashboard.severities.reduce((sum, severity) => sum + Number(severity.abiertos || 0), 0),

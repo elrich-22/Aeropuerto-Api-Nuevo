@@ -91,6 +91,8 @@ public final class MainActivity extends Activity {
 
     private JSONObject health;
     private JSONArray flights = new JSONArray();
+    private JSONArray routeFlights = new JSONArray();
+    private String routeFlightsKey = "";
     private JSONArray airports = new JSONArray();
     private JSONArray destinations = new JSONArray();
     private JSONArray severities = new JSONArray();
@@ -604,6 +606,7 @@ public final class MainActivity extends Activity {
             datePickerMode = "departure";
             setTravelCalendarFromDate(criteriaDepartureDate);
             activeView = "select_dates";
+            fetchRouteFlights();
             render();
         }));
 
@@ -696,16 +699,26 @@ public final class MainActivity extends Activity {
     private void selectAirport(JSONObject airport, boolean originPicker) {
         String name = airportTitle(airport);
         if (originPicker) {
+            if (!criteriaOrigin.equals(name)) {
+                routeFlights = new JSONArray();
+                routeFlightsKey = "";
+            }
             criteriaOrigin = name;
         } else {
+            if (!criteriaDestination.equals(name)) {
+                routeFlights = new JSONArray();
+                routeFlightsKey = "";
+            }
             criteriaDestination = name;
             registerDestinationClick(airport);
         }
         activeView = "explorar";
         render();
+        fetchRouteFlights();
     }
 
     private void renderDatePicker() {
+        fetchRouteFlights();
         contentLayout.addView(screenHeader("Fecha de viaje", "Elige salida y vuelta con tarifas disponibles.", "explorar", "", null));
 
         LinearLayout card = card();
@@ -829,8 +842,9 @@ public final class MainActivity extends Activity {
         Map<String, Double> fares = new HashMap<>();
         String prefix = String.format(Locale.US, "%04d-%02d", year, month);
         int passengers = passengerCountFromCriteria();
-        for (int i = 0; i < flights.length(); i++) {
-            JSONObject flight = flights.optJSONObject(i);
+        JSONArray source = routeFlights.length() > 0 ? routeFlights : flights;
+        for (int i = 0; i < source.length(); i++) {
+            JSONObject flight = source.optJSONObject(i);
             String flightDate = value(flight, "fechaVuelo", "");
             if (flight == null || !canPurchase(flight) || flightDate.length() < 10 || !flightDate.startsWith(prefix)) {
                 continue;
@@ -2660,6 +2674,39 @@ public final class MainActivity extends Activity {
             lastMessage = "La API respondio correctamente.";
             render();
         });
+    }
+
+    private void fetchRouteFlights() {
+        String origin = criteriaOrigin.trim().isEmpty() ? "La Aurora" : criteriaOrigin.trim();
+        String destination = criteriaDestination.trim();
+        if (destination.isEmpty()) return;
+        String key = origin + " -> " + destination;
+        if (key.equals(routeFlightsKey) && routeFlights.length() > 0) return;
+        routeFlightsKey = key;
+        new Thread(() -> {
+            try {
+                String encOrigin = URLEncoder.encode(origin, "UTF-8");
+                String encDest = URLEncoder.encode(destination, "UTF-8");
+                JSONArray outbound = new JSONArray(apiClient.get("/api/vuelos?origen=" + encOrigin + "&destino=" + encDest + "&limit=500"));
+                JSONArray inbound = new JSONArray(apiClient.get("/api/vuelos?origen=" + encDest + "&destino=" + encOrigin + "&limit=500"));
+                JSONArray combined = new JSONArray();
+                for (int i = 0; i < outbound.length(); i++) combined.put(outbound.get(i));
+                for (int i = 0; i < inbound.length(); i++) combined.put(inbound.get(i));
+                final JSONArray result = combined;
+                final int count = result.length();
+                runOnUiThread(() -> {
+                    routeFlights = result;
+                    statusText.setText("Tarifas cargadas: " + count + " vuelos para " + origin + " <-> " + destination);
+                    render();
+                });
+            } catch (Exception ex) {
+                final String message = ex.getMessage() == null ? "Error desconocido" : ex.getMessage();
+                runOnUiThread(() -> {
+                    routeFlightsKey = "";
+                    statusText.setText("No se pudieron cargar tarifas de ruta: " + message);
+                });
+            }
+        }).start();
     }
 
     private void loadDashboard() {
