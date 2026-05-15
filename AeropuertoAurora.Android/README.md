@@ -1,6 +1,6 @@
 # Aeropuerto Aurora Android
 
-App Android nativa para consumir `AeropuertoAurora.Api`. Esta hecha en Java con vistas nativas para evitar dependencias extra.
+App Android nativa para consumir `AeropuertoAurora.Api`. Esta hecha en Java con vistas nativas para evitar dependencias extra. Usa los mismos endpoints y autenticacion JWT que el frontend web.
 
 ## Stack
 
@@ -14,9 +14,10 @@ App Android nativa para consumir `AeropuertoAurora.Api`. Esta hecha en Java con 
 
 - Conexion configurable contra la API.
 - Prueba rapida de `GET /api/health`.
-- Login con `POST /api/auth/login`.
+- Login con `POST /api/auth/login` que guarda el JWT para requests siguientes.
 - Registro de pasajero y usuario.
 - Busqueda de vuelos de ida o ida y vuelta.
+- Calendario de tarifas filtrado por ruta seleccionada.
 - Seleccion de fechas, pasajeros, tarifa y servicios.
 - Carrito conectado a la API por pasajero.
 - Checkout con metodo de pago.
@@ -25,7 +26,7 @@ App Android nativa para consumir `AeropuertoAurora.Api`. Esta hecha en Java con 
 - Rastreo de vuelos.
 - Reportes de destinos mas buscados, ocupacion e incidentes por severidad.
 - Operaciones de equipaje, incidentes y mantenimientos.
-- Panel administrativo con carga de tablas, edicion y borrado de registros.
+- Panel administrativo (solo ADMIN) con carga de tablas, edicion y borrado.
 
 ## Abrir en Android Studio
 
@@ -72,9 +73,15 @@ El telefono y la PC deben estar en la misma red. Si tu firewall bloquea el puert
 
 ## API key
 
-Tu `appsettings.Development.json` actualmente tiene `ApiSecurity:ApiKey` vacio, asi que puedes dejar el campo API key vacio en la app.
+Tu `appsettings.Development.json` actualmente tiene `ApiSecurity:Enabled` en `false`, asi que puedes dejar el campo API key vacio en la app.
 
-Si luego levantas la API con una key, escribe la misma en la pantalla `Conexion`.
+Si luego habilitas la key en la API, escribe la misma en la pantalla `Conexion`.
+
+## Autenticacion
+
+- Al iniciar sesion, la app guarda el JWT en `SettingsStore` y lo envia automaticamente como `Authorization: Bearer <token>` en cada request.
+- Tambien guarda el `pasajeroPrincipal` para sincronizar el carrito con el backend.
+- El menu administrativo y las pantallas de admin (cancelar/reprogramar vuelos, arrestos, etc.) solo se muestran a usuarios con rol `ADMIN`.
 
 ## Flujo recomendado de prueba
 
@@ -83,19 +90,25 @@ Si luego levantas la API con una key, escribe la misma en la pantalla `Conexion`
 3. Configura `http://10.0.2.2:5185` si usas emulador.
 4. Presiona `Probar` para validar `/api/health`.
 5. Inicia sesion o registra un usuario.
-6. Explora vuelos, agrega uno al carrito y confirma la compra.
+6. Selecciona origen y destino para explorar vuelos.
+7. Abre el calendario de fechas y elige fecha de salida y regreso.
+8. Agrega un vuelo al carrito y confirma la compra.
 
 ## Donde esta el codigo
 
 - `app/src/main/java/com/aeropuertoaurora/android/MainActivity.java`: interfaz, navegacion y acciones.
-- `app/src/main/java/com/aeropuertoaurora/android/ApiClient.java`: llamadas HTTP.
-- `app/src/main/java/com/aeropuertoaurora/android/SettingsStore.java`: guarda URL y API key.
+- `app/src/main/java/com/aeropuertoaurora/android/ApiClient.java`: llamadas HTTP. Inyecta `X-Api-Key` y `Authorization: Bearer` cuando estan configurados.
+- `app/src/main/java/com/aeropuertoaurora/android/SettingsStore.java`: guarda URL, API key, JWT y pasajero principal.
 - `app/src/main/AndroidManifest.xml`: permisos y configuracion de red.
 - `app/src/main/res/xml/network_security_config.xml`: permite trafico HTTP local para desarrollo.
 
+## Calendario de tarifas
+
+El calendario consulta `GET /api/vuelos?origen=X&destino=Y&limit=500` (ida y vuelta) cuando se abre la pantalla `Fecha de viaje`. Los precios se calculan por ruta y se cachean hasta que cambia origen o destino. Si la API falla, el statusText muestra el mensaje de error para depurar.
+
 ## Notas
 
-- La app usa la misma API que el frontend web.
+- La app usa la misma API que el frontend web y comparte la sesion (login/registro) por backend.
 - El carrito compartido depende de un pasajero autenticado.
-- El panel administrativo solo se muestra para usuarios administradores.
+- El panel administrativo solo se muestra para usuarios con rol `ADMIN`.
 - Para probar en telefono fisico, revisa firewall y direccion IP local de la PC.

@@ -4,10 +4,10 @@ Proyecto integrado de Bases de Datos II para gestionar operaciones, venta de bol
 
 El repositorio contiene tres clientes alrededor de la misma API:
 
-- `AeropuertoAurora.Api/`: API ASP.NET Core conectada a Oracle.
+- `AeropuertoAurora.Api/`: API ASP.NET Core conectada a Oracle, con autenticacion JWT y roles.
 - `AeropuertoAurora.Web/`: frontend React + Vite para pasajeros y administradores.
 - `AeropuertoAurora.Android/`: app Android nativa en Java.
-- `AeropuertoAurora.Api/Database/`: scripts de estructura, seed y ajuste de identities.
+- `AeropuertoAurora.Api/Database/`: scripts de estructura, seed y alteraciones.
 - `start-dev.ps1`: script para levantar backend y frontend juntos.
 
 ## Estructura
@@ -37,14 +37,25 @@ Orden recomendado de ejecucion:
 
 ```sql
 @AeropuertoAurora.Api/Database/aeropuerto_aurora_v2.sql
-@AeropuertoAurora.Api/Database/aeropuerto_aurora_seed.sql
-@AeropuertoAurora.Api/Database/reset-identities.sql
+@AeropuertoAurora.Api/Database/aeropuerto_aurora_add_rol.sql
+@AeropuertoAurora.Api/Database/alter_add_documento_pasajero.sql
+@AeropuertoAurora.Api/Database/alter_add_venta_cantidad_boletos.sql
+@AeropuertoAurora.Api/Database/alter_detalle_boleto_pasajero_snapshot.sql
+@AeropuertoAurora.Api/Database/aeropuerto_aurora_seed_presentacion.sql
 ```
 
-Si despues del seed Oracle devuelve `ORA-00001` en inserts nuevos, vuelve a ejecutar:
+El seed de presentacion incluye:
+
+- 37 aeropuertos en 5 continentes, 20 aerolineas, 34 aeronaves.
+- 120 pasajeros y 103 usuarios login (80 activos, 10 inactivos, 10 bloqueados, 3 admin).
+- 90+ rutas: nacionales, regionales, internacionales e intercontinentales.
+- ~18,000 vuelos generados de 2026-05-18 a 2026-12-31.
+- 150 reservaciones pre-vuelo con tickets, detalles y transacciones de pago.
+
+Si necesitas reiniciar la base completa:
 
 ```sql
-@AeropuertoAurora.Api/Database/reset-identities.sql
+@AeropuertoAurora.Api/Database/aeropuerto_aurora_reset_total.sql
 ```
 
 ## Ejecutar API y Web
@@ -79,6 +90,7 @@ Si necesitas ejecutar solo la API:
 ```powershell
 $env:Database__ConnectionString="User Id=AEROPUERTO_AURORA;Password=1234;Data Source=localhost:1521/ORCLPDB"
 $env:ApiSecurity__ApiKey="clave-local-segura"
+$env:Jwt__Secret="cadena-larga-secreta-min-32-chars"
 dotnet run --project AeropuertoAurora.Api --urls http://localhost:5185
 ```
 
@@ -86,11 +98,13 @@ La API expone Swagger en:
 
 - `http://localhost:5185/swagger`
 
-Si `ApiSecurity:ApiKey` esta configurada, los clientes deben enviar:
+Si `ApiSecurity:Enabled` esta en `true`, los clientes deben enviar:
 
 ```http
 X-Api-Key: clave-local-segura
 ```
+
+En desarrollo `ApiSecurity:Enabled` viene en `false`, asi que no se exige el header localmente.
 
 Para probar correos de confirmacion de compra, configura `Email__Enabled`, `Email__Host`, `Email__User`, `Email__Password` y `Email__FromEmail` como variables de entorno. Las credenciales SMTP no deben subirse al repo.
 
@@ -124,16 +138,28 @@ URLs recomendadas para conectar con la API:
 
 El telefono y la PC deben estar en la misma red. Si el firewall bloquea el puerto `5185`, permite la conexion entrante.
 
+## Seguridad
+
+- Autenticacion con JWT (HMAC-SHA256). El token viaja en `Authorization: Bearer ...` y contiene `sub`, `email`, `usuario`, `pasajeroId`, `rol` y `jti`.
+- Contrasenas con PBKDF2 (SHA-256, 100k iteraciones) y sal por usuario.
+- Bloqueo automatico tras 5 intentos fallidos (30 minutos).
+- Rate limiting en `POST /api/auth/login` (5 req/min por IP).
+- Roles `ADMIN` y `PASAJERO` en la tabla `AER_USUARIO_LOGIN`. Endpoints administrativos requieren rol `ADMIN`.
+- HSTS y `UseHttpsRedirection` activos en produccion.
+- API key opcional via header `X-Api-Key` controlado por `ApiSecurity:Enabled`.
+- DTOs validados con `StringLength`, formato de email y caracteres permitidos.
+
 ## Modulos destacados
 
-- Autenticacion y registro de pasajeros con `POST /api/auth/login` y `POST /api/auth/register`.
-- Busqueda de vuelos, seleccion de tarifa y flujo de compra.
+- Autenticacion JWT con `POST /api/auth/login` (devuelve token) y `POST /api/auth/register`.
+- Busqueda de vuelos por origen, destino y fecha, con calendario de tarifas por ruta.
+- Seleccion de tarifa y flujo de compra integrado.
 - Carrito compartido por pasajero y checkout con metodo de pago.
 - Confirmacion de compras con creacion de reserva, venta, detalle y transaccion de pago.
 - Rastreo de vuelos, destinos mas buscados y reportes de ocupacion.
 - Operaciones de equipaje, mantenimientos, controles e incidentes.
-- Panel administrativo con metadata y CRUD generico sobre tablas habilitadas.
-- Clientes Web y Android consumiendo la misma API.
+- Panel administrativo (solo ADMIN) con CRUD generico sobre tablas habilitadas.
+- Clientes Web y Android consumiendo la misma API con autenticacion JWT.
 
 ## Documentacion por modulo
 
