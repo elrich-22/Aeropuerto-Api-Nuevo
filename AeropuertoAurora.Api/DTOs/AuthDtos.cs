@@ -8,7 +8,7 @@ public sealed record LoginRequestDto(
 
 public sealed record RegisterRequestDto(
     [StringLength(50, MinimumLength = 1)] string Usuario,
-    [StringLength(254, MinimumLength = 1)] string Email,
+    [StringLength(254, MinimumLength = 1), EmailAddress] string Email,
     [StringLength(200, MinimumLength = 8)] string Contrasena,
     [StringLength(30, MinimumLength = 1)] string NumeroDocumento,
     [StringLength(20, MinimumLength = 1)] string TipoDocumento,
@@ -51,7 +51,7 @@ public sealed record PasajeroAdicionalDto(
     string? Nacionalidad,
     string? Sexo,
     string? Telefono,
-    string? Email);
+    [EmailAddress] string? Email);
 
 public sealed record ReservaAdicionalInfo(
     int PasajeroId,

@@ -52,6 +52,15 @@ public sealed class VuelosController(IAeropuertoQueryService service, IOracleCru
         if (string.Equals(flight.Estado, "CANCELADO", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { message = "El vuelo ya esta cancelado y no puede modificarse." });
 
+        if (dto.FechaVuelo.HasValue)
+        {
+            var now = DateTime.UtcNow;
+            if (dto.FechaVuelo.Value < now)
+                return BadRequest(new { message = "La fecha del vuelo no puede ser en el pasado." });
+            if (dto.FechaVuelo.Value > now.AddYears(2))
+                return BadRequest(new { message = "La fecha del vuelo no puede ser mas de 2 años en el futuro." });
+        }
+
         var values = new Dictionary<string, object?> { ["VUE_ESTADO"] = dto.Estado.ToUpperInvariant() };
         if (dto.FechaVuelo.HasValue)
             values["VUE_FECHA_VUELO"] = dto.FechaVuelo.Value;
