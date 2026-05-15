@@ -1945,8 +1945,11 @@ function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
 
   useEffect(() => {
     if (!resolvedOrigin || !resolvedDestination) { setRouteFlights([]); return undefined; }
-    api.flightsByRoute(resolvedOrigin, resolvedDestination)
-      .then(setRouteFlights)
+    Promise.all([
+      api.flightsByRoute(resolvedOrigin, resolvedDestination),
+      api.flightsByRoute(resolvedDestination, resolvedOrigin)
+    ])
+      .then(([outbound, inbound]) => setRouteFlights([...outbound, ...inbound]))
       .catch(() => setRouteFlights([]));
     return undefined;
   }, [resolvedOrigin, resolvedDestination]);
