@@ -1873,6 +1873,8 @@ function PassengerPicker({ open, groups, onClose, onApply }) {
 }
 
 function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
+  const [routeFlights, setRouteFlights] = useState([]);
+
   const airportOptions = useMemo(() => {
     const values = new Map();
     airports.forEach((airport) => {
@@ -1938,14 +1940,20 @@ function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
     }));
   };
 
+  const resolvedOrigin = resolveAirportQuery(criteria.origin, airportOptions);
+  const resolvedDestination = resolveAirportQuery(criteria.destination, airportOptions);
+
+  useEffect(() => {
+    if (!resolvedOrigin || !resolvedDestination) { setRouteFlights([]); return undefined; }
+    api.flightsByRoute(resolvedOrigin, resolvedDestination)
+      .then(setRouteFlights)
+      .catch(() => setRouteFlights([]));
+    return undefined;
+  }, [resolvedOrigin, resolvedDestination]);
+
   const submit = (event) => {
     event.preventDefault();
-    onExplore({
-      ...criteria,
-      origin: resolveAirportQuery(criteria.origin, airportOptions),
-      destination: resolveAirportQuery(criteria.destination, airportOptions),
-      currency
-    });
+    onExplore({ ...criteria, origin: resolvedOrigin, destination: resolvedDestination, currency });
   };
 
   return (
@@ -2014,9 +2022,9 @@ function TravelSearchSection({ flights, airports = [], currency, onExplore }) {
           tripType={criteria.tripType}
           departureDate={criteria.departureDate}
           returnDate={criteria.returnDate}
-          flights={flights}
-          origin={resolveAirportQuery(criteria.origin, airportOptions)}
-          destination={resolveAirportQuery(criteria.destination, airportOptions)}
+          flights={routeFlights.length > 0 ? routeFlights : flights}
+          origin={resolvedOrigin}
+          destination={resolvedDestination}
           passengerCount={passengerCountFromGroups(criteria.passengerGroups)}
           currency={currency}
           onClose={() => setDatePickerOpen(false)}

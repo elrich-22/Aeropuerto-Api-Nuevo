@@ -29,8 +29,8 @@ public sealed class AeropuertoQueryService(IAeropuertoReadRepository repository)
     public Task<IReadOnlyList<ProgramaVueloDto>> GetFlightProgramsAsync(int limit, CancellationToken cancellationToken) =>
         repository.GetFlightProgramsAsync(limit, cancellationToken);
 
-    public Task<IReadOnlyList<VueloDto>> GetFlightsAsync(DateTime? date, int limit, CancellationToken cancellationToken) =>
-        repository.GetFlightsAsync(date, limit, cancellationToken);
+    public Task<IReadOnlyList<VueloDto>> GetFlightsAsync(DateTime? date, string? origen, string? destino, int limit, CancellationToken cancellationToken) =>
+        repository.GetFlightsAsync(date, origen, destino, limit, cancellationToken);
 
     public Task<VueloDto?> GetFlightByIdAsync(int id, CancellationToken cancellationToken) =>
         repository.GetFlightByIdAsync(id, cancellationToken);

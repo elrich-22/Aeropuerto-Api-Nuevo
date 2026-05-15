@@ -81,6 +81,7 @@ export const api = {
   airports: (limit = 100) => request(`/api/aeropuertos?limit=${limit}`),
   flights: (limit = 8) => request(`/api/vuelos?limit=${limit}`),
   flightsByDate: (date, limit = 500) => request(`/api/vuelos?fecha=${date}&limit=${limit}`),
+  flightsByRoute: (origen, destino, limit = 500) => request(`/api/vuelos?origen=${encodeURIComponent(origen)}&destino=${encodeURIComponent(destino)}&limit=${limit}`),
   topDestinations: (limit = 5) => request(`/api/reportes/destinos-mas-buscados?limit=${limit}`),
   salesByDate: () => request('/api/reportes/ventas-por-fecha'),
   paymentMethodsReport: () => request('/api/reportes/metodos-pago'),

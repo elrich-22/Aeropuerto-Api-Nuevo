@@ -17,9 +17,9 @@ public sealed class VuelosController(IAeropuertoQueryService service, IOracleCru
         ["VUE_ESTADO", "VUE_FECHA_VUELO"]);
 
     [HttpGet]
-    public async Task<IActionResult> GetAll([FromQuery] DateTime? fecha, [FromQuery] int limit = 100, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> GetAll([FromQuery] DateTime? fecha, [FromQuery] string? origen, [FromQuery] string? destino, [FromQuery] int limit = 100, CancellationToken cancellationToken = default)
     {
-        return Ok(await service.GetFlightsAsync(fecha, limit, cancellationToken));
+        return Ok(await service.GetFlightsAsync(fecha, origen, destino, limit, cancellationToken));
     }
 
     [HttpGet("{id:int}")]
