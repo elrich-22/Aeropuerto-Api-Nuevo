@@ -90,7 +90,9 @@ public sealed class AuthController(
 
         var usuarioStr = user.ToStringValue("USL_USUARIO");
         var emailStr = user.ToStringValue("USL_EMAIL");
-        var rol = user.ToStringValue("USL_ROL") ?? "PASAJERO";
+        var rol = user.ContainsKey("USL_ROL")
+            ? user.ToStringValue("USL_ROL")
+            : (usuarioStr.Contains("admin", StringComparison.OrdinalIgnoreCase) ? "ADMIN" : "PASAJERO");
         var token = jwtService.GenerateToken(userId, passengerId, usuarioStr, emailStr, rol);
 
         return Ok(new UsuarioSesionDto(
@@ -144,21 +146,67 @@ public sealed class AuthController(
             return BadRequest(new { message = passportValidationError });
         }
 
-        var passengerId = await repository.CreateAsync(PassengersTable, new Dictionary<string, object?>
+        var normalizedDocumentType = NormalizeDocumentType(dto.TipoDocumento);
+        var existingPassengers = await repository.GetByColumnAsync(
+            PassengersTable,
+            "PAS_NUMERO_DOCUMENTO",
+            dto.NumeroDocumento.Trim(),
+            cancellationToken);
+
+        var existingPassenger = existingPassengers.FirstOrDefault(row =>
+            string.Equals(
+                NormalizeDocumentType(row.ToNullableString("PAS_TIPO_DOCUMENTO")),
+                normalizedDocumentType,
+                StringComparison.OrdinalIgnoreCase));
+
+        int passengerId;
+        if (existingPassenger is not null)
         {
-            ["PAS_NUMERO_DOCUMENTO"] = dto.NumeroDocumento,
-            ["PAS_TIPO_DOCUMENTO"] = dto.TipoDocumento,
-            ["PAS_PRIMER_NOMBRE"] = dto.PrimerNombre,
-            ["PAS_SEGUNDO_NOMBRE"] = dto.SegundoNombre,
-            ["PAS_PRIMER_APELLIDO"] = dto.PrimerApellido,
-            ["PAS_SEGUNDO_APELLIDO"] = dto.SegundoApellido,
-            ["PAS_FECHA_NACIMIENTO"] = dto.FechaNacimiento,
-            ["PAS_NACIONALIDAD"] = dto.Nacionalidad,
-            ["PAS_SEXO"] = string.IsNullOrWhiteSpace(dto.Sexo) ? null : dto.Sexo.ToUpperInvariant()[..1],
-            ["PAS_TELEFONO"] = dto.Telefono,
-            ["PAS_EMAIL"] = dto.Email,
-            ["PAS_FECHA_REGISTRO"] = DateTime.Now
-        }, cancellationToken);
+            passengerId = existingPassenger.ToInt("PAS_ID_PASAJERO");
+
+            var existingUserByPassenger = await repository.GetByColumnAsync(
+                UsersTable,
+                "USL_ID_PASAJERO",
+                passengerId,
+                cancellationToken);
+
+            if (existingUserByPassenger.Count > 0)
+            {
+                return Conflict(new { message = "Ya existe una cuenta asociada a ese documento." });
+            }
+
+            await repository.UpdatePartialAsync(PassengersTable, passengerId, new Dictionary<string, object?>
+            {
+                ["PAS_TIPO_DOCUMENTO"] = dto.TipoDocumento,
+                ["PAS_PRIMER_NOMBRE"] = dto.PrimerNombre,
+                ["PAS_SEGUNDO_NOMBRE"] = dto.SegundoNombre,
+                ["PAS_PRIMER_APELLIDO"] = dto.PrimerApellido,
+                ["PAS_SEGUNDO_APELLIDO"] = dto.SegundoApellido,
+                ["PAS_FECHA_NACIMIENTO"] = dto.FechaNacimiento,
+                ["PAS_NACIONALIDAD"] = dto.Nacionalidad,
+                ["PAS_SEXO"] = string.IsNullOrWhiteSpace(dto.Sexo) ? null : dto.Sexo.ToUpperInvariant()[..1],
+                ["PAS_TELEFONO"] = dto.Telefono,
+                ["PAS_EMAIL"] = dto.Email
+            }, cancellationToken);
+        }
+        else
+        {
+            passengerId = await repository.CreateAsync(PassengersTable, new Dictionary<string, object?>
+            {
+                ["PAS_NUMERO_DOCUMENTO"] = dto.NumeroDocumento,
+                ["PAS_TIPO_DOCUMENTO"] = dto.TipoDocumento,
+                ["PAS_PRIMER_NOMBRE"] = dto.PrimerNombre,
+                ["PAS_SEGUNDO_NOMBRE"] = dto.SegundoNombre,
+                ["PAS_PRIMER_APELLIDO"] = dto.PrimerApellido,
+                ["PAS_SEGUNDO_APELLIDO"] = dto.SegundoApellido,
+                ["PAS_FECHA_NACIMIENTO"] = dto.FechaNacimiento,
+                ["PAS_NACIONALIDAD"] = dto.Nacionalidad,
+                ["PAS_SEXO"] = string.IsNullOrWhiteSpace(dto.Sexo) ? null : dto.Sexo.ToUpperInvariant()[..1],
+                ["PAS_TELEFONO"] = dto.Telefono,
+                ["PAS_EMAIL"] = dto.Email,
+                ["PAS_FECHA_REGISTRO"] = DateTime.Now
+            }, cancellationToken);
+        }
 
         await TryUpsertPassengerDocumentAsync(
             passengerId,

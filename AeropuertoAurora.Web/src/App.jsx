@@ -589,8 +589,6 @@ function NavBar({ user, adminView, isAdmin, activeView, onAdminView, onNavigate,
         <a className={activeView === 'rastreo' ? 'active' : ''} href="#rastreo" onClick={(event) => onNavigate(event, 'rastreo')}>Rastreo</a>
         <a className={activeView === 'mis-viajes' ? 'active' : ''} href="#mis-viajes" onClick={(event) => onNavigate(event, 'mis-viajes')}>Mis viajes</a>
         <a className={activeView === 'checkin' ? 'active' : ''} href="#checkin" onClick={(event) => onNavigate(event, 'checkin')}>Check-in</a>
-        <a className={activeView === 'objetos' ? 'active' : ''} href="#objetos" onClick={(event) => onNavigate(event, 'objetos')}>Objetos</a>
-        <a className={activeView === 'promos' ? 'active' : ''} href="#promos" onClick={(event) => onNavigate(event, 'promos')}>Promos</a>
         <a className={activeView === 'ubicacion' ? 'active' : ''} href="#ubicacion" onClick={(event) => onNavigate(event, 'ubicacion')}>Ubicación</a>
         {user ? (
           <div className="nav-user-dropdown">
@@ -612,17 +610,17 @@ function NavBar({ user, adminView, isAdmin, activeView, onAdminView, onNavigate,
                   <>
                     <button
                       type="button"
-                      className={adminView === 'reporteria' ? 'active' : ''}
-                      onClick={() => { setUserMenuOpen(false); onAdminView('reporteria'); }}
-                    >
-                      Reportería
-                    </button>
-                    <button
-                      type="button"
                       className={adminView === 'arrestos' ? 'active' : ''}
                       onClick={() => { setUserMenuOpen(false); onAdminView('arrestos'); }}
                     >
                       Arrestos
+                    </button>
+                    <button
+                      type="button"
+                      className={adminView === 'objetos' ? 'active' : ''}
+                      onClick={() => { setUserMenuOpen(false); onAdminView('objetos'); }}
+                    >
+                      Objetos
                     </button>
                     <button
                       type="button"
@@ -821,6 +819,35 @@ function AuthModal({ open, onClose, onLogin, onRegister }) {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
 
+  const applyRegisterConflict = (message = '') => {
+    const normalized = normalize(message);
+
+    if (normalized.includes('usuario') && normalized.includes('existe')) {
+      setFieldErrors((current) => ({
+        ...current,
+        usuario: 'Ese nombre de usuario ya está en uso.'
+      }));
+      setError('Ese nombre de usuario ya está en uso.');
+      return;
+    }
+
+    if (normalized.includes('email') && normalized.includes('existe')) {
+      setFieldErrors((current) => ({
+        ...current,
+        email: 'Ese correo ya fue registrado.'
+      }));
+      setError('Ese correo ya fue registrado.');
+      return;
+    }
+
+    if (normalized.includes('ya existe un registro') || normalized.includes('identity de oracle')) {
+      setError('No se pudo crear la cuenta porque ya existe un registro relacionado o la base de datos tiene un conflicto interno de identidad.');
+      return;
+    }
+
+    setError(message || 'No se pudo crear la cuenta.');
+  };
+
   if (!open) return null;
 
   const submitLogin = async (event) => {
@@ -874,7 +901,7 @@ function AuthModal({ open, onClose, onLogin, onRegister }) {
         telefono: ''
       });
     } catch (registerError) {
-      setError(registerError.message);
+      applyRegisterConflict(registerError.message);
     } finally {
       setSubmitting(false);
     }
@@ -2552,7 +2579,7 @@ function MyTripsSection({ user, flights, onRequireLogin }) {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    if (!user?.pasajeroId) return undefined;
+    if (!user?.pasajeroId || !user?.token) return undefined;
 
     let active = true;
     setLoading(true);
@@ -2570,7 +2597,13 @@ function MyTripsSection({ user, flights, onRequireLogin }) {
         passes: results[2].status === 'fulfilled' ? results[2].value : []
       });
       if (results.some((result) => result.status === 'rejected')) {
-        setMessage('No se pudo cargar todo el historial, pero mostramos lo disponible.');
+        const unauthorized = results.some((result) =>
+          result.status === 'rejected' && /unauthorized/i.test(result.reason?.message || ''));
+        setMessage(
+          unauthorized
+            ? 'Tu sesión ya no es válida. Vuelve a iniciar sesión para ver tus viajes.'
+            : 'No se pudo cargar todo el historial, pero mostramos lo disponible.'
+        );
       }
     }).finally(() => {
       if (active) setLoading(false);
@@ -2581,7 +2614,7 @@ function MyTripsSection({ user, flights, onRequireLogin }) {
     };
   }, [user?.pasajeroId]);
 
-  if (!user) {
+  if (!user || !user?.token) {
     return (
       <main className="tab-page">
         <section className="section passenger-tool">
@@ -2649,7 +2682,7 @@ function CheckInSection({ user, flights, onRequireLogin }) {
   const [message, setMessage] = useState('');
 
   const loadData = useCallback(async () => {
-    if (!user?.pasajeroId) return;
+    if (!user?.pasajeroId || !user?.token) return;
 
     setLoading(true);
     setMessage('');
@@ -2662,17 +2695,21 @@ function CheckInSection({ user, flights, onRequireLogin }) {
       setCheckIns(checkInRows);
       setSelectedReservationId((current) => current || reservationRows[0]?.id?.toString() || '');
     } catch (requestError) {
-      setMessage(`No se pudieron cargar tus reservas: ${requestError.message}`);
+      setMessage(
+        /unauthorized/i.test(requestError.message || '')
+          ? 'Tu sesión ya no es válida. Vuelve a iniciar sesión para cargar tus reservas.'
+          : `No se pudieron cargar tus reservas: ${requestError.message}`
+      );
     } finally {
       setLoading(false);
     }
-  }, [user?.pasajeroId]);
+  }, [user?.pasajeroId, user?.token]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  if (!user) {
+  if (!user || !user?.token) {
     return (
       <main className="tab-page">
         <section className="section passenger-tool">
@@ -2868,6 +2905,19 @@ function BaggageTrackerSection() {
 }
 
 const LOST_OBJECT_ESTADOS = ['REPORTADO', 'ENCONTRADO', 'ENTREGADO', 'NO_RECLAMADO'];
+const lostObjectDeliveryDraft = (item = {}) => ({
+  estado: item.estado || 'REPORTADO',
+  fechaEntrega: item.fechaEntrega ? toDateInputValue(item.fechaEntrega) : '',
+  reclamantePrimerNombre: item.reclamantePrimerNombre || '',
+  reclamantePrimerApellido: item.reclamantePrimerApellido || ''
+});
+const searchText = (value) => {
+  if (value === null || value === undefined) return '';
+  if (value instanceof Date) return normalize(value.toISOString());
+  if (Array.isArray(value)) return normalize(value.map(searchText).join(' '));
+  if (typeof value === 'object') return normalize(Object.values(value).map(searchText).join(' '));
+  return normalize(String(value));
+};
 
 function AdminLostObjectPanel({ airports, onCreated }) {
   const [flights, setFlights] = useState([]);
@@ -2880,6 +2930,7 @@ function AdminLostObjectPanel({ airports, onCreated }) {
     reportantePrimerApellido: '',
     contactoReportante: ''
   });
+  const [flightSearch, setFlightSearch] = useState('');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -2888,6 +2939,21 @@ function AdminLostObjectPanel({ airports, onCreated }) {
   }, []);
 
   const update = (field, value) => setForm((f) => ({ ...f, [field]: value }));
+  const filteredFlights = useMemo(() => {
+    const term = normalize(flightSearch);
+    if (!term) return flights;
+
+    return flights.filter((flight) =>
+      [
+        flight.numeroVuelo,
+        flight.origen,
+        flight.destino,
+        flight.aerolinea,
+        flight.estado,
+        formatDate(flight.fechaVuelo)
+      ].some((value) => normalize(value).includes(term))
+    );
+  }, [flightSearch, flights]);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -2916,6 +2982,7 @@ function AdminLostObjectPanel({ airports, onCreated }) {
         reclamanteSegundoApellido: null
       });
       setForm({ vueloId: '', descripcion: '', ubicacionEncontrado: '', estado: 'ENCONTRADO', reportantePrimerNombre: '', reportantePrimerApellido: '', contactoReportante: '' });
+      setFlightSearch('');
       setMessage('Objeto registrado correctamente.');
       onCreated();
     } catch (err) {
@@ -2930,13 +2997,22 @@ function AdminLostObjectPanel({ airports, onCreated }) {
       <h2>Registrar objeto encontrado</h2>
       {message && <div className="connection-alert">{message}</div>}
       <label className="field">
+        <span>Buscar vuelo</span>
+        <input
+          value={flightSearch}
+          onChange={(e) => setFlightSearch(e.target.value)}
+          placeholder="Ej. AV204, Miami, Guatemala, Avianca..."
+        />
+      </label>
+      <label className="field">
         <span>Vuelo relacionado <small>(opcional)</small></span>
         <select value={form.vueloId} onChange={(e) => update('vueloId', e.target.value)}>
           <option value="">— Sin vuelo —</option>
-          {flights.map((f) => (
+          {filteredFlights.map((f) => (
             <option key={f.id} value={f.id}>{f.numeroVuelo} · {f.origen} → {f.destino} · {formatDate(f.fechaVuelo)}</option>
           ))}
         </select>
+        <small>{filteredFlights.length} vuelo(s) encontrados</small>
       </label>
       <label className="field"><span>Descripción del objeto</span><textarea value={form.descripcion} onChange={(e) => update('descripcion', e.target.value)} placeholder="Ej. mochila negra con etiqueta roja, laptop plateada..." required /></label>
       <label className="field"><span>Ubicación donde fue encontrado</span><input value={form.ubicacionEncontrado} onChange={(e) => update('ubicacionEncontrado', e.target.value)} placeholder="Ej. Puerta 12, Banda de equipaje 3" required /></label>
@@ -2956,17 +3032,30 @@ function AdminLostObjectPanel({ airports, onCreated }) {
 
 function LostObjectsSection({ airports, isAdmin }) {
   const [items, setItems] = useState([]);
+  const [flights, setFlights] = useState([]);
   const [form, setForm] = useState({
     descripcion: '',
     reportanteNombre: '',
     contactoReportante: ''
   });
+  const [itemsSearch, setItemsSearch] = useState('');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [updatingItemId, setUpdatingItemId] = useState(null);
+  const [deliveryDrafts, setDeliveryDrafts] = useState({});
+  const [editingItemId, setEditingItemId] = useState(null);
 
   const loadItems = useCallback(async () => {
     try {
-      setItems(await api.lostObjects(50));
+      const nextItems = await api.lostObjects(50);
+      setItems(nextItems);
+      setDeliveryDrafts((current) => {
+        const nextDrafts = {};
+        nextItems.forEach((item) => {
+          nextDrafts[item.id] = current[item.id] || lostObjectDeliveryDraft(item);
+        });
+        return nextDrafts;
+      });
     } catch {
       setItems([]);
     }
@@ -2976,7 +3065,94 @@ function LostObjectsSection({ airports, isAdmin }) {
     loadItems();
   }, [loadItems]);
 
+  useEffect(() => {
+    api.flights(1000).then(setFlights).catch(() => setFlights([]));
+  }, []);
+
   const updateForm = (field, value) => setForm((current) => ({ ...current, [field]: value }));
+  const flightNumberById = useMemo(
+    () => new Map(flights.map((flight) => [Number(flight.id), flight.numeroVuelo || ''])),
+    [flights]
+  );
+  const filteredItems = useMemo(() => {
+    const term = searchText(itemsSearch);
+    if (!term) return items;
+
+    return items.filter((item) =>
+      [
+        item.descripcion,
+        item.ubicacionEncontrado,
+        item.estado,
+        item.vueloId ? `vuelo ${item.vueloId}` : '',
+        item.vueloId ? flightNumberById.get(Number(item.vueloId)) || '' : '',
+        item.fechaReporte,
+        item.fechaEntrega,
+        item.reclamantePrimerNombre,
+        item.reclamantePrimerApellido,
+        item.reportantePrimerNombre,
+        item.reportantePrimerApellido,
+        item.contactoReportante
+      ].some((value) => searchText(value).includes(term))
+    );
+  }, [flightNumberById, items, itemsSearch]);
+
+  const updateDeliveryDraft = (itemId, field, value) => {
+    setDeliveryDrafts((current) => ({
+      ...current,
+      [itemId]: {
+        ...current[itemId],
+        [field]: value
+      }
+    }));
+  };
+
+  const updateLostObjectStatus = async (item) => {
+    const draft = deliveryDrafts[item.id] || lostObjectDeliveryDraft(item);
+    const isTransitioningToDelivered =
+      !String(item.estado || '').trim().toUpperCase().includes('ENTREGADO') &&
+      String(draft.estado || '').trim().toUpperCase() === 'ENTREGADO';
+
+    if (isTransitioningToDelivered) {
+      const confirmed = window.confirm('Si cambias este objeto a ENTREGADO ya no podras modificar nuevamente su estado. ¿Deseas continuar?');
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    const payload = {
+      estado: draft.estado,
+      fechaEntrega: draft.estado === 'ENTREGADO' && draft.fechaEntrega ? `${draft.fechaEntrega}T00:00:00` : null,
+      reclamantePrimerNombre: draft.estado === 'ENTREGADO' ? draft.reclamantePrimerNombre.trim() || null : null,
+      reclamanteSegundoNombre: null,
+      reclamantePrimerApellido: draft.estado === 'ENTREGADO' ? draft.reclamantePrimerApellido.trim() || null : null,
+      reclamanteSegundoApellido: null
+    };
+
+    setUpdatingItemId(item.id);
+    setMessage('');
+
+    try {
+      await api.updateLostObjectStatus(item.id, payload);
+      setItems((current) => current.map((currentItem) => (
+        currentItem.id === item.id
+          ? {
+              ...currentItem,
+              estado: payload.estado,
+              fechaEntrega: payload.fechaEntrega,
+              reclamantePrimerNombre: payload.reclamantePrimerNombre,
+              reclamantePrimerApellido: payload.reclamantePrimerApellido
+            }
+          : currentItem
+      )));
+      setMessage('Datos de entrega actualizados correctamente.');
+      setEditingItemId(null);
+    } catch (requestError) {
+      setMessage(`No se pudo actualizar la entrega: ${requestError.message}`);
+      await loadItems();
+    } finally {
+      setUpdatingItemId(null);
+    }
+  };
 
   const submit = async (event) => {
     event.preventDefault();
@@ -3040,18 +3216,104 @@ function LostObjectsSection({ airports, isAdmin }) {
           )}
           <div className="tool-panel">
             <h2>{isAdmin ? 'Todos los registros' : 'Encontrados recientes'}</h2>
-            {items.length === 0 && <div className="board-empty">Sin registros.</div>}
-            {items.slice(0, isAdmin ? 50 : 8).map((item) => (
-              <div className="operation-row" key={item.id}>
-                <div>
+            <label className="field">
+              <span>Buscar en historial</span>
+              <input
+                value={itemsSearch}
+                onChange={(event) => setItemsSearch(event.target.value)}
+                placeholder="Ej. mochila, ENTREGADO, vuelo 25, LA6101M..."
+              />
+              <small>{filteredItems.length} resultado(s)</small>
+            </label>
+            {filteredItems.length === 0 && <div className="board-empty">Sin registros.</div>}
+            {filteredItems.slice(0, isAdmin ? 50 : 8).map((item) => (
+              <div className="operation-row lost-object-row" key={item.id}>
+                <div className="lost-object-main">
                   <strong>{item.descripcion}</strong>
                   <small>
                     {item.ubicacionEncontrado || 'Ubicación pendiente'}
-                    {item.vueloId ? ` · Vuelo #${item.vueloId}` : ''}
+                    {item.vueloId ? ` · Vuelo ${flightNumberById.get(Number(item.vueloId)) || `#${item.vueloId}`}` : ''}
                     {' · '}{formatDateOnly(item.fechaReporte)}
+                    {item.fechaEntrega ? ` · Entregado: ${formatDateOnly(item.fechaEntrega)}` : ''}
+                    {item.reclamantePrimerNombre ? ` · Recibe: ${[item.reclamantePrimerNombre, item.reclamantePrimerApellido].filter(Boolean).join(' ')}` : ''}
                   </small>
                 </div>
-                <span className={`status ${statusClassName(item.estado)}`}>{item.estado}</span>
+                {isAdmin ? (
+                  <div className="lost-object-admin">
+                    <div className="lost-object-admin-actions">
+                      <span className={`status ${statusClassName(item.estado)}`}>{item.estado}</span>
+                      {String(item.estado || '').trim().toUpperCase() === 'ENTREGADO' ? (
+                        <button className="btn btn-secondary" type="button" disabled>
+                          Entregado final
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-secondary"
+                          type="button"
+                          disabled={updatingItemId === item.id}
+                          onClick={() => setEditingItemId((current) => current === item.id ? null : item.id)}
+                        >
+                          {editingItemId === item.id ? 'Cancelar' : 'Actualizar estado'}
+                        </button>
+                      )}
+                    </div>
+                    {editingItemId === item.id && String(item.estado || '').trim().toUpperCase() !== 'ENTREGADO' && (
+                      <div className="lost-object-edit-panel">
+                        <h3>Actualizar entrega</h3>
+                        <label className="field">
+                          <span>Estado</span>
+                          <select
+                            value={(deliveryDrafts[item.id] || lostObjectDeliveryDraft(item)).estado}
+                            onChange={(event) => updateDeliveryDraft(item.id, 'estado', event.target.value)}
+                            disabled={updatingItemId === item.id}
+                          >
+                            {LOST_OBJECT_ESTADOS.map((estado) => <option key={estado} value={estado}>{estado}</option>)}
+                          </select>
+                        </label>
+                        <p className="lost-object-edit-hint">
+                          Si marcas <strong>ENTREGADO</strong>, completa quién lo recibió y la fecha.
+                        </p>
+                        <label className="field">
+                          <span>Nombre de quien recibe</span>
+                          <input
+                            value={(deliveryDrafts[item.id] || lostObjectDeliveryDraft(item)).reclamantePrimerNombre}
+                            onChange={(event) => updateDeliveryDraft(item.id, 'reclamantePrimerNombre', event.target.value)}
+                            disabled={updatingItemId === item.id || (deliveryDrafts[item.id] || lostObjectDeliveryDraft(item)).estado !== 'ENTREGADO'}
+                            placeholder="Nombre"
+                          />
+                        </label>
+                        <label className="field">
+                          <span>Apellido <small>(opcional)</small></span>
+                          <input
+                            value={(deliveryDrafts[item.id] || lostObjectDeliveryDraft(item)).reclamantePrimerApellido}
+                            onChange={(event) => updateDeliveryDraft(item.id, 'reclamantePrimerApellido', event.target.value)}
+                            disabled={updatingItemId === item.id || (deliveryDrafts[item.id] || lostObjectDeliveryDraft(item)).estado !== 'ENTREGADO'}
+                            placeholder="Apellido"
+                          />
+                        </label>
+                        <label className="field">
+                          <span>Fecha de entrega</span>
+                          <input
+                            type="date"
+                            value={(deliveryDrafts[item.id] || lostObjectDeliveryDraft(item)).fechaEntrega}
+                            onChange={(event) => updateDeliveryDraft(item.id, 'fechaEntrega', event.target.value)}
+                            disabled={updatingItemId === item.id || (deliveryDrafts[item.id] || lostObjectDeliveryDraft(item)).estado !== 'ENTREGADO'}
+                          />
+                        </label>
+                        <button
+                          className="btn btn-primary"
+                          type="button"
+                          disabled={updatingItemId === item.id}
+                          onClick={() => updateLostObjectStatus(item)}
+                        >
+                          {updatingItemId === item.id ? 'Guardando...' : 'Guardar'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <span className={`status ${statusClassName(item.estado)}`}>{item.estado}</span>
+                )}
               </div>
             ))}
           </div>
@@ -3099,6 +3361,7 @@ function ArrestosSection({ airports, flights }) {
   const [arrests, setArrests] = useState([]);
   const [passengerFlights, setPassengerFlights] = useState([]);
   const [searchDoc, setSearchDoc] = useState('');
+  const [arrestsSearch, setArrestsSearch] = useState('');
   const [foundPassenger, setFoundPassenger] = useState(null);
   const [searchMessage, setSearchMessage] = useState('');
   const [form, setForm] = useState({
@@ -3107,11 +3370,12 @@ function ArrestosSection({ airports, flights }) {
     autoridadCargo: '',
     descripcionIncidente: '',
     ubicacionArresto: '',
-    estadoCaso: 'ABIERTO',
     numeroExpediente: ''
   });
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
+  const [updatingArrestId, setUpdatingArrestId] = useState(null);
+  const [arrestStatusDrafts, setArrestStatusDrafts] = useState({});
 
   const loadData = useCallback(async () => {
     try {
@@ -3121,6 +3385,13 @@ function ArrestosSection({ airports, flights }) {
       ]);
       setPassengers(passengerList);
       setArrests(arrestList);
+      setArrestStatusDrafts((current) => {
+        const next = {};
+        arrestList.forEach((arrest) => {
+          next[arrest.id] = current[arrest.id] || arrest.estadoCaso || 'ABIERTO';
+        });
+        return next;
+      });
     } catch {
       setPassengers([]);
       setArrests([]);
@@ -3180,10 +3451,10 @@ function ArrestosSection({ airports, flights }) {
         autoridadCargo: form.autoridadCargo.trim() || null,
         descripcionIncidente: form.descripcionIncidente.trim() || null,
         ubicacionArresto: form.ubicacionArresto.trim() || null,
-        estadoCaso: form.estadoCaso,
+        estadoCaso: 'ABIERTO',
         numeroExpediente: form.numeroExpediente.trim() || null
       });
-      setForm({ vueloId: '', motivo: '', autoridadCargo: '', descripcionIncidente: '', ubicacionArresto: '', estadoCaso: 'ABIERTO', numeroExpediente: '' });
+      setForm({ vueloId: '', motivo: '', autoridadCargo: '', descripcionIncidente: '', ubicacionArresto: '', numeroExpediente: '' });
       setFoundPassenger(null);
       setSearchDoc('');
       setMessage('Arresto registrado correctamente.');
@@ -3197,6 +3468,58 @@ function ArrestosSection({ airports, flights }) {
 
   const passengerLabel = (p) =>
     `${[p.primerNombre, p.segundoNombre, p.primerApellido, p.segundoApellido].filter(Boolean).join(' ')} · ${p.tipoDocumento} ${p.numeroDocumento}`;
+  const filteredArrests = useMemo(() => {
+    const term = searchText(arrestsSearch);
+    if (!term) return arrests;
+
+    return arrests.filter((arrest) => {
+      const passenger = passengers.find((item) => item.id === arrest.pasajeroId);
+      const flight = flights.find((item) => Number(item.id) === Number(arrest.vueloId));
+
+      return [
+        arrest.motivo,
+        arrest.estadoCaso,
+        arrest.numeroExpediente,
+        arrest.autoridadCargo,
+        arrest.ubicacionArresto,
+        arrest.descripcionIncidente,
+        arrest.fechaHoraArresto,
+        arrest.vueloId ? `vuelo ${arrest.vueloId}` : '',
+        flight?.numeroVuelo,
+        passenger ? passengerLabel(passenger) : '',
+        passenger?.numeroDocumento,
+        passenger?.tipoDocumento
+      ].some((value) => searchText(value).includes(term));
+    });
+  }, [arrests, arrestsSearch, flights, passengers]);
+
+  const updateArrestStatus = async (arrest) => {
+    if (String(arrest.estadoCaso || '').trim().toUpperCase() === 'CERRADO') {
+      setMessage('El caso ya se encuentra CERRADO y no puede actualizarse nuevamente.');
+      return;
+    }
+
+    const nextStatus = arrestStatusDrafts[arrest.id] || arrest.estadoCaso || 'ABIERTO';
+    if (String(nextStatus).trim().toUpperCase() === 'CERRADO') {
+      const confirmed = window.confirm('Vas a cambiar el caso a CERRADO. ¿Deseas continuar?');
+      if (!confirmed) return;
+    }
+
+    setUpdatingArrestId(arrest.id);
+    setMessage('');
+    try {
+      await api.updateArrestStatus(arrest.id, nextStatus);
+      setArrests((current) => current.map((item) => (
+        item.id === arrest.id ? { ...item, estadoCaso: nextStatus } : item
+      )));
+      setMessage('Estado del arresto actualizado correctamente.');
+    } catch (requestError) {
+      setMessage(`No se pudo actualizar el estado: ${requestError.message}`);
+      await loadData();
+    } finally {
+      setUpdatingArrestId(null);
+    }
+  };
 
   return (
     <main className="tab-page">
@@ -3248,28 +3571,64 @@ function ArrestosSection({ airports, flights }) {
             <label className="field"><span>Autoridad a cargo <small>(opcional)</small></span><input value={form.autoridadCargo} onChange={(e) => update('autoridadCargo', e.target.value)} placeholder="Ej. PNC, Migración" /></label>
             <label className="field"><span>Descripción del incidente <small>(opcional)</small></span><textarea value={form.descripcionIncidente} onChange={(e) => update('descripcionIncidente', e.target.value)} placeholder="Detalle adicional del incidente" /></label>
             <label className="field"><span>Ubicación del arresto <small>(opcional)</small></span><input value={form.ubicacionArresto} onChange={(e) => update('ubicacionArresto', e.target.value)} placeholder="Ej. Puerta 7, Control de seguridad" /></label>
-            <label className="field">
-              <span>Estado del caso</span>
-              <select value={form.estadoCaso} onChange={(e) => update('estadoCaso', e.target.value)}>
-                {ARREST_ESTADOS.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </label>
+            <div className="connection-alert">Los nuevos arrestos se registran automáticamente con estado <strong>ABIERTO</strong>.</div>
             <label className="field"><span>Número de expediente <small>(opcional)</small></span><input value={form.numeroExpediente} onChange={(e) => update('numeroExpediente', e.target.value)} placeholder="Ej. EXP-2024-001" /></label>
             <button className="btn btn-primary" type="submit" disabled={saving || !foundPassenger}>{saving ? 'Guardando...' : 'Registrar arresto'}</button>
           </form>
           <div className="tool-panel">
             <h2>Arrestos registrados</h2>
-            {arrests.length === 0 && <div className="board-empty">Sin registros.</div>}
-            {arrests.slice(0, 50).map((a) => {
+            <label className="field">
+              <span>Buscar en historial</span>
+              <input
+                value={arrestsSearch}
+                onChange={(event) => setArrestsSearch(event.target.value)}
+                placeholder="Ej. documento, motivo, estado, vuelo, expediente..."
+              />
+              <small>{filteredArrests.length} resultado(s)</small>
+            </label>
+            {filteredArrests.length === 0 && <div className="board-empty">Sin registros.</div>}
+            {filteredArrests.slice(0, 50).map((a) => {
               const pas = passengers.find((p) => p.id === a.pasajeroId);
+              const flight = flights.find((item) => Number(item.id) === Number(a.vueloId));
+              const arrestClosed = String(a.estadoCaso || '').trim().toUpperCase() === 'CERRADO';
               return (
                 <div className="operation-row" key={a.id}>
                   <div>
                     <strong>{pas ? passengerLabel(pas) : `Pasajero #${a.pasajeroId}`}</strong>
-                    <small>{a.motivo}{a.vueloId ? ` · Vuelo #${a.vueloId}` : ''} · {formatDateOnly(a.fechaHoraArresto)}</small>
+                    <small>{a.motivo}{a.vueloId ? ` · Vuelo ${flight?.numeroVuelo || `#${a.vueloId}`}` : ''} · {formatDateOnly(a.fechaHoraArresto)}</small>
                     {a.autoridadCargo && <small>Autoridad: {a.autoridadCargo}</small>}
                   </div>
-                  <span className={`status ${statusClassName(a.estadoCaso)}`}>{a.estadoCaso}</span>
+                  <div className="lost-object-admin">
+                    <div className="lost-object-admin-actions">
+                      <span className={`status ${statusClassName(a.estadoCaso)}`}>{a.estadoCaso}</span>
+                    </div>
+                    <div className="lost-object-edit-panel">
+                      <label className="field">
+                        <span>Estado del caso</span>
+                        <select
+                          value={arrestStatusDrafts[a.id] || a.estadoCaso}
+                          onChange={(event) => setArrestStatusDrafts((current) => ({ ...current, [a.id]: event.target.value }))}
+                          disabled={updatingArrestId === a.id || arrestClosed}
+                        >
+                          {ARREST_ESTADOS.map((status) => <option key={status} value={status}>{status}</option>)}
+                        </select>
+                      </label>
+                      {arrestClosed ? (
+                        <button className="btn" type="button" disabled>
+                          Caso finalizado
+                        </button>
+                      ) : (
+                        <button
+                          className="btn btn-primary"
+                          type="button"
+                          disabled={updatingArrestId === a.id}
+                          onClick={() => updateArrestStatus(a)}
+                        >
+                          {updatingArrestId === a.id ? 'Guardando...' : 'Actualizar estado'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               );
             })}
@@ -4043,39 +4402,51 @@ function App() {
 
   const handleLogin = async (credentials) => {
     const sessionUser = await api.login(credentials);
-    const pendingLocalItems = cartItems.filter((item) => !item.itemCarritoId);
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
+    setUser(sessionUser);
 
-    for (const item of pendingLocalItems) {
-      for (const payload of cartItemPayloads(item)) {
-        await api.addCartItem(sessionUser.pasajeroId, payload);
+    try {
+      const pendingLocalItems = cartItems.filter((item) => !item.itemCarritoId);
+
+      for (const item of pendingLocalItems) {
+        for (const payload of cartItemPayloads(item)) {
+          await api.addCartItem(sessionUser.pasajeroId, payload);
+        }
       }
+
+      const serverItems = await api.cartItems(sessionUser.pasajeroId);
+      const normalizedItems = serverItems.map(serverCartItemToFlight);
+      window.localStorage.setItem(CART_KEY, JSON.stringify(normalizedItems));
+      setCartItems(normalizedItems);
+    } catch {
+      // Si la sincronizacion del carrito falla, no bloqueamos el inicio de sesion.
     }
 
-    const serverItems = await api.cartItems(sessionUser.pasajeroId);
-    const normalizedItems = serverItems.map(serverCartItemToFlight);
-    window.localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
-    window.localStorage.setItem(CART_KEY, JSON.stringify(normalizedItems));
-    setUser(sessionUser);
-    setCartItems(normalizedItems);
     setLoginOpen(false);
   };
 
   const handleRegister = async (payload) => {
     const sessionUser = await api.register(payload);
-    const pendingLocalItems = cartItems.filter((item) => !item.itemCarritoId);
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
+    setUser(sessionUser);
 
-    for (const item of pendingLocalItems) {
-      for (const payload of cartItemPayloads(item)) {
-        await api.addCartItem(sessionUser.pasajeroId, payload);
+    try {
+      const pendingLocalItems = cartItems.filter((item) => !item.itemCarritoId);
+
+      for (const item of pendingLocalItems) {
+        for (const payload of cartItemPayloads(item)) {
+          await api.addCartItem(sessionUser.pasajeroId, payload);
+        }
       }
+
+      const serverItems = await api.cartItems(sessionUser.pasajeroId);
+      const normalizedItems = serverItems.map(serverCartItemToFlight);
+      window.localStorage.setItem(CART_KEY, JSON.stringify(normalizedItems));
+      setCartItems(normalizedItems);
+    } catch {
+      // Si la sincronizacion del carrito falla, no bloqueamos el registro.
     }
 
-    const serverItems = await api.cartItems(sessionUser.pasajeroId);
-    const normalizedItems = serverItems.map(serverCartItemToFlight);
-    window.localStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
-    window.localStorage.setItem(CART_KEY, JSON.stringify(normalizedItems));
-    setUser(sessionUser);
-    setCartItems(normalizedItems);
     setLoginOpen(false);
   };
 
@@ -4474,10 +4845,10 @@ function App() {
       <AuthModal open={loginOpen} onClose={() => setLoginOpen(false)} onLogin={handleLogin} onRegister={handleRegister} />
       {adminView === 'admin' && isAdmin ? (
         <AdminSection tables={tables} selectedTable={selectedTable} onSelectTable={setSelectedTable} />
-      ) : adminView === 'reporteria' && isAdmin ? (
-        <ReporteriaSection />
       ) : adminView === 'arrestos' && isAdmin ? (
         <ArrestosSection airports={dashboard.airports} flights={dashboard.flights} />
+      ) : adminView === 'objetos' && isAdmin ? (
+        <LostObjectsSection airports={dashboard.airports} isAdmin={isAdmin} />
       ) : adminView === 'vuelos' && isAdmin ? (
         <VuelosAdminSection />
       ) : activeView === 'success' && purchaseSuccess ? (
@@ -4511,10 +4882,6 @@ function App() {
         <MyTripsSection user={user} flights={dashboard.flights} onRequireLogin={() => setLoginOpen(true)} />
       ) : activeView === 'checkin' ? (
         <CheckInSection user={user} flights={dashboard.flights} onRequireLogin={() => setLoginOpen(true)} />
-      ) : activeView === 'objetos' ? (
-        <LostObjectsSection airports={dashboard.airports} isAdmin={isAdmin} />
-      ) : activeView === 'promos' ? (
-        <PromotionsSection />
       ) : activeView === 'explorar' && travelCriteria ? (
         <main>
           <TravelResultsView
