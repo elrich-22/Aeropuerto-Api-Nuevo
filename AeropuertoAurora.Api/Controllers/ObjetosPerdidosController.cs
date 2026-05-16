@@ -37,9 +37,51 @@ public sealed class ObjetosPerdidosController(IOracleCrudRepository repository) 
     }
 
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(int id, ActualizarObjetoPerdidoDto dto, CancellationToken cancellationToken)
+    public async Task<IActionResult> Update(int id, ActualizarEstadoObjetoPerdidoDto dto, CancellationToken cancellationToken)
     {
-        return await repository.UpdateAsync(Table, id, ToValues(dto), cancellationToken) ? NoContent() : NotFound();
+        var currentRow = await repository.GetByIdAsync(Table, id, cancellationToken);
+        if (currentRow is null)
+        {
+            return NotFound();
+        }
+
+        var currentStatus = currentRow.ToStringValue("OBJ_ESTADO");
+        if (string.Equals(currentStatus, "ENTREGADO", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "Este objeto ya fue marcado como ENTREGADO y su estado no puede cambiar nuevamente." });
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.Estado))
+        {
+            return BadRequest(new { message = "El estado es obligatorio." });
+        }
+
+        var estado = dto.Estado.Trim();
+        var isDelivered = string.Equals(estado, "ENTREGADO", StringComparison.OrdinalIgnoreCase);
+
+        if (isDelivered && string.IsNullOrWhiteSpace(dto.ReclamantePrimerNombre))
+        {
+            return BadRequest(new { message = "Debes indicar el nombre de la persona a quien se entrego el objeto." });
+        }
+
+        if (isDelivered && !dto.FechaEntrega.HasValue)
+        {
+            return BadRequest(new { message = "Debes indicar la fecha de entrega cuando el estado es ENTREGADO." });
+        }
+
+        var values = new Dictionary<string, object?>
+        {
+            ["OBJ_ESTADO"] = estado,
+            ["OBJ_FECHA_ENTREGA"] = isDelivered ? dto.FechaEntrega : DBNull.Value,
+            ["OBJ_REC_PRIMER_NOMBRE"] = isDelivered ? dto.ReclamantePrimerNombre?.Trim() : DBNull.Value,
+            ["OBJ_REC_SEGUNDO_NOMBRE"] = isDelivered ? NullIfWhiteSpace(dto.ReclamanteSegundoNombre) : DBNull.Value,
+            ["OBJ_REC_PRIMER_APELLIDO"] = isDelivered ? NullIfWhiteSpace(dto.ReclamantePrimerApellido) : DBNull.Value,
+            ["OBJ_REC_SEGUNDO_APELLIDO"] = isDelivered ? NullIfWhiteSpace(dto.ReclamanteSegundoApellido) : DBNull.Value
+        };
+
+        return await repository.UpdatePartialAsync(Table, id, values, cancellationToken)
+            ? NoContent()
+            : NotFound();
     }
 
     [HttpDelete("{id:int}")]
@@ -87,6 +129,6 @@ public sealed class ObjetosPerdidosController(IOracleCrudRepository repository) 
         ["OBJ_REC_SEGUNDO_APELLIDO"] = dto.ReclamanteSegundoApellido
     };
 
-    private static IReadOnlyDictionary<string, object?> ToValues(ActualizarObjetoPerdidoDto dto) => ToValues(new CrearObjetoPerdidoDto(
-        dto.VueloId, dto.AeropuertoId, dto.Descripcion, dto.FechaReporte, dto.UbicacionEncontrado, dto.Estado, dto.ReportantePrimerNombre, dto.ReportanteSegundoNombre, dto.ReportantePrimerApellido, dto.ReportanteSegundoApellido, dto.ContactoReportante, dto.FechaEntrega, dto.ReclamantePrimerNombre, dto.ReclamanteSegundoNombre, dto.ReclamantePrimerApellido, dto.ReclamanteSegundoApellido));
+    private static object? NullIfWhiteSpace(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? DBNull.Value : value.Trim();
 }

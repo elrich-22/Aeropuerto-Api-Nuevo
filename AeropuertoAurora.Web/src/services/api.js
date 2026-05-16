@@ -42,7 +42,7 @@ async function request(path, options = {}) {
           .flatMap(([field, errors]) => (Array.isArray(errors) ? errors.map((error) => `${field}: ${error}`) : []));
         message = validationMessages.length > 0 ? validationMessages.join(' ') : body.title || message;
       } else {
-        message = body.message || body.title || message;
+        message = body.message || body.Mensaje || body.title || message;
       }
     } catch {
       message = response.statusText || message;
@@ -120,11 +120,19 @@ export const api = {
     method: 'POST',
     body: JSON.stringify(payload)
   }),
+  updateLostObjectStatus: (id, payload) => request(`/api/objetos-perdidos/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload)
+  }),
   passengers: (limit = 500) => request(`/api/pasajeros?limit=${limit}`),
   arrests: (limit = 100) => request(`/api/arrestos?limit=${limit}`),
   createArrest: (payload) => request('/api/arrestos', {
     method: 'POST',
     body: JSON.stringify(payload)
+  }),
+  updateArrestStatus: (id, estadoCaso) => request(`/api/arrestos/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({ estadoCaso })
   }),
   updateFlight: (id, payload) => request(`/api/vuelos/${id}`, {
     method: 'PUT',

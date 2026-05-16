@@ -36,3 +36,6 @@ public sealed record ActualizarArrestoDto(
     string? UbicacionArresto,
     string EstadoCaso,
     string? NumeroExpediente);
+
+public sealed record ActualizarEstadoArrestoDto(
+    string EstadoCaso);

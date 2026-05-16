@@ -37,18 +37,8 @@ public sealed record CrearObjetoPerdidoDto(
     string? ReclamantePrimerApellido,
     string? ReclamanteSegundoApellido);
 
-public sealed record ActualizarObjetoPerdidoDto(
-    int? VueloId,
-    int AeropuertoId,
-    string Descripcion,
-    DateTime? FechaReporte,
-    string? UbicacionEncontrado,
+public sealed record ActualizarEstadoObjetoPerdidoDto(
     string Estado,
-    string? ReportantePrimerNombre,
-    string? ReportanteSegundoNombre,
-    string? ReportantePrimerApellido,
-    string? ReportanteSegundoApellido,
-    string? ContactoReportante,
     DateTime? FechaEntrega,
     string? ReclamantePrimerNombre,
     string? ReclamanteSegundoNombre,

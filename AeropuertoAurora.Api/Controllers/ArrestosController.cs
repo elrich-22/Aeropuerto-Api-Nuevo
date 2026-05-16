@@ -39,9 +39,39 @@ public sealed class ArrestosController(IOracleCrudRepository repository) : Contr
     }
 
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> Update(int id, ActualizarArrestoDto dto, CancellationToken cancellationToken)
+    public async Task<IActionResult> Update(int id, ActualizarEstadoArrestoDto dto, CancellationToken cancellationToken)
     {
-        return await repository.UpdateAsync(Table, id, ToValues(dto), cancellationToken) ? NoContent() : NotFound();
+        if (string.IsNullOrWhiteSpace(dto.EstadoCaso))
+        {
+            return BadRequest(new { message = "El estado del caso es obligatorio." });
+        }
+
+        var currentRow = await repository.GetByIdAsync(Table, id, cancellationToken);
+        if (currentRow is null)
+        {
+            return NotFound();
+        }
+
+        var currentStatus = currentRow.ToNullableString("ARR_ESTADO_CASO");
+        if (string.Equals(currentStatus, "CERRADO", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "El caso ya se encuentra CERRADO y no puede actualizarse nuevamente." });
+        }
+
+        var allowedStatuses = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "ABIERTO", "EN_PROCESO", "CERRADO"
+        };
+        var status = dto.EstadoCaso.Trim().ToUpperInvariant();
+        if (!allowedStatuses.Contains(status))
+        {
+            return BadRequest(new { message = "Estado invalido. Valores permitidos: ABIERTO, EN_PROCESO, CERRADO." });
+        }
+
+        return await repository.UpdatePartialAsync(Table, id, new Dictionary<string, object?>
+        {
+            ["ARR_ESTADO_CASO"] = status
+        }, cancellationToken) ? NoContent() : NotFound();
     }
 
     [HttpDelete("{id:int}")]
@@ -73,10 +103,7 @@ public sealed class ArrestosController(IOracleCrudRepository repository) : Contr
         ["ARR_AUTORIDAD_CARGO"] = dto.AutoridadCargo,
         ["ARR_DESCRIPCION_INCIDENTE"] = dto.DescripcionIncidente,
         ["ARR_UBICACION_ARRESTO"] = dto.UbicacionArresto,
-        ["ARR_ESTADO_CASO"] = dto.EstadoCaso,
+        ["ARR_ESTADO_CASO"] = "ABIERTO",
         ["ARR_NUMERO_EXPEDIENTE"] = dto.NumeroExpediente
     };
-
-    private static IReadOnlyDictionary<string, object?> ToValues(ActualizarArrestoDto dto) => ToValues(new CrearArrestoDto(
-        dto.PasajeroId, dto.VueloId, dto.AeropuertoId, dto.FechaHoraArresto, dto.Motivo, dto.AutoridadCargo, dto.DescripcionIncidente, dto.UbicacionArresto, dto.EstadoCaso, dto.NumeroExpediente));
 }
