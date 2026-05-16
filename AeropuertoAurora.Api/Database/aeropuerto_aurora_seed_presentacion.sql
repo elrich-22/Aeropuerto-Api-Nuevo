@@ -1020,6 +1020,9 @@ DECLARE
     v_venid NUMBER;
     v_total NUMBER;
     v_fres  DATE;
+    v_nombre_pasajero   VARCHAR2(200);
+    v_tipo_documento    VARCHAR2(20);
+    v_numero_documento  VARCHAR2(50);
   BEGIN
     BEGIN
       SELECT v.VUE_ID_VUELO INTO v_vid
@@ -1035,6 +1038,19 @@ DECLARE
     END;
     v_fres  := p_fecha - TRUNC(DBMS_RANDOM.VALUE(3,22));
     v_total := p_tarifa;
+    SELECT TRIM(
+             pa.PAS_PRIMER_NOMBRE || ' ' ||
+             NVL(pa.PAS_SEGUNDO_NOMBRE || ' ', '') ||
+             pa.PAS_PRIMER_APELLIDO || ' ' ||
+             NVL(pa.PAS_SEGUNDO_APELLIDO, '')
+           ),
+           pa.PAS_TIPO_DOCUMENTO,
+           pa.PAS_NUMERO_DOCUMENTO
+      INTO v_nombre_pasajero,
+           v_tipo_documento,
+           v_numero_documento
+      FROM AER_PASAJERO pa
+     WHERE pa.PAS_ID_PASAJERO = p_pas;
     INSERT INTO AER_RESERVA
       (RES_ID_VUELO,RES_ID_PASAJERO,RES_CLASE,RES_FECHA_RESERVA,
        RES_ESTADO,RES_EQUIPAJE_FACTURADO,RES_PESO_EQUIPAJE,
@@ -1056,8 +1072,10 @@ DECLARE
        p_metodo,p_canal,'COMPLETADA')
     RETURNING VEN_ID_VENTA INTO v_venid;
     INSERT INTO AER_DETALLEVENTABOLETO
-      (DEV_ID_VENTA,DEV_ID_RESERVA,DEV_PRECIO_BASE,DEV_CARGOS_ADICIONALES)
-    VALUES(v_venid,v_rid,p_tarifa,0);
+      (DEV_ID_VENTA,DEV_ID_RESERVA,DEV_PRECIO_BASE,DEV_CARGOS_ADICIONALES,
+       DEV_NOMBRE_PASAJERO,DEV_TIPO_DOCUMENTO,DEV_NUMERO_DOCUMENTO)
+    VALUES(v_venid,v_rid,p_tarifa,0,
+       v_nombre_pasajero,v_tipo_documento,v_numero_documento);
     INSERT INTO AER_TRANSACCIONPAGO
       (TRA_ID_RESERVA,TRA_ID_METODO_PAGO,TRA_MONTO_TOTAL,TRA_MONEDA,
        TRA_FECHA_TRANSACCION,TRA_ESTADO,TRA_NUMERO_AUTORIZACION,

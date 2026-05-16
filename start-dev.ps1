@@ -1,6 +1,6 @@
 param(
-    [string]$ApiUrl = "http://localhost:5185",
-    [string]$WebHost = "127.0.0.1",
+    [string]$ApiUrl = "http://0.0.0.0:5185",
+    [string]$WebHost = "0.0.0.0",
     [int]$WebPort = 5173
 )
 
@@ -94,7 +94,12 @@ $apiProcess = Start-Process `
 
 Write-Host "Esperando a que el backend responda..." -ForegroundColor Cyan
 
-$healthUrl = "$ApiUrl/api/health"
+$healthUrl = if ($ApiUrl -match "0\.0\.0\.0") {
+    ($ApiUrl -replace "0\.0\.0\.0", "127.0.0.1") + "/api/health"
+}
+else {
+    "$ApiUrl/api/health"
+}
 $apiReady = $false
 
 for ($attempt = 1; $attempt -le 45; $attempt++) {
